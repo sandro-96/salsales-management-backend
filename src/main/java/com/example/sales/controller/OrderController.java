@@ -7,6 +7,7 @@ import com.example.sales.model.User;
 import com.example.sales.service.OrderService;
 import com.example.sales.util.MessageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,4 +42,16 @@ public class OrderController {
         orderService.cancelOrder(user, id);
         return ApiResponse.success(ApiMessage.ORDER_CANCELLED, messageService, locale);
     }
+
+    @PostMapping("/orders/{orderId}/confirm-payment")
+    public ApiResponse<?> confirmPayment(
+            @PathVariable String orderId,
+            @RequestParam String paymentId,
+            @RequestParam String paymentMethod,
+            @AuthenticationPrincipal User user) {
+
+        Order confirmed = orderService.confirmPayment(user, orderId, paymentId, paymentMethod);
+        return ApiResponse.success(ApiMessage.ORDER_PAYMENT_CONFIRMED, confirmed, messageService, Locale.getDefault());
+    }
+
 }

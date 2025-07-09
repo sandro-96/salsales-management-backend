@@ -31,7 +31,7 @@ public class User extends BaseEntity {
     private String password;
 
     private String businessType;
-
+    private String shopName;
     @Builder.Default
     private boolean verified = false; // Đã xác thực tài khoản chưa?
     private String verificationToken;

@@ -1,196 +1,71 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiErrorCode;
-import com.example.sales.dto.CustomerSearchRequest;
+import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
-import com.example.sales.helper.CustomerSearchHelper;
 import com.example.sales.model.Customer;
+import com.example.sales.model.Shop;
 import com.example.sales.model.User;
 import com.example.sales.repository.CustomerRepository;
+import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.*;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerService {
 
-    private final MongoTemplate mongoTemplate;
-
     private final CustomerRepository customerRepository;
+    private final ShopRepository shopRepository;
 
-    private final CustomerSearchHelper searchHelper;
-
-    private final ExcelExportService excelExportService;
-
-    public List<Customer> getAllByUser(User user) {
-        return customerRepository.findByUserId(user.getId());
+    // Lấy danh sách khách hàng thuộc shop của user
+    public List<Customer> getCustomers(User user) {
+        Shop shop = getShopOfUser(user);
+        return customerRepository.findByShopId(shop.getId());
     }
 
+    // Tạo khách hàng mới, gắn shopId
     public Customer createCustomer(User user, Customer customer) {
+        Shop shop = getShopOfUser(user);
+
         customer.setId(null);
-        customer.setUserId(user.getId());
+        customer.setShopId(shop.getId());
+
         return customerRepository.save(customer);
     }
 
+    // Cập nhật khách hàng
     public Customer updateCustomer(User user, String id, Customer updated) {
+        Shop shop = getShopOfUser(user);
+
         Customer existing = customerRepository.findById(id)
-                .filter(c -> c.getUserId().equals(user.getId()))
+                .filter(c -> c.getShopId().equals(shop.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
 
         existing.setName(updated.getName());
         existing.setPhone(updated.getPhone());
         existing.setEmail(updated.getEmail());
         existing.setAddress(updated.getAddress());
-        existing.setNote(updated.getNote());
 
         return customerRepository.save(existing);
     }
 
+    // Xoá khách hàng
     public void deleteCustomer(User user, String id) {
-        Customer existing = customerRepository.findById(id)
-                .filter(c -> c.getUserId().equals(user.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
+        Shop shop = getShopOfUser(user);
 
-        customerRepository.delete(existing);
-    }
-
-    public Page<Customer> searchWithAggregation(User user, CustomerSearchRequest req) {
-        Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
-        List<Customer> content = searchHelper.search(user.getId(), req, pageable);
-        long total = searchHelper.counts(user.getId(), req);
-        return new PageImpl<>(content, pageable, total);
-    }
-
-    public List<Customer> exportAllCustomers(User user, CustomerSearchRequest req) {
-        return searchHelper.exportAll(user.getId(), req);
-    }
-
-    public void softDeleteCustomer(User user, String id) {
         Customer customer = customerRepository.findById(id)
-                .filter(c -> c.getUserId().equals(user.getId()) && !c.isDeleted())
+                .filter(c -> c.getShopId().equals(shop.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
 
-        customer.setDeleted(true);
-        customer.setDeletedAt(LocalDateTime.now());
-
-        customerRepository.save(customer);
+        customerRepository.delete(customer);
     }
 
-    public ResponseEntity<byte[]> exportCustomersExcel(User user) {
-        List<Customer> customers = getCustomersByUser(user); // đã có filter deleted nếu cần
-
-        List<String> headers = List.of("ID", "Tên", "Email", "SĐT", "Ngày tạo");
-
-        Function<Customer, List<String>> mapper = c -> List.of(
-                c.getId(),
-                c.getName(),
-                c.getEmail(),
-                c.getPhone(),
-                c.getCreatedAt() != null ? c.getCreatedAt().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm")) : ""
-        );
-
-        return excelExportService.exportExcel("customers.xlsx", "Customers", headers, customers, mapper);
-    }
-
-    public List<Customer> getCustomersByUser(User user) {
-        return customerRepository.findByUserIdAndDeletedFalse(user.getId());
-    }
-
-    public List<Customer> searchCustomers(User user, CustomerSearchRequest req) {
-        Query query = new Query();
-        List<Criteria> criteriaList = new ArrayList<>();
-
-        criteriaList.add(Criteria.where("userId").is(user.getId()));
-        criteriaList.add(Criteria.where("deleted").ne(true));
-
-        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
-            Criteria keyword = new Criteria().orOperator(
-                    Criteria.where("name").regex(req.getKeyword(), "i"),
-                    Criteria.where("email").regex(req.getKeyword(), "i"),
-                    Criteria.where("phone").regex(req.getKeyword(), "i")
-            );
-            criteriaList.add(keyword);
-        }
-
-        if (req.getFromDate() != null) {
-            criteriaList.add(Criteria.where("createdAt").gte(req.getFromDate().atStartOfDay()));
-        }
-        if (req.getToDate() != null) {
-            criteriaList.add(Criteria.where("createdAt").lt(req.getToDate().plusDays(1).atStartOfDay()));
-        }
-
-        query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
-        return mongoTemplate.find(query, Customer.class);
-    }
-
-    public ResponseEntity<byte[]> exportCustomers(User user, CustomerSearchRequest req) {
-        List<Customer> customers = searchCustomers(user, req);
-
-        List<String> headers = List.of("ID", "Tên", "Email", "SĐT", "Ngày tạo");
-
-        Function<Customer, List<String>> mapper = c -> List.of(
-                c.getId(),
-                c.getName(),
-                c.getEmail(),
-                c.getPhone(),
-                c.getCreatedAt() != null ? c.getCreatedAt().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm")) : ""
-        );
-
-        return excelExportService.exportExcel("customers.xlsx", "Customers", headers, customers, mapper);
-    }
-
-    public Page<Customer> searchCustomersPaged(User user, CustomerSearchRequest req) {
-        Query query = new Query();
-        List<Criteria> criteriaList = new ArrayList<>();
-
-        criteriaList.add(Criteria.where("userId").is(user.getId()));
-        criteriaList.add(Criteria.where("deleted").ne(true));
-
-        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
-            Criteria keyword = new Criteria().orOperator(
-                    Criteria.where("name").regex(req.getKeyword(), "i"),
-                    Criteria.where("email").regex(req.getKeyword(), "i"),
-                    Criteria.where("phone").regex(req.getKeyword(), "i")
-            );
-            criteriaList.add(keyword);
-        }
-
-        if (req.getFromDate() != null) {
-            criteriaList.add(Criteria.where("createdAt").gte(req.getFromDate().atStartOfDay()));
-        }
-        if (req.getToDate() != null) {
-            criteriaList.add(Criteria.where("createdAt").lt(req.getToDate().plusDays(1).atStartOfDay()));
-        }
-
-        query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
-
-        String sortBy = (req.getSortBy() == null || req.getSortBy().isBlank()) ? "createdAt" : req.getSortBy();
-        String sortDir = (req.getSortDir() == null || req.getSortDir().isBlank()) ? "desc" : req.getSortDir();
-
-        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        query.with(Sort.by(direction, sortBy));
-
-        // Phân trang
-        Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
-        query.with(pageable);
-
-        long total = mongoTemplate.count(query, Customer.class);
-        List<Customer> customers = mongoTemplate.find(query, Customer.class);
-
-        return new PageImpl<>(customers, pageable, total);
+    // Helper: lấy shop của user hiện tại
+    private Shop getShopOfUser(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
     }
 }

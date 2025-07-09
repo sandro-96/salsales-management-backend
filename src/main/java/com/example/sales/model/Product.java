@@ -31,5 +31,5 @@ public class Product extends BaseEntity {
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
     private double price;
-
+    private String shopId;
 }

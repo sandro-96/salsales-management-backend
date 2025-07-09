@@ -19,4 +19,5 @@ public class Customer extends BaseEntity {
     private String email;
     private String address;
     private String note;
+    private String shopId;
 }
