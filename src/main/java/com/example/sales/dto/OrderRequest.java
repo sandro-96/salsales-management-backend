@@ -7,9 +7,7 @@ import java.util.List;
 
 @Data
 public class OrderRequest {
-    private String shopId;
-    private String userId;
     private List<OrderItem> items;
-
-    private String tableId; // 🎯 Mới thêm
+    private String tableId;      // ✅ có thể null
+    private String note;
 }

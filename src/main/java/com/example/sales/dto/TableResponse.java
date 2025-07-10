@@ -12,5 +12,9 @@ public class TableResponse {
     private TableStatus status;
     private String shopId;
     private String shopName;
+    private Integer capacity;
+    private String note;
+    private String currentOrderId;
 }
+
 

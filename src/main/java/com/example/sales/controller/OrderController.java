@@ -1,13 +1,15 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiMessage;
+import com.example.sales.constant.OrderStatus;
 import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.OrderRequest;
 import com.example.sales.model.Order;
 import com.example.sales.model.User;
 import com.example.sales.service.OrderService;
 import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,9 +31,9 @@ public class OrderController {
 
     @PostMapping
     public ApiResponse<Order> createOrder(@AuthenticationPrincipal User user,
-                                          @RequestBody Order order,
+                                          @RequestBody @Valid OrderRequest request,
                                           Locale locale) {
-        Order created = orderService.createOrder(user, order);
+        Order created = orderService.createOrder(user, request);
         return ApiResponse.success(ApiMessage.ORDER_CREATED, created, messageService, locale);
     }
 
@@ -43,15 +45,30 @@ public class OrderController {
         return ApiResponse.success(ApiMessage.ORDER_CANCELLED, messageService, locale);
     }
 
-    @PostMapping("/orders/{orderId}/confirm-payment")
-    public ApiResponse<?> confirmPayment(
-            @PathVariable String orderId,
-            @RequestParam String paymentId,
-            @RequestParam String paymentMethod,
-            @AuthenticationPrincipal User user) {
-
+    @PostMapping("/{orderId}/confirm-payment")
+    public ApiResponse<?> confirmPayment(@PathVariable String orderId,
+                                         @RequestParam String paymentId,
+                                         @RequestParam String paymentMethod,
+                                         @AuthenticationPrincipal User user) {
         Order confirmed = orderService.confirmPayment(user, orderId, paymentId, paymentMethod);
         return ApiResponse.success(ApiMessage.ORDER_PAYMENT_CONFIRMED, confirmed, messageService, Locale.getDefault());
     }
 
+    @PutMapping("/{id}/status")
+    public ApiResponse<Order> updateStatus(@AuthenticationPrincipal User user,
+                                           @PathVariable String id,
+                                           @RequestParam OrderStatus status,
+                                           Locale locale) {
+        Order updated = orderService.updateStatus(user, id, status);
+        return ApiResponse.success(ApiMessage.ORDER_STATUS_UPDATED, updated, messageService, locale);
+    }
+
+    @GetMapping("/filter")
+    public ApiResponse<List<Order>> getByStatus(@AuthenticationPrincipal User user,
+                                                @RequestParam OrderStatus status,
+                                                Locale locale) {
+        return ApiResponse.success(ApiMessage.ORDER_LIST, orderService.getOrdersByStatus(user, status), messageService, locale);
+    }
+
 }
+

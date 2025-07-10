@@ -11,7 +11,9 @@ public class TableRequest {
     @NotBlank
     private String name;
 
-    private TableStatus status;
-
+    private TableStatus status = TableStatus.AVAILABLE;
     private String shopId;
+    private Integer capacity;
+    private String note;
 }
+

@@ -1,7 +1,8 @@
 package com.example.sales.constant;
 
 public enum TableStatus {
-    AVAILABLE,
-    OCCUPIED,
-    CLOSED
+    AVAILABLE,  // Trống
+    OCCUPIED,   // Đang có khách
+    CLOSED      // Không hoạt động / Khoá
 }
+

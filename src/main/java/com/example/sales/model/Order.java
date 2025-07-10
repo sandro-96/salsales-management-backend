@@ -15,21 +15,22 @@ public class Order extends BaseEntity {
     @Id
     private String id;
 
-    private String userId;               // Người đặt đơn
-    private List<OrderItem> items;      // Danh sách sản phẩm trong đơn
-    private double totalPrice;          // Tổng tiền
-    private double totalAmount;         // Tổng số lượng
+    private String shopId;             // ✔️ Ràng buộc chặt với 1 shop
+    private String tableId;            // ✔️ Gắn bàn (có thể null)
 
-    private String shopId;              // ID cửa hàng
-    private String tableId;             // Bàn phục vụ (nếu có)
+    private String userId;             // Ai tạo đơn
+
+    private List<OrderItem> items;     // Danh sách sản phẩm
+    private double totalPrice;
+    private double totalAmount;
 
     private OrderStatus status = OrderStatus.PENDING;
 
-    // ---------- Các trường thanh toán ----------
-    private String paymentId;           // Mã giao dịch thanh toán (VNPay, Momo, v.v.)
-    private LocalDateTime paymentTime;  // Thời gian thanh toán
-    private boolean isPaid = false;     // Trạng thái đã thanh toán hay chưa
-    private String paymentMethod;       // Phương thức thanh toán (e.g., "Momo", "VNPay", "Cash")
+    // Thông tin thanh toán
+    private String paymentId;
+    private String paymentMethod;      // Momo, VNPay, Cash
+    private LocalDateTime paymentTime;
+    private boolean isPaid;
 
-    private String note;                // Ghi chú đơn hàng (nếu có)
+    private String note;
 }

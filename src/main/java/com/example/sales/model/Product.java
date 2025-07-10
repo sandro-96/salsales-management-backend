@@ -1,24 +1,21 @@
+// File: Product.java
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
-import lombok.*;
-import org.springframework.data.annotation.*;
-import org.springframework.data.mongodb.core.mapping.Document;
 import jakarta.validation.constraints.*;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
-import java.util.Date;
-
-@Document(collection = "products")
+@Document("products")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Product extends BaseEntity {
 
     @Id
     private String id;
-
-    private String userId;
 
     @NotBlank(message = "Tên sản phẩm không được để trống")
     private String name;
@@ -31,5 +28,15 @@ public class Product extends BaseEntity {
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
     private double price;
-    private String shopId;
+
+    private String unit; // ví dụ: "kg", "cái", "hộp" (tuỳ loại cửa hàng)
+
+    private String imageUrl;
+
+    private String description;
+
+    private String shopId; // Chỉ gắn shopId, không cần userId
+
+    @Builder.Default
+    private boolean active = true; // Có đang bán hay tạm ngưng
 }
