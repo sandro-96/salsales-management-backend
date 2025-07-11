@@ -1,4 +1,4 @@
-// File: Product.java
+// File: src/main/java/com/example/sales/model/Product.java
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;

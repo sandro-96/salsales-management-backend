@@ -1,4 +1,5 @@
-// File: ProductRequest.java
+// File: src/main/java/com/example/sales/dto/product/ProductRequest.java
+
 package com.example.sales.dto.product;
 
 import jakarta.validation.constraints.*;

@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/SalesApplication.java
 package com.example.sales;
 
 import org.springframework.boot.SpringApplication;

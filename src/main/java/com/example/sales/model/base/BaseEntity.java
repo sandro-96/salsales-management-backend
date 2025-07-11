@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/model/base/BaseEntity.java
 package com.example.sales.model.base;
 
 import lombok.Getter;

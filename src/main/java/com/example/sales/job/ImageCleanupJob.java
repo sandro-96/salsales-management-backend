@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/job/ImageCleanupJob.java
 package com.example.sales.job;
 
 import lombok.extern.slf4j.Slf4j;

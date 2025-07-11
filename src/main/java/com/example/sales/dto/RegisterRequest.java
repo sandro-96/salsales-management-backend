@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/dto/RegisterRequest.java
 package com.example.sales.dto;
 
 import jakarta.validation.constraints.Email;

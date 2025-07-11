@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/dto/SalesReportDto.java
 package com.example.sales.dto;
 
 import lombok.AllArgsConstructor;

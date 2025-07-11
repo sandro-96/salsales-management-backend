@@ -1,3 +1,5 @@
+// File: ShopType.java
+
 package com.example.sales.constant;
 
 public enum ShopType {

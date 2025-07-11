@@ -1,3 +1,5 @@
+// File: WebConfig.java
+
 package com.example.sales.config;
 
 import org.springframework.context.MessageSource;

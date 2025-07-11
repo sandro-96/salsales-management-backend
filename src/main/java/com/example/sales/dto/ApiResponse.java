@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/dto/ApiResponse.java
 package com.example.sales.dto;
 
 import com.example.sales.constant.ApiErrorCode;

@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/model/Promotion.java
 package com.example.sales.model;
 
 import com.example.sales.constant.DiscountType;

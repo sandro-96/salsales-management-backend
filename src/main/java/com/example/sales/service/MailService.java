@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/service/MailService.java
 package com.example.sales.service;
 
 import jakarta.mail.MessagingException;

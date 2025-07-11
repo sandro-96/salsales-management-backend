@@ -1,3 +1,5 @@
+// File: DiscountType.java
+
 package com.example.sales.constant;
 
 public enum DiscountType {

@@ -1,3 +1,5 @@
+// File: SecurityConfig.java
+
 package com.example.sales.config;
 
 import com.example.sales.security.JwtAuthenticationFilter;

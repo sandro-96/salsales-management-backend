@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/service/ShopService.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiErrorCode;

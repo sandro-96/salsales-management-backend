@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/dto/UpdateProfileRequest.java
 package com.example.sales.dto;
 
 import lombok.Data;

@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/dto/LoginRequest.java
 package com.example.sales.dto;
 
 import jakarta.validation.constraints.Email;

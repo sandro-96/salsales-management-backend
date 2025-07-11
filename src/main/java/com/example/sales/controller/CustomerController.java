@@ -1,3 +1,5 @@
+// File: src/main/java/com/example/sales/controller/CustomerController.java
+
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiMessage;

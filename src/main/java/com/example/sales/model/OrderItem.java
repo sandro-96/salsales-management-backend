@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/model/OrderItem.java
 package com.example.sales.model;
 
 import lombok.Data;

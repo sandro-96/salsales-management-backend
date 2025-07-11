@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/dto/report/ReportResponse.java
 package com.example.sales.dto.report;
 
 import lombok.Builder;

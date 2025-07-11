@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/repository/RefreshTokenRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.RefreshToken;

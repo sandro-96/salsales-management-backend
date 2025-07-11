@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/model/Shop.java
 package com.example.sales.model;
 
 import com.example.sales.constant.ShopType;

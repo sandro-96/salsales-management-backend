@@ -1,9 +1,11 @@
+// File: src/main/java/com/example/sales/service/AuthService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.UserRole;
+import com.example.sales.constant.ApiErrorCode;
 import com.example.sales.dto.JwtResponse;
 import com.example.sales.dto.LoginRequest;
 import com.example.sales.dto.RegisterRequest;
+import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
@@ -17,10 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.UUID;
-
-import com.example.sales.constant.ApiErrorCode;
-import com.example.sales.exception.BusinessException;
-import com.example.sales.exception.ResourceNotFoundException;
 
 @Service
 @RequiredArgsConstructor

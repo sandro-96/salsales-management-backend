@@ -1,4 +1,4 @@
-// File: ProductResponse.java
+// File: src/main/java/com/example/sales/dto/product/ProductResponse.java
 package com.example.sales.dto.product;
 
 import lombok.Builder;

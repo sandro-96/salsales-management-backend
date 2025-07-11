@@ -1,3 +1,5 @@
+// File: src/main/java/com/example/sales/controller/ProductController.java
+
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiMessage;
@@ -25,7 +27,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 
-// File: ProductController.java
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor

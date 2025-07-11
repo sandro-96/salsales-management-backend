@@ -1,4 +1,4 @@
-// File: ProductSearchRequest.java
+// File: src/main/java/com/example/sales/dto/product/ProductSearchRequest.java
 package com.example.sales.dto.product;
 
 import lombok.Data;

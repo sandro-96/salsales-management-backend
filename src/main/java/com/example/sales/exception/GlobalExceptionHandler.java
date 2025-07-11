@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/exception/GlobalExceptionHandler.java
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiErrorCode;

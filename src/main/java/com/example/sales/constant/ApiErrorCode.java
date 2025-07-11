@@ -1,3 +1,5 @@
+// File: ApiErrorCode.java
+
 package com.example.sales.constant;
 
 import lombok.Getter;

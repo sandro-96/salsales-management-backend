@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/model/Order.java
 package com.example.sales.model;
 
 import com.example.sales.constant.OrderStatus;

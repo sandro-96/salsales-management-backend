@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/helper/CustomerSearchHelper.java
 package com.example.sales.helper;
 
 import com.example.sales.dto.customer.CustomerSearchRequest;

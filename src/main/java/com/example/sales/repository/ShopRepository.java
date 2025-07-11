@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/repository/ShopRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.Shop;

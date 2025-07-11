@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/sales/dto/promotion/PromotionRequest.java
 package com.example.sales.dto.promotion;
 
 import com.example.sales.constant.DiscountType;

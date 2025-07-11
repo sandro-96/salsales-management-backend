@@ -1,4 +1,4 @@
-// File: Table.java
+// File: src/main/java/com/example/sales/model/Table.java
 package com.example.sales.model;
 
 import com.example.sales.constant.TableStatus;
