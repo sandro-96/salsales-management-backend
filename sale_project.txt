@@ -1,0 +1,4636 @@
+[START]
+// File: AuditorAwareImpl.java
+
+package com.example.sales.config;
+
+import com.example.sales.model.User;
+import org.springframework.data.domain.AuditorAware;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+
+import java.util.Optional;
+
+@Component("auditorAware")
+public class AuditorAwareImpl implements AuditorAware<String> {
+
+    @Override
+    public Optional<String> getCurrentAuditor() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return Optional.empty();
+
+        Object principal = auth.getPrincipal();
+        if (principal instanceof User user) {
+            return Optional.of(user.getId());
+        }
+
+        return Optional.empty();
+    }
+}
+// File: SecurityConfig.java
+
+package com.example.sales.config;
+
+import com.example.sales.security.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+
+@Configuration
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN") // hiểu là ROLE_ADMIN
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(); // Mã hóa password khi lưu
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+}
+// File: WebConfig.java
+
+package com.example.sales.config;
+
+import org.springframework.context.MessageSource;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.support.ReloadableResourceBundleMessageSource;
+import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
+
+import java.util.Locale;
+
+@Configuration
+public class WebConfig {
+
+    @Bean
+    public AcceptHeaderLocaleResolver localeResolver() {
+        AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();
+        resolver.setDefaultLocale(Locale.ENGLISH);
+        return resolver;
+    }
+
+    @Bean
+    public MessageSource messageSource() {
+        ReloadableResourceBundleMessageSource ms = new ReloadableResourceBundleMessageSource();
+        ms.setBasename("classpath:messages");
+        ms.setDefaultEncoding("UTF-8");
+        return ms;
+    }
+}
+// File: ApiErrorCode.java
+
+package com.example.sales.constant;
+
+import lombok.Getter;
+
+@Getter
+public enum ApiErrorCode {
+    UNAUTHORIZED("ERR_401", "UNAUTHORIZED"),
+    FORBIDDEN("ERR_403", "FORBIDDEN"),
+    NOT_FOUND("ERR_404", "NOT_FOUND"),
+    INTERNAL_ERROR("ERR_500", "INTERNAL_ERROR"),
+    ACCESS_DENIED("ERR_403_ACCESS_DENIED", "ACCESS_DENIED"),
+    VALIDATION_ERROR("ERR_400_VALIDATION", "VALIDATION_ERROR"),
+    EMAIL_EXISTS("ERR_400_EMAIL_EXISTS", "EMAIL_EXISTS"),
+    USER_NOT_FOUND("ERR_404_USER_NOT_FOUND", "USER_NOT_FOUND"),
+    INVALID_TOKEN("ERR_400_INVALID_TOKEN", "INVALID_TOKEN"),
+    ALREADY_VERIFIED("ERR_400_ALREADY_VERIFIED", "ALREADY_VERIFIED"),
+    TOKEN_EXPIRED("ERR_400_TOKEN_EXPIRED", "TOKEN_EXPIRED"),
+    EMAIL_NOT_VERIFIED("ERR_400_EMAIL_NOT_VERIFIED", "EMAIL_NOT_VERIFIED"),
+    REFRESH_TOKEN_INVALID("ERR_400_REFRESH_TOKEN_INVALID", "REFRESH_TOKEN_INVALID"),
+    REFRESH_TOKEN_EXPIRED("ERR_400_REFRESH_TOKEN_EXPIRED", "REFRESH_TOKEN_EXPIRED"),
+    INCORRECT_PASSWORD("INCORRECT_PASSWORD", "INCORRECT_PASSWORD"),
+    CUSTOMER_NOT_FOUND("CUSTOMER_NOT_FOUND", "CUSTOMER_NOT_FOUND"),
+    CANNOT_DELETE_SELF("CANNOT_DELETE_SELF", "CANNOT_DELETE_SELF"),
+    SHOP_ALREADY_EXISTS("SHOP_ALREADY_EXISTS", "SHOP_ALREADY_EXISTS"),
+    SHOP_NOT_FOUND("SHOP_NOT_FOUND", "SHOP_NOT_FOUND"),
+    PRODUCT_NOT_FOUND("PRODUCT_NOT_FOUND", "PRODUCT_NOT_FOUND"),
+    TABLE_NOT_FOUND("TABLE_NOT_FOUND", "TABLE_NOT_FOUND"),
+    ORDER_NOT_FOUND("ORDER_NOT_FOUND", "ORDER_NOT_FOUND"),
+    ORDER_ALREADY_PAID("ORDER_ALREADY_PAID", "ORDER_ALREADY_PAID"),
+    INVALID_STATUS_TRANSITION("INVALID_STATUS_TRANSITION", "INVALID_STATUS_TRANSITION"),
+    PRODUCT_OUT_OF_STOCK("PRODUCT_OUT_OF_STOCK", "PRODUCT_OUT_OF_STOCK"),
+    PROMOTION_NOT_FOUND("PROMOTION_NOT_FOUND", "PROMOTION_NOT_FOUND"),
+    DUPLICATE_DATA("DUPLICATE_DATA", "DUPLICATE_DATA"),
+    BRANCH_NOT_FOUND("BRANCH_NOT_FOUND", "BRANCH_NOT_FOUND");
+
+
+    private final String code;
+    private final String message;
+
+    ApiErrorCode(String code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+}
+// File: ApiMessage.java
+
+package com.example.sales.constant;
+
+public enum ApiMessage {
+    SUCCESS("SUCCESS", "SUCCESS"),
+    REGISTER_SUCCESS("REGISTER_SUCCESS", "REGISTER_SUCCESS"),
+    LOGIN_SUCCESS("LOGIN_SUCCESS", "LOGIN_SUCCESS"),
+    PASSWORD_RESET_SENT("PASSWORD_RESET_SENT", "PASSWORD_RESET_SENT"),
+    VERIFICATION_EMAIL_SENT("VERIFICATION_EMAIL_SENT", "VERIFICATION_EMAIL_SENT"),
+    PRODUCT_CREATED("PRODUCT_CREATED", "PRODUCT_CREATED"),
+    PRODUCT_UPDATED("PRODUCT_UPDATED", "PRODUCT_UPDATED"),
+    PRODUCT_DELETED("PRODUCT_DELETED", "PRODUCT_DELETED"),
+    PRODUCT_LIST("PRODUCT_LIST", "PRODUCT_LIST"),
+    PRODUCT_IMPORT_SUCCESS("PRODUCT_IMPORT_SUCCESS", "PRODUCT_IMPORT_SUCCESS"),
+    PRODUCT_UPLOAD_IMAGE_SUCCESS("PRODUCT_UPLOAD_IMAGE_SUCCESS", "PRODUCT_UPLOAD_IMAGE_SUCCESS"),
+    PRODUCT_NOT_FOUND("PRODUCT_NOT_FOUND", "PRODUCT_NOT_FOUND"),
+    USER_NOT_FOUND("USER_NOT_FOUND", "USER_NOT_FOUND"),
+    ACCESS_DENIED("ACCESS_DENIED", "ACCESS_DENIED"),
+    ORDER_CREATED("ORDER_CREATED", "ORDER_CREATED"),
+    ORDER_UPDATED("ORDER_UPDATED", "ORDER_UPDATED"),
+    ORDER_DELETED("ORDER_DELETED", "ORDER_DELETED"),
+    ORDER_LIST("ORDER_LIST", "ORDER_LIST"),
+    ORDER_CANCELLED("ORDER_CANCELLED", "ORDER_CANCELLED"),
+    ORDER_STATUS_UPDATED("ORDER_STATUS_UPDATED", "ORDER_STATUS_UPDATED"),
+    VERIFY_SUCCESS("VERIFY_SUCCESS", "VERIFY_SUCCESS"),
+    EMAIL_VERIFICATION_SENT("EMAIL_VERIFICATION_SENT", "EMAIL_VERIFICATION_SENT"),
+    REFRESH_SUCCESS("REFRESH_SUCCESS", "REFRESH_SUCCESS"),
+    LOGOUT_SUCCESS("LOGOUT_SUCCESS", "LOGOUT_SUCCESS"),
+    USER_INFO("USER_INFO", "USER_INFO"),
+    USER_UPDATED("USER_UPDATED", "USER_UPDATED"),
+    PASSWORD_CHANGED("PASSWORD_CHANGED", "PASSWORD_CHANGED"),
+    USER_LIST("USER_LIST", "USER_LIST"),
+    USER_DETAIL("USER_DETAIL", "USER_DETAIL"),
+    CUSTOMER_LIST("CUSTOMER_LIST", "CUSTOMER_LIST"),
+    CUSTOMER_CREATED("CUSTOMER_CREATED", "CUSTOMER_CREATED"),
+    CUSTOMER_UPDATED("CUSTOMER_UPDATED", "CUSTOMER_UPDATED"),
+    CUSTOMER_DELETED("CUSTOMER_DELETED", "CUSTOMER_DELETED"),
+    USER_DELETED("USER_DELETED", "USER_DELETED"),
+    SALES_REPORT_CREATED("SALES_REPORT_CREATED", "SALES_REPORT_CREATED"),
+    SALES_REPORT("SALES_REPORT", "SALES_REPORT"),
+    SHOP_NOT_FOUND("SHOP_NOT_FOUND", "SHOP_NOT_FOUND"),
+    TABLE_CREATED("TABLE_CREATED", "TABLE_CREATED"),
+    TABLE_LIST("TABLE_LIST", "TABLE_LIST"),
+    TABLE_STATUS_UPDATED("TABLE_STATUS_UPDATED", "TABLE_STATUS_UPDATED"),
+    ORDER_PAYMENT_CONFIRMED("ORDER_PAYMENT_CONFIRMED", "ORDER_PAYMENT_CONFIRMED"),
+    TABLE_NOT_FOUND("TABLE_NOT_FOUND", "TABLE_NOT_FOUND"),
+    AUDIT_LOG_LIST("AUDIT_LOG_LIST", "AUDIT_LOG_LIST");
+
+    private final String code;
+    private final String message;
+
+    ApiMessage(String code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    public String getCode() { return code; }
+
+    public String getMessage() { return message; }
+}
+// File: DiscountType.java
+
+package com.example.sales.constant;
+
+public enum DiscountType {
+    PERCENT, // Giảm theo %
+    AMOUNT   // Giảm cố định số tiền
+}
+// File: OrderStatus.java
+
+package com.example.sales.constant;
+
+public enum OrderStatus {
+    PENDING,       // Mới tạo
+    CONFIRMED,     // Đã xác nhận
+    SHIPPING,      // Đang vận chuyển
+    COMPLETED,     // Hoàn tất
+    CANCELLED      // Đã huỷ
+}
+// File: ShopRole.java
+
+package com.example.sales.constant;
+
+public enum ShopRole {
+    OWNER,
+    STAFF,
+    CASHIER
+}
+// File: ShopType.java
+
+package com.example.sales.constant;
+
+public enum ShopType {
+    RESTAURANT,     // Nhà hàng ăn uống
+    CAFE,           // Quán cà phê
+    BAR,            // Quán nhậu / bar
+    GROCERY,        // Tạp hóa
+    CONVENIENCE,    // Cửa hàng tiện lợi
+    PHARMACY,       // Nhà thuốc
+    RETAIL,         // Cửa hàng bán lẻ (quần áo, điện máy...)
+    OTHER           // Khác
+}
+
+// File: TableStatus.java
+
+package com.example.sales.constant;
+
+public enum TableStatus {
+    AVAILABLE,  // Trống
+    OCCUPIED,   // Đang có khách
+    CLOSED      // Không hoạt động / Khoá
+}
+
+// File: UserRole.java
+
+package com.example.sales.constant;
+
+public enum UserRole {
+    ROLE_USER,
+    ROLE_ADMIN
+}
+// File: src/main/java/com/example/sales/controller/admin/AdminUserController.java
+
+package com.example.sales.controller.admin;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.User;
+import com.example.sales.service.AdminUserService;
+import com.example.sales.util.MessageService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/admin/users")
+@RequiredArgsConstructor
+@Validated
+public class AdminUserController {
+
+    private final AdminUserService adminUserService;
+    private final MessageService messageService;
+
+    @GetMapping
+    public ApiResponse<List<User>> getAll(Locale locale) {
+        return ApiResponse.success(ApiMessage.USER_LIST, adminUserService.getAllUsers(), messageService, locale);
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<User> getById(@PathVariable String id, Locale locale) {
+        return ApiResponse.success(ApiMessage.USER_DETAIL, adminUserService.getUserById(id), messageService, locale);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<User> updateUser(@PathVariable String id,
+                                        @RequestBody User userUpdate,
+                                        Locale locale) {
+        return ApiResponse.success(ApiMessage.USER_UPDATED, adminUserService.updateUser(id, userUpdate), messageService, locale);
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<?> deleteUser(@PathVariable String id,
+                                     @AuthenticationPrincipal User currentUser,
+                                     Locale locale) {
+        if (id.equals(currentUser.getId())) {
+            throw new BusinessException(ApiErrorCode.CANNOT_DELETE_SELF);
+        }
+
+        adminUserService.deleteUser(id);
+        return ApiResponse.success(ApiMessage.USER_DELETED, messageService, locale);
+    }
+
+}
+
+// File: src/main/java/com/example/sales/controller/AuditLogController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.model.AuditLog;
+import com.example.sales.repository.AuditLogRepository;
+import com.example.sales.util.MessageService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/audit")
+@RequiredArgsConstructor
+@Validated
+public class AuditLogController {
+
+    private final AuditLogRepository auditLogRepository;
+    private final MessageService messageService;
+
+    @GetMapping("/{targetId}")
+    public ApiResponse<List<AuditLog>> getLogs(@PathVariable String targetId, Locale locale) {
+        List<AuditLog> logs = auditLogRepository.findByTargetIdOrderByCreatedAtDesc(targetId);
+        return ApiResponse.success(ApiMessage.AUDIT_LOG_LIST, logs, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/AuthController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.*;
+import com.example.sales.service.AuthService;
+import com.example.sales.service.TokenService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@Validated
+public class AuthController {
+
+    private final AuthService authService;
+    private final MessageService messageService;
+    private final TokenService tokenService;
+
+    @PostMapping("/register")
+    public ApiResponse<?> register(@RequestBody @Valid RegisterRequest request, Locale locale) {
+        authService.register(request);
+        return ApiResponse.success(ApiMessage.EMAIL_VERIFICATION_SENT, messageService, locale);
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<JwtResponse> login(@RequestBody @Valid LoginRequest request, Locale locale) {
+        JwtResponse token = authService.login(request);
+        return ApiResponse.success(ApiMessage.LOGIN_SUCCESS, token, messageService, locale);
+    }
+
+    @PostMapping("/forgot-password")
+    public ApiResponse<?> forgotPassword(@RequestParam String email, Locale locale) {
+        authService.forgotPassword(email);
+        return ApiResponse.success(ApiMessage.PASSWORD_RESET_SENT, messageService, locale);
+    }
+
+    @PostMapping("/resend-verification")
+    public ApiResponse<?> resendVerification(@RequestParam String email, Locale locale) {
+        authService.resendVerification(email);
+        return ApiResponse.success(ApiMessage.VERIFICATION_EMAIL_SENT, messageService, locale);
+    }
+
+    @GetMapping("/verify")
+    public ApiResponse<?> verify(@RequestParam String token, Locale locale) {
+        authService.verifyEmail(token);
+        return ApiResponse.success(ApiMessage.VERIFY_SUCCESS, messageService, locale);
+    }
+    @PostMapping("/refresh-token")
+    public ApiResponse<JwtResponse> refreshToken(@RequestBody RefreshTokenRequest request, Locale locale) {
+        String newAccessToken = tokenService.refreshAccessToken(request.getRefreshToken());
+        JwtResponse response = new JwtResponse(newAccessToken, request.getRefreshToken());
+        return ApiResponse.success(ApiMessage.REFRESH_SUCCESS, response, messageService, locale);
+    }
+    @PostMapping("/logout")
+    public ApiResponse<?> logout(@RequestBody RefreshTokenRequest request, Locale locale) {
+        tokenService.revokeToken(request.getRefreshToken());
+        return ApiResponse.success(ApiMessage.LOGOUT_SUCCESS, messageService, locale);
+    }
+
+}
+
+// File: src/main/java/com/example/sales/controller/BranchController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.branch.BranchRequest;
+import com.example.sales.dto.branch.BranchResponse;
+import com.example.sales.model.User;
+import com.example.sales.service.BranchService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/branches")
+@RequiredArgsConstructor
+@Validated
+public class BranchController {
+
+    private final BranchService branchService;
+    private final MessageService messageService;
+
+    @GetMapping
+    public ApiResponse<List<BranchResponse>> getAll(@AuthenticationPrincipal User user, Locale locale) {
+        return ApiResponse.success(ApiMessage.SUCCESS, branchService.getAll(user), messageService, locale);
+    }
+
+    @PostMapping
+    public ApiResponse<BranchResponse> create(@AuthenticationPrincipal User user,
+                                              @RequestBody @Valid BranchRequest request,
+                                              Locale locale) {
+        return ApiResponse.success(ApiMessage.SUCCESS, branchService.create(user, request), messageService, locale);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<BranchResponse> update(@AuthenticationPrincipal User user,
+                                              @PathVariable String id,
+                                              @RequestBody @Valid BranchRequest request,
+                                              Locale locale) {
+        return ApiResponse.success(ApiMessage.SUCCESS, branchService.update(user, id, request), messageService, locale);
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
+                                    @PathVariable String id,
+                                    Locale locale) {
+        branchService.delete(user, id);
+        return ApiResponse.success(ApiMessage.SUCCESS, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/CustomerController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.customer.CustomerRequest;
+import com.example.sales.dto.customer.CustomerResponse;
+import com.example.sales.model.User;
+import com.example.sales.service.CustomerService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/customers")
+@RequiredArgsConstructor
+@Validated
+public class CustomerController {
+
+    private final CustomerService customerService;
+    private final MessageService messageService;
+
+    @GetMapping
+    public ApiResponse<List<CustomerResponse>> getAll(@AuthenticationPrincipal User user,
+                                                        @RequestParam(required = false) String branchId,
+                                                      Locale locale) {
+        return ApiResponse.success(ApiMessage.CUSTOMER_LIST, customerService.getCustomers(user, branchId), messageService, locale);
+    }
+
+    @PostMapping
+    public ApiResponse<CustomerResponse> create(@AuthenticationPrincipal User user,
+                                                @RequestBody @Valid CustomerRequest request,
+                                                Locale locale) {
+        return ApiResponse.success(ApiMessage.CUSTOMER_CREATED, customerService.createCustomer(user, request), messageService, locale);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<CustomerResponse> update(@AuthenticationPrincipal User user,
+                                                @PathVariable String id,
+                                                @RequestBody @Valid CustomerRequest request,
+                                                Locale locale) {
+        return ApiResponse.success(ApiMessage.CUSTOMER_UPDATED, customerService.updateCustomer(user, id, request), messageService, locale);
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
+                                 @PathVariable String id,
+                                 @RequestParam(required = false) String branchId,
+                                 Locale locale) {
+        customerService.deleteCustomer(user, branchId, id);
+        return ApiResponse.success(ApiMessage.CUSTOMER_DELETED, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/OrderController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.order.OrderRequest;
+import com.example.sales.dto.order.OrderResponse;
+import com.example.sales.model.User;
+import com.example.sales.service.OrderService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/orders")
+@RequiredArgsConstructor
+@Validated
+public class OrderController {
+
+    private final OrderService orderService;
+    private final MessageService messageService;
+
+    // ✅ 1. Lấy danh sách đơn hàng của user (shop owner)
+    @GetMapping
+    public ApiResponse<List<OrderResponse>> getMyOrders(@AuthenticationPrincipal User user, Locale locale) {
+        List<OrderResponse> orders = orderService.getOrdersByUser(user);
+        return ApiResponse.success(ApiMessage.ORDER_LIST, orders, messageService, locale);
+    }
+
+    // ✅ 2. Tạo đơn hàng mới
+    @PostMapping
+    public ApiResponse<OrderResponse> createOrder(@AuthenticationPrincipal User user,
+                                                  @RequestBody @Valid OrderRequest request,
+                                                  Locale locale) {
+        OrderResponse created = orderService.createOrder(user, request);
+        return ApiResponse.success(ApiMessage.ORDER_CREATED, created, messageService, locale);
+    }
+
+    // ✅ 3. Hủy đơn
+    @PutMapping("/{id}/cancel")
+    public ApiResponse<?> cancelOrder(@AuthenticationPrincipal User user,
+                                      @PathVariable String id,
+                                      Locale locale) {
+        orderService.cancelOrder(user, id);
+        return ApiResponse.success(ApiMessage.ORDER_CANCELLED, messageService, locale);
+    }
+
+    // ✅ 4. Xác nhận thanh toán
+    @PostMapping("/{orderId}/confirm-payment")
+    public ApiResponse<OrderResponse> confirmPayment(@PathVariable String orderId,
+                                                     @RequestParam String paymentId,
+                                                     @RequestParam String paymentMethod,
+                                                     @AuthenticationPrincipal User user,
+                                                     Locale locale) {
+        OrderResponse confirmed = orderService.confirmPayment(user, orderId, paymentId, paymentMethod);
+        return ApiResponse.success(ApiMessage.ORDER_PAYMENT_CONFIRMED, confirmed, messageService, locale);
+    }
+
+    // ✅ 5. Cập nhật trạng thái đơn hàng
+    @PutMapping("/{id}/status")
+    public ApiResponse<OrderResponse> updateStatus(@AuthenticationPrincipal User user,
+                                                   @PathVariable String id,
+                                                   @RequestParam OrderStatus status,
+                                                   Locale locale) {
+        OrderResponse updated = orderService.updateStatus(user, id, status);
+        return ApiResponse.success(ApiMessage.ORDER_STATUS_UPDATED, updated, messageService, locale);
+    }
+
+    // ✅ 6. Lọc đơn theo trạng thái
+    @GetMapping("/filter")
+    public ApiResponse<List<OrderResponse>> getByStatus(@AuthenticationPrincipal User user,
+                                                        @RequestParam OrderStatus status,
+                                                        @RequestParam(required = false) String branchId,
+                                                        Locale locale) {
+        List<OrderResponse> filtered = orderService.getOrdersByStatus(user, status, branchId);
+        return ApiResponse.success(ApiMessage.ORDER_LIST, filtered, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/ProductController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.dto.product.ProductSearchRequest;
+import com.example.sales.model.Product;
+import com.example.sales.model.User;
+import com.example.sales.service.ExcelExportService;
+import com.example.sales.service.FileUploadService;
+import com.example.sales.service.ProductImportService;
+import com.example.sales.service.ProductService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+
+@RestController
+@RequestMapping("/api/products")
+@RequiredArgsConstructor
+@Validated
+public class ProductController {
+
+    private final ProductService productService;
+    private final MessageService messageService;
+    private final ExcelExportService excelExportService;
+    private final ProductImportService productImportService;
+    private final FileUploadService fileUploadService;
+
+    // Trả về List<ProductResponse> thay vì List<Product>
+    @GetMapping
+    public ApiResponse<List<ProductResponse>> getAllByUser(@AuthenticationPrincipal User user, Locale locale) {
+        return ApiResponse.success(ApiMessage.PRODUCT_LIST, productService.getAllByUser(user), messageService, locale);
+    }
+
+    @PostMapping
+    public ApiResponse<ProductResponse> createProduct(@AuthenticationPrincipal User user,
+                                                      @RequestBody @Valid ProductRequest request,
+                                                      Locale locale) {
+        return ApiResponse.success(ApiMessage.PRODUCT_CREATED, productService.createProduct(user, request), messageService, locale);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<ProductResponse> updateProduct(@AuthenticationPrincipal User user,
+                                                      @PathVariable String id,
+                                                      @RequestBody @Valid ProductRequest request,
+                                                      Locale locale) {
+        return ApiResponse.success(ApiMessage.PRODUCT_UPDATED, productService.updateProduct(user, id, request), messageService, locale);
+    }
+
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<?> deleteProduct(@AuthenticationPrincipal User user,
+                                        @PathVariable String id,
+                                        Locale locale) {
+        productService.deleteProduct(user, id);
+        return ApiResponse.success(ApiMessage.PRODUCT_DELETED, messageService, locale);
+    }
+
+    @PostMapping("/search")
+    public ApiResponse<Page<ProductResponse>> searchProducts(@AuthenticationPrincipal User user,
+                                                             @RequestBody ProductSearchRequest req,
+                                                             Locale locale) {
+        return ApiResponse.success(ApiMessage.PRODUCT_LIST, productService.search(user, req), messageService, locale);
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportProducts(@AuthenticationPrincipal User user,
+                                                 @ModelAttribute ProductSearchRequest req) {
+        List<Product> products = productService.searchAllForExport(user, req);
+
+        List<String> headers = List.of("Tên", "Danh mục", "Số lượng", "Đơn giá", "Đơn vị", "Trạng thái");
+
+        Function<Product, List<String>> mapper = p -> List.of(
+                p.getName(),
+                p.getCategory(),
+                String.valueOf(p.getQuantity()),
+                String.valueOf(p.getPrice()),
+                p.getUnit() != null ? p.getUnit() : "",
+                p.isActive() ? "Đang bán" : "Ngưng bán"
+        );
+
+        return excelExportService.exportExcel(
+                "danh_sach_san_pham.xlsx",
+                "Products",
+                headers,
+                products,
+                mapper
+        );
+    }
+
+    @PutMapping("/{id}/toggle-active")
+    public ApiResponse<ProductResponse> toggleActive(@AuthenticationPrincipal User user,
+                                                     @PathVariable String id,
+                                                     Locale locale) {
+        ProductResponse result = productService.toggleActive(user, id);
+        return ApiResponse.success(ApiMessage.PRODUCT_UPDATED, result, messageService, locale);
+    }
+
+    @GetMapping("/low-stock")
+    public ApiResponse<List<ProductResponse>> getLowStock(@AuthenticationPrincipal User user,
+                                                          @RequestParam(defaultValue = "5") int threshold,
+                                                          Locale locale) {
+        List<ProductResponse> results = productService.getLowStock(user, threshold);
+        return ApiResponse.success(ApiMessage.PRODUCT_LIST, results, messageService, locale);
+    }
+
+    @PostMapping("/import")
+    public ApiResponse<Map<String, Object>> importExcel(@AuthenticationPrincipal User user,
+                                                        @RequestParam("file") MultipartFile file,
+                                                        @RequestParam(required = false) String branchId,
+                                                        Locale locale) {
+        Map<String, Object> result = productImportService.importExcel(user, branchId, file);
+        return ApiResponse.success(ApiMessage.PRODUCT_IMPORT_SUCCESS, result, messageService, locale);
+    }
+
+    @PostMapping("/upload-image")
+    public ApiResponse<String> uploadImage(@RequestParam("file") MultipartFile file, Locale locale) {
+        String imageUrl = fileUploadService.upload(file);
+        return ApiResponse.success(ApiMessage.PRODUCT_UPLOAD_IMAGE_SUCCESS, imageUrl, messageService, locale);
+    }
+
+}
+
+// File: src/main/java/com/example/sales/controller/PromotionController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.promotion.PromotionRequest;
+import com.example.sales.dto.promotion.PromotionResponse;
+import com.example.sales.model.User;
+import com.example.sales.service.PromotionService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/promotions")
+@RequiredArgsConstructor
+@Validated
+public class PromotionController {
+
+    private final PromotionService promotionService;
+    private final MessageService messageService;
+
+    @GetMapping
+    public ApiResponse<List<PromotionResponse>> getAll(@AuthenticationPrincipal User user,
+                                                       @RequestParam(required = false) String branchId,
+                                                       Locale locale) {
+        return ApiResponse.success(ApiMessage.SUCCESS, promotionService.getAll(user, branchId), messageService, locale);
+    }
+
+    @PostMapping
+    public ApiResponse<PromotionResponse> create(@AuthenticationPrincipal User user,
+                                                 @RequestBody @Valid PromotionRequest request,
+                                                 Locale locale) {
+        return ApiResponse.success(ApiMessage.SUCCESS, promotionService.create(user, request), messageService, locale);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<PromotionResponse> update(@AuthenticationPrincipal User user,
+                                                 @PathVariable String id,
+                                                 @RequestBody @Valid PromotionRequest request,
+                                                 Locale locale) {
+        return ApiResponse.success(ApiMessage.SUCCESS, promotionService.update(user, id, request), messageService, locale);
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
+                                 @PathVariable String id,
+                                 Locale locale) {
+        promotionService.delete(user, id);
+        return ApiResponse.success(ApiMessage.SUCCESS, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/ReportController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.report.DailyReportResponse;
+import com.example.sales.dto.report.ReportRequest;
+import com.example.sales.dto.report.ReportResponse;
+import com.example.sales.model.User;
+import com.example.sales.service.ReportService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/reports")
+@RequiredArgsConstructor
+@Validated
+public class ReportController {
+
+    private final ReportService reportService;
+    private final MessageService messageService;
+
+    /**
+     * API tổng hợp báo cáo đơn hàng (doanh thu, tổng đơn, số lượng SP)
+     */
+    @PostMapping
+    public ApiResponse<ReportResponse> getReport(@AuthenticationPrincipal User user,
+                                                 @RequestBody @Valid ReportRequest request,
+                                                 Locale locale) {
+        ReportResponse result = reportService.getReport(user, request);
+        return ApiResponse.success(ApiMessage.SUCCESS, result, messageService, locale);
+    }
+
+    /**
+     * API thống kê doanh thu theo từng ngày
+     */
+    @PostMapping("/daily")
+    public ApiResponse<List<DailyReportResponse>> getDailyReport(@AuthenticationPrincipal User user,
+                                                                 @RequestBody @Valid ReportRequest request,
+                                                                 Locale locale) {
+        List<DailyReportResponse> result = reportService.getDailyReport(user, request);
+        return ApiResponse.success(ApiMessage.SUCCESS, result, messageService, locale);
+    }
+
+    /**
+     * API xuất file Excel báo cáo doanh thu theo ngày
+     */
+    @GetMapping("/daily/export")
+    public ResponseEntity<byte[]> exportDailyReport(@AuthenticationPrincipal User user,
+                                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return reportService.exportDailyReportExcel(user, startDate, endDate);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/ShopController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ShopRequest;
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.service.ShopService;
+import com.example.sales.util.MessageService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/shops")
+@RequiredArgsConstructor
+@Validated
+public class ShopController {
+
+    private final ShopService shopService;
+    private final MessageService messageService;
+
+    @PostMapping
+    public ApiResponse<Shop> createShop(@AuthenticationPrincipal User user,
+                                        @RequestBody ShopRequest request, Locale locale) {
+        Shop created = shopService.createShop(user, request);
+        return ApiResponse.success(ApiMessage.SUCCESS, created, messageService, locale);
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<?> getMyShop(@AuthenticationPrincipal User user, Locale locale) {
+        Shop shop = shopService.getMyShop(user);
+        if (shop == null) {
+            return ApiResponse.error(ApiErrorCode.SHOP_NOT_FOUND, messageService, locale);
+        }
+        return ApiResponse.success(ApiMessage.SUCCESS, shop, messageService, locale);
+    }
+
+    @PutMapping
+    public ApiResponse<Shop> updateMyShop(@AuthenticationPrincipal User user,
+                                          @RequestBody ShopRequest request, Locale locale) {
+        Shop updated = shopService.updateMyShop(user, request);
+        return ApiResponse.success(ApiMessage.SUCCESS, updated, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/ShopUserController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.User;
+import com.example.sales.service.ShopUserService;
+import com.example.sales.util.MessageService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/shop-users")
+@RequiredArgsConstructor
+@Validated
+public class ShopUserController {
+
+    private final ShopUserService shopUserService;
+    private final MessageService messageService;
+
+    @PostMapping("/add")
+    public ApiResponse<?> addUser(@AuthenticationPrincipal User admin,
+                                  @RequestParam String shopId,
+                                  @RequestParam String userId,
+                                  @RequestParam ShopRole role,
+                                  Locale locale) {
+        if (!shopUserService.isOwner(shopId, admin.getId())) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
+
+        shopUserService.addUser(shopId, userId, role);
+        return ApiResponse.success(ApiMessage.SUCCESS, messageService, locale);
+    }
+
+    @DeleteMapping("/remove")
+    public ApiResponse<?> removeUser(@AuthenticationPrincipal User admin,
+                                     @RequestParam String shopId,
+                                     @RequestParam String userId,
+                                     Locale locale) {
+        if (shopUserService.isOwner(shopId, admin.getId())) {
+            throw new com.example.sales.exception.BusinessException(
+                    com.example.sales.constant.ApiErrorCode.UNAUTHORIZED);
+        }
+        shopUserService.removeUser(shopId, userId);
+        return ApiResponse.success(ApiMessage.SUCCESS, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/TableController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.constant.TableStatus;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.TableRequest;
+import com.example.sales.dto.TableResponse;
+import com.example.sales.service.TableService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/table")
+@RequiredArgsConstructor
+@Validated
+public class TableController {
+
+    private final TableService tableService;
+    private final MessageService messageService;
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<TableResponse>> create(
+            @Valid @RequestBody TableRequest request,
+            Locale locale
+    ) {
+        TableResponse response = tableService.create(request);
+        return ResponseEntity.ok(ApiResponse.success(ApiMessage.TABLE_CREATED, response, messageService, locale));
+    }
+
+    @GetMapping("/shop/{shopId}")
+    public ResponseEntity<ApiResponse<List<TableResponse>>> getByShop(
+            @PathVariable String shopId,
+            @RequestParam(required = false) String branchId,
+            Locale locale
+    ) {
+        List<TableResponse> tables = tableService.getByShop(shopId, branchId);
+        return ResponseEntity.ok(ApiResponse.success(ApiMessage.TABLE_LIST, tables, messageService, locale));
+    }
+
+    @PutMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<TableResponse>> updateStatus(
+            @PathVariable String id,
+            @RequestParam TableStatus status,
+            Locale locale
+    ) {
+        TableResponse response = tableService.updateStatus(id, status);
+        return ResponseEntity.ok(ApiResponse.success(ApiMessage.TABLE_STATUS_UPDATED, response, messageService, locale));
+    }
+}
+
+// File: src/main/java/com/example/sales/controller/UserController.java
+
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ChangePasswordRequest;
+import com.example.sales.dto.UpdateProfileRequest;
+import com.example.sales.model.User;
+import com.example.sales.service.UserService;
+import com.example.sales.util.MessageService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Locale;
+
+@RestController
+@RequestMapping("/api/user")
+@RequiredArgsConstructor
+@Validated
+public class UserController {
+
+    private final UserService userService;
+    private final MessageService messageService;
+
+    @GetMapping("/me")
+    public ApiResponse<User> getCurrentUser(@AuthenticationPrincipal User user, Locale locale) {
+        return ApiResponse.success(ApiMessage.USER_INFO, userService.getCurrentUser(user), messageService, locale);
+    }
+
+    @PutMapping("/update-profile")
+    public ApiResponse<User> updateProfile(@AuthenticationPrincipal User user,
+                                           @RequestBody UpdateProfileRequest request,
+                                           Locale locale) {
+        User updated = userService.updateProfile(user, request.getFullName(), request.getPhone(), request.getBusinessType());
+        return ApiResponse.success(ApiMessage.USER_UPDATED, updated, messageService, locale);
+    }
+
+    @PostMapping("/change-password")
+    public ApiResponse<?> changePassword(@AuthenticationPrincipal User user,
+                                         @RequestBody @Valid ChangePasswordRequest request,
+                                         Locale locale) {
+        userService.changePassword(user, request.getCurrentPassword(), request.getNewPassword());
+        return ApiResponse.success(ApiMessage.PASSWORD_CHANGED, messageService, locale);
+    }
+}
+
+// File: src/main/java/com/example/sales/dto/branch/BranchRequest.java
+
+package com.example.sales.dto.branch;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class BranchRequest {
+
+    @NotBlank(message = "Tên chi nhánh không được để trống")
+    private String name;
+
+    private String address;
+
+    private String phone;
+
+    private boolean active = true;
+}
+// File: src/main/java/com/example/sales/dto/branch/BranchResponse.java
+
+package com.example.sales.dto.branch;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class BranchResponse {
+    private String id;
+    private String name;
+    private String address;
+    private String phone;
+    private boolean active;
+    private String createdAt;
+}
+// File: src/main/java/com/example/sales/dto/customer/CustomerRequest.java
+
+package com.example.sales.dto.customer;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class CustomerRequest {
+    @NotBlank(message = "Tên khách hàng không được để trống")
+    private String name;
+
+    private String phone;
+
+    @Email(message = "Email không hợp lệ")
+    private String email;
+
+    private String address;
+
+    private String note;
+    private String branchId; // Có thể null nếu không phân biệt chi nhánh
+}
+// File: src/main/java/com/example/sales/dto/customer/CustomerResponse.java
+
+package com.example.sales.dto.customer;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class CustomerResponse {
+    private String id;
+    private String name;
+    private String phone;
+    private String email;
+    private String address;
+    private String note;
+}
+// File: src/main/java/com/example/sales/dto/customer/CustomerSearchRequest.java
+
+package com.example.sales.dto.customer;
+
+import lombok.Data;
+
+import java.time.LocalDate;
+
+@Data
+public class CustomerSearchRequest {
+    private String keyword = "";
+    private int page = 0;
+    private int size = 20;
+    private LocalDate fromDate;
+    private LocalDate toDate;
+    private String sortBy = "createdAt";
+    private String sortDir = "desc";
+}
+
+// File: src/main/java/com/example/sales/dto/order/OrderItemRequest.java
+
+package com.example.sales.dto.order;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class OrderItemRequest {
+    @NotBlank
+    private String productId;
+
+    @Min(1)
+    private int quantity;
+
+    @Min(0)
+    private double price;
+}
+
+// File: src/main/java/com/example/sales/dto/order/OrderItemResponse.java
+
+package com.example.sales.dto.order;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class OrderItemResponse {
+    private String productId;
+    private String productName;
+    private int quantity;
+    private double price;
+    private double priceAfterDiscount; // giá sau khi đã áp dụng khuyến mãi
+    private String appliedPromotionId; // id khuyến mãi được áp dụng (nếu có)
+}
+// File: src/main/java/com/example/sales/dto/order/OrderRequest.java
+
+package com.example.sales.dto.order;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+public class OrderRequest {
+    @NotNull
+    @Valid
+    private List<OrderItemRequest> items;
+
+    private String tableId; // optional
+    private String note;
+    private String branchId;
+}
+// File: src/main/java/com/example/sales/dto/order/OrderResponse.java
+
+package com.example.sales.dto.order;
+
+import com.example.sales.constant.OrderStatus;
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+public class OrderResponse {
+    private String id;
+    private String tableId;
+    private String note;
+    private OrderStatus status;
+
+    private boolean paid;
+    private String paymentMethod;
+    private String paymentId;
+    private LocalDateTime paymentTime;
+
+    private double totalAmount;
+    private double totalPrice;
+
+    private List<OrderItemResponse> items;
+}
+// File: src/main/java/com/example/sales/dto/product/ProductRequest.java
+
+package com.example.sales.dto.product;
+
+import jakarta.validation.constraints.*;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class ProductRequest {
+
+    @NotBlank(message = "Tên sản phẩm không được để trống")
+    private String name;
+
+    @NotBlank(message = "Danh mục không được để trống")
+    private String category;
+
+    @Min(value = 0, message = "Số lượng không được âm")
+    private int quantity;
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
+    private double price;
+
+    private String unit;
+
+    private String imageUrl;
+
+    private String description;
+
+    private boolean active = true;
+    private String productCode;
+    private String branchId; // nếu có chi nhánh, có thể để null nếu không có
+}
+// File: src/main/java/com/example/sales/dto/product/ProductResponse.java
+package com.example.sales.dto.product;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class ProductResponse {
+    private String id;
+    private String name;
+    private String category;
+    private int quantity;
+    private double price;
+    private String unit;
+    private String imageUrl;
+    private String description;
+    private boolean active;
+    private String productCode;
+    private String createdAt;
+    private String updatedAt;
+}
+// File: src/main/java/com/example/sales/dto/product/ProductSearchRequest.java
+package com.example.sales.dto.product;
+
+import lombok.Data;
+
+@Data
+public class ProductSearchRequest {
+    private String keyword = "";
+    private String category = "";
+    private Boolean active;
+    private Double minPrice;
+    private Double maxPrice;
+    private int page = 0;
+    private int size = 20;
+    private String sortBy = "createdAt";
+    private String sortDir = "desc";
+    private String branchId; // nếu có chi nhánh, có thể để null nếu không có
+}
+// File: src/main/java/com/example/sales/dto/promotion/PromotionRequest.java
+package com.example.sales.dto.promotion;
+
+import com.example.sales.constant.DiscountType;
+import jakarta.validation.constraints.*;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+public class PromotionRequest {
+
+    @NotBlank
+    private String name;
+
+    @NotNull
+    private DiscountType discountType;
+
+    @Positive
+    private double discountValue;
+
+    private List<String> applicableProductIds;
+
+    @NotNull
+    private LocalDateTime startDate;
+
+    @NotNull
+    private LocalDateTime endDate;
+
+    private boolean active = true;
+    private String branchId;
+}
+// File: src/main/java/com/example/sales/dto/promotion/PromotionResponse.java
+package com.example.sales.dto.promotion;
+
+import com.example.sales.constant.DiscountType;
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+public class PromotionResponse {
+    private String id;
+    private String name;
+    private DiscountType discountType;
+    private double discountValue;
+    private List<String> applicableProductIds;
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+    private boolean active;
+}
+// File: src/main/java/com/example/sales/dto/report/DailyReportResponse.java
+package com.example.sales.dto.report;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.LocalDate;
+
+@Data
+@Builder
+public class DailyReportResponse {
+    private LocalDate date;
+    private long totalOrders;
+    private long totalProductsSold;
+    private double totalRevenue;
+}
+
+// File: src/main/java/com/example/sales/dto/report/ReportRequest.java
+package com.example.sales.dto.report;
+
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.validation.ValidDateRange;
+import lombok.Data;
+
+import java.time.LocalDate;
+
+@Data
+@ValidDateRange
+public class ReportRequest {
+    private LocalDate startDate;
+    private LocalDate endDate;
+    private OrderStatus status; // optional
+}
+
+// File: src/main/java/com/example/sales/dto/report/ReportResponse.java
+package com.example.sales.dto.report;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class ReportResponse {
+    private long totalOrders;
+    private long totalProductsSold;
+    private double totalRevenue;
+}
+// File: src/main/java/com/example/sales/dto/ApiResponse.java
+package com.example.sales.dto;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiMessage;
+import com.example.sales.util.MessageService;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+import java.util.Locale;
+
+@Data
+@AllArgsConstructor
+public class ApiResponse<T> {
+    private boolean success;
+    private String code;
+    private String message;
+    private T data;
+
+    // ✅ Success with i18n
+    public static <T> ApiResponse<T> success(ApiMessage msg, T data, MessageService ms, Locale locale) {
+        return new ApiResponse<>(true, msg.getCode(), ms.get(msg.getMessage(), locale), data);
+    }
+
+    public static ApiResponse<?> success(ApiMessage msg, MessageService ms, Locale locale) {
+        return success(msg, null, ms, locale);
+    }
+
+    // ✅ Error with i18n
+    public static ApiResponse<?> error(ApiErrorCode error, MessageService ms, Locale locale) {
+        return new ApiResponse<>(false, error.getCode(), ms.get(error.getMessage(), locale), null);
+    }
+}
+// File: src/main/java/com/example/sales/dto/ChangePasswordRequest.java
+package com.example.sales.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class ChangePasswordRequest {
+
+    @NotBlank
+    private String currentPassword;
+
+    @NotBlank
+    private String newPassword;
+}
+// File: src/main/java/com/example/sales/dto/JwtResponse.java
+package com.example.sales.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class JwtResponse {
+    private String accessToken;
+    private String refreshToken;
+}
+
+// File: src/main/java/com/example/sales/dto/LoginRequest.java
+package com.example.sales.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class LoginRequest {
+    @Email
+    private String email;
+
+    @NotBlank
+    private String password;
+}
+
+// File: src/main/java/com/example/sales/dto/RefreshTokenRequest.java
+package com.example.sales.dto;
+
+import lombok.Data;
+
+@Data
+public class RefreshTokenRequest {
+    private String refreshToken;
+}
+
+// File: src/main/java/com/example/sales/dto/RegisterRequest.java
+package com.example.sales.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class RegisterRequest {
+    @Email
+    private String email;
+
+    @Size(min = 6, message = "Mật khẩu phải từ 6 ký tự")
+    private String password;
+
+    @NotBlank
+    private String businessType;
+}
+// File: src/main/java/com/example/sales/dto/SalesReportDto.java
+package com.example.sales.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+import java.time.LocalDate;
+
+@Data
+@AllArgsConstructor
+public class SalesReportDto {
+    private LocalDate date;
+    private long totalOrders;
+    private double totalAmount;
+}
+// File: src/main/java/com/example/sales/dto/ShopRequest.java
+package com.example.sales.dto;
+
+import com.example.sales.constant.ShopType;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class ShopRequest {
+    private String name;
+    private ShopType type;
+    private String address;
+    private String phone;
+    private String logoUrl;
+}
+// File: src/main/java/com/example/sales/dto/TableRequest.java
+package com.example.sales.dto;
+
+import com.example.sales.constant.TableStatus;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class TableRequest {
+    @NotBlank
+    private String name;
+
+    private TableStatus status = TableStatus.AVAILABLE;
+    private String shopId;
+    private Integer capacity;
+    private String note;
+    private String branchId; // Có thể null nếu không phân biệt chi nhánh
+}
+
+// File: src/main/java/com/example/sales/dto/TableResponse.java
+package com.example.sales.dto;
+
+import com.example.sales.constant.TableStatus;
+import lombok.*;
+
+@Getter
+@Setter
+@Builder
+public class TableResponse {
+    private String id;
+    private String name;
+    private TableStatus status;
+    private String shopId;
+    private String shopName;
+    private Integer capacity;
+    private String note;
+    private String currentOrderId;
+    private String branchId; // Có thể null nếu không phân biệt chi nhánh
+}
+
+
+// File: src/main/java/com/example/sales/dto/UpdateProfileRequest.java
+package com.example.sales.dto;
+
+import lombok.Data;
+
+@Data
+public class UpdateProfileRequest {
+    private String fullName;
+    private String phone;
+    private String businessType;
+}
+// File: src/main/java/com/example/sales/exception/BusinessException.java
+package com.example.sales.exception;
+
+import com.example.sales.constant.ApiErrorCode;
+import lombok.Getter;
+
+@Getter
+public class BusinessException extends RuntimeException {
+    private final ApiErrorCode error;
+
+    public BusinessException(ApiErrorCode error) {
+        super(error.getMessage());
+        this.error = error;
+    }
+    public BusinessException(ApiErrorCode error, String message) {
+        super(message);
+        this.error = error;
+    }
+}
+
+// File: src/main/java/com/example/sales/exception/GlobalExceptionHandler.java
+package com.example.sales.exception;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.util.MessageService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.Locale;
+
+@RestControllerAdvice
+@RequiredArgsConstructor
+public class GlobalExceptionHandler {
+
+    private final MessageService messageService;
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<?> handleNotFound(ResourceNotFoundException ex, Locale locale) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getError(), messageService, locale));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex, Locale locale) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ApiErrorCode.VALIDATION_ERROR, messageService, locale));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex, Locale locale) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ApiErrorCode.ACCESS_DENIED, messageService, locale));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleGeneral(Exception ex, Locale locale) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ApiErrorCode.INTERNAL_ERROR, messageService, locale));
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<?> handleBusiness(BusinessException ex, Locale locale) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(ex.getError(), messageService, locale));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(HttpStatus.BAD_REQUEST.value(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<?> handleRuntimeException(RuntimeException ex) {
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiError(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Lỗi hệ thống"));
+    }
+}
+
+// File: src/main/java/com/example/sales/exception/ResourceNotFoundException.java
+package com.example.sales.exception;
+
+import com.example.sales.constant.ApiErrorCode;
+import lombok.Getter;
+
+@Getter
+public class ResourceNotFoundException extends RuntimeException {
+    private final ApiErrorCode error;
+
+    public ResourceNotFoundException(ApiErrorCode error) {
+        super(error.getMessage());
+        this.error = error;
+    }
+}
+// File: src/main/java/com/example/sales/export/GenericExcelExporter.java
+package com.example.sales.export;
+
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.*;
+import java.util.List;
+import java.util.function.Function;
+
+public class GenericExcelExporter<T> {
+
+    public InputStream export(String sheetName, List<String> headers, List<T> data, Function<T, List<String>> mapper) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet(sheetName);
+
+            // Header row
+            Row headerRow = sheet.createRow(0);
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            for (int i = 0; i < headers.size(); i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers.get(i));
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Data rows
+            int rowNum = 1;
+            for (T item : data) {
+                Row row = sheet.createRow(rowNum++);
+                List<String> values = mapper.apply(item);
+                for (int i = 0; i < values.size(); i++) {
+                    row.createCell(i).setCellValue(values.get(i));
+                }
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < headers.size(); i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            return new ByteArrayInputStream(out.toByteArray());
+        }
+    }
+
+    private CellStyle createHeaderStyle(Workbook wb) {
+        CellStyle style = wb.createCellStyle();
+        Font font = wb.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        return style;
+    }
+}
+// File: src/main/java/com/example/sales/helper/CustomerSearchHelper.java
+package com.example.sales.helper;
+
+import com.example.sales.dto.customer.CustomerSearchRequest;
+import com.example.sales.model.Customer;
+import org.bson.Document;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+
+@Component
+public class CustomerSearchHelper {
+
+    private final MongoTemplate mongoTemplate;
+
+    public CustomerSearchHelper(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
+
+    public List<Customer> search(String userId, CustomerSearchRequest req, Pageable pageable) {
+        Aggregation agg = newAggregation(
+                buildMatch(userId, req),
+                sort(Sort.Direction.DESC, "_id"),
+                skip((long) pageable.getPageNumber() * pageable.getPageSize()),
+                limit(pageable.getPageSize())
+        );
+
+        return mongoTemplate.aggregate(agg, "customers", Customer.class).getMappedResults();
+    }
+
+    public long counts(String userId, CustomerSearchRequest req) {
+        Aggregation countAgg = newAggregation(
+                buildMatch(userId, req),
+                count().as("total")
+        );
+
+        return Optional.of(
+                mongoTemplate.aggregate(countAgg, "customers", Document.class)
+                        .getUniqueMappedResult()
+        ).map(d -> ((Number) d.get("total")).longValue()).orElse(0L);
+    }
+
+    public List<Customer> exportAll(String userId, CustomerSearchRequest req) {
+        Aggregation agg = newAggregation(
+                buildMatch(userId, req),
+                sort(Sort.Direction.ASC, "name")
+        );
+
+        return mongoTemplate.aggregate(agg, "customers", Customer.class).getMappedResults();
+    }
+
+    private MatchOperation buildMatch(String userId, CustomerSearchRequest req) {
+        String keyword = Optional.ofNullable(req.getKeyword()).orElse("").trim();
+
+        Criteria base = Criteria.where("userId").is(userId);
+        List<Criteria> andConditions = new ArrayList<>();
+        andConditions.add(base);
+
+        // keyword
+        if (!keyword.isEmpty()) {
+            andConditions.add(new Criteria().orOperator(
+                    Criteria.where("name").regex(keyword, "i"),
+                    Criteria.where("email").regex(keyword, "i"),
+                    Criteria.where("phone").regex(keyword, "i")
+            ));
+        }
+
+        // filter ngày tạo
+        if (req.getFromDate() != null || req.getToDate() != null) {
+            Criteria dateCriteria = Criteria.where("createdAt");
+            if (req.getFromDate() != null) {
+                dateCriteria = dateCriteria.gte(req.getFromDate().atStartOfDay());
+            }
+            if (req.getToDate() != null) {
+                dateCriteria = dateCriteria.lte(req.getToDate().atTime(23, 59, 59));
+            }
+            andConditions.add(dateCriteria);
+        }
+
+        return match(new Criteria().andOperator(andConditions.toArray(new Criteria[0])));
+    }
+}
+// File: src/main/java/com/example/sales/helper/ProductSearchHelper.java
+package com.example.sales.helper;
+
+import com.example.sales.dto.product.ProductSearchRequest;
+import com.example.sales.model.Product;
+import lombok.RequiredArgsConstructor;
+import org.bson.Document;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.stereotype.Component;
+
+import java.util.*;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+
+@Component
+@RequiredArgsConstructor
+public class ProductSearchHelper {
+
+    private final MongoTemplate mongoTemplate;
+
+    public List<Product> search(String shopId, String branchId, ProductSearchRequest req, Pageable pageable) {
+        Aggregation agg = newAggregation(
+                buildMatch(shopId, branchId, req),
+                sort(Sort.Direction.fromString(req.getSortDir()), req.getSortBy()),
+                skip((long) pageable.getPageNumber() * pageable.getPageSize()),
+                limit(pageable.getPageSize())
+        );
+
+        return mongoTemplate.aggregate(agg, "products", Product.class).getMappedResults();
+    }
+
+    public long counts(String shopId, String branchId, ProductSearchRequest req) {
+        Aggregation agg = newAggregation(
+                buildMatch(shopId, branchId, req),
+                count().as("total")
+        );
+
+        return Optional.of(
+                mongoTemplate.aggregate(agg, "products", Document.class).getUniqueMappedResult()
+        ).map(d -> ((Number) d.get("total")).longValue()).orElse(0L);
+    }
+
+    private MatchOperation buildMatch(String shopId, String branchId, ProductSearchRequest req) {
+        List<Criteria> criteria = new ArrayList<>();
+        criteria.add(Criteria.where("shopId").is(shopId));
+        if (branchId != null && !branchId.isBlank()) {
+            criteria.add(Criteria.where("branchId").is(branchId));
+        }
+        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
+            String pattern = ".*" + req.getKeyword().trim() + ".*";
+            criteria.add(new Criteria().orOperator(
+                    Criteria.where("name").regex(pattern, "i"),
+                    Criteria.where("category").regex(pattern, "i")
+            ));
+        }
+
+        if (req.getCategory() != null && !req.getCategory().isBlank()) {
+            criteria.add(Criteria.where("category").is(req.getCategory()));
+        }
+
+        if (req.getActive() != null) {
+            criteria.add(Criteria.where("active").is(req.getActive()));
+        }
+
+        if (req.getMinPrice() != null) {
+            criteria.add(Criteria.where("price").gte(req.getMinPrice()));
+        }
+
+        if (req.getMaxPrice() != null) {
+            criteria.add(Criteria.where("price").lte(req.getMaxPrice()));
+        }
+
+        return match(new Criteria().andOperator(criteria.toArray(new Criteria[0])));
+    }
+}
+// File: src/main/java/com/example/sales/job/ImageCleanupJob.java
+package com.example.sales.job;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.io.File;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+
+@Slf4j
+@Component
+public class ImageCleanupJob {
+
+    private static final String TEMP_FOLDER = "uploads/temp";
+    private static final long EXPIRE_MINUTES = 30;
+
+    @Scheduled(fixedRate = 15 * 60 * 1000) // mỗi 15 phút
+    public void cleanUpTempImages() {
+        File dir = new File(TEMP_FOLDER);
+        if (!dir.exists() || !dir.isDirectory()) return;
+
+        File[] files = dir.listFiles();
+        if (files == null) return;
+
+        Instant now = Instant.now();
+
+        for (File file : files) {
+            if (file.isFile()) {
+                long lastModified = file.lastModified();
+                Instant modifiedTime = Instant.ofEpochMilli(lastModified);
+                if (modifiedTime.isBefore(now.minus(EXPIRE_MINUTES, ChronoUnit.MINUTES))) {
+                    boolean deleted = file.delete();
+                    log.info("Deleted temp image {}: {}", file.getName(), deleted);
+                }
+            }
+        }
+    }
+}
+// File: src/main/java/com/example/sales/model/base/BaseEntity.java
+package com.example.sales.model.base;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+public abstract class BaseEntity {
+
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+
+    @CreatedBy
+    private String createdBy;
+
+    @LastModifiedBy
+    private String updatedBy;
+
+    private boolean deleted = false;
+
+    private LocalDateTime deletedAt;
+}
+// File: src/main/java/com/example/sales/model/AuditLog.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("audit_logs")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class AuditLog extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String userId;
+    private String shopId;
+
+    private String targetId;     // ID của Order hoặc Product
+    private String targetType;   // "ORDER", "PRODUCT"
+
+    private String action;       // Hành động: PRICE_CHANGED, STATUS_UPDATED...
+    private String description;  // Mô tả cụ thể
+}
+// File: src/main/java/com/example/sales/model/Branch.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("branches")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Branch extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+
+    private String name;
+    private String address;
+    private String phone;
+
+    @Builder.Default
+    private boolean active = true;
+}
+// File: src/main/java/com/example/sales/model/Customer.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import lombok.Data;
+import org.springframework.data.annotation.*;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+
+@Document("customers")
+@Data
+public class Customer extends BaseEntity {
+    @Id
+    private String id;
+
+    private String userId; // Chủ sở hữu
+    private String name;
+    private String phone;
+    private String email;
+    private String address;
+    private String note;
+    private String shopId;
+    private String branchId; // Có thể null nếu không phân biệt chi nhánh
+}
+// File: src/main/java/com/example/sales/model/Order.java
+package com.example.sales.model;
+
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.model.base.BaseEntity;
+import lombok.Data;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Document("orders")
+@Data
+public class Order extends BaseEntity {
+    @Id
+    private String id;
+
+    private String shopId;             // ✔️ Ràng buộc chặt với 1 shop
+    private String branchId;            // ✔️ Ràng buộc chặt với 1 chi nhánh
+    private String tableId;            // ✔️ Gắn bàn (có thể null)
+
+    private String userId;             // Ai tạo đơn
+
+    private List<OrderItem> items;     // Danh sách sản phẩm
+    private double totalPrice;
+    private double totalAmount;
+
+    private OrderStatus status = OrderStatus.PENDING;
+
+    // Thông tin thanh toán
+    private String paymentId;
+    private String paymentMethod;      // Momo, VNPay, Cash
+    private LocalDateTime paymentTime;
+    private boolean isPaid;
+
+    private String note;
+}
+// File: src/main/java/com/example/sales/model/OrderItem.java
+package com.example.sales.model;
+
+import lombok.Data;
+
+@Data
+public class OrderItem {
+    private String productId;
+    private String productName;
+    private int quantity;
+    private double price;
+    private double priceAfterDiscount; // giá sau khi đã áp dụng khuyến mãi
+    private String appliedPromotionId; // id khuyến mãi được áp dụng (nếu có)
+}
+
+// File: src/main/java/com/example/sales/model/Product.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import jakarta.validation.constraints.*;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("products")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Product extends BaseEntity {
+
+    @Id
+    private String id;
+
+    @NotBlank(message = "Tên sản phẩm không được để trống")
+    private String name;
+
+    @NotBlank(message = "Danh mục không được để trống")
+    private String category;
+
+    @Min(value = 0, message = "Số lượng không được âm")
+    private int quantity;
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
+    private double price;
+
+    private String unit; // ví dụ: "kg", "cái", "hộp" (tuỳ loại cửa hàng)
+
+    private String imageUrl;
+
+    private String description;
+
+    private String shopId;
+    private String branchId;
+
+    @Builder.Default
+    private boolean active = true; // Có đang bán hay tạm ngưng
+    private String productCode; // mã sản phẩm duy nhất
+}
+// File: src/main/java/com/example/sales/model/Promotion.java
+package com.example.sales.model;
+
+import com.example.sales.constant.DiscountType;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Document(collection = "promotions")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Promotion extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+    private String branchId; // có thể null nếu áp dụng toàn bộ chi nhánh
+
+    private String name;
+
+    private DiscountType discountType; // PERCENT or AMOUNT
+
+    private double discountValue;
+
+    private List<String> applicableProductIds; // nếu null hoặc empty: áp dụng toàn bộ
+
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+
+    private boolean active;
+}
+// File: src/main/java/com/example/sales/model/RefreshToken.java
+package com.example.sales.model;
+
+import lombok.Data;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.Date;
+
+@Data
+@Document(collection = "refresh_tokens")
+public class RefreshToken {
+    @Id
+    private String id;
+    private String token;
+    private String userId;
+    private Date expiryDate;
+}
+// File: src/main/java/com/example/sales/model/Shop.java
+package com.example.sales.model;
+
+import com.example.sales.constant.ShopType;
+import com.example.sales.model.base.BaseEntity;
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@Document(collection = "shops")
+public class Shop extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String name;
+    private String ownerId; // user.id
+    private ShopType type; // RESTAURANT, GROCERY, CONVENIENCE, ...
+    private String address;
+    private String phone;
+    private String logoUrl; // nếu cần logo
+    private boolean active = true;
+
+    // ====== Nâng cao (SS) ======
+    private boolean trackInventory = true; // Có quản lý tồn kho không
+    private String currency = "VND";       // Đơn vị tiền tệ mặc định
+    private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
+    private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
+}
+// File: src/main/java/com/example/sales/model/ShopUser.java
+package com.example.sales.model;
+
+import com.example.sales.constant.ShopRole;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document(collection = "shop_users")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ShopUser extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+
+    private String userId;
+
+    private ShopRole role;
+}
+// File: src/main/java/com/example/sales/model/Table.java
+package com.example.sales.model;
+
+import com.example.sales.constant.TableStatus;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document(collection = "tables")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Table extends BaseEntity {
+    @Id
+    private String id;
+
+    private String shopId;               // ✔️ ID của cửa hàng
+    private String branchId;             // ✔️ ID của chi nhánh (có thể null nếu không phân biệt chi nhánh)
+    private String name;                 // Tên bàn (B1, B2...)
+    private TableStatus status;         // Trạng thái bàn
+
+    private Integer capacity;           // Sức chứa (optional)
+    private String note;                // Ghi chú (optional)
+    private String currentOrderId;      // Đơn đang sử dụng bàn (nếu có)
+}
+// File: src/main/java/com/example/sales/model/User.java
+package com.example.sales.model;
+
+import com.example.sales.constant.UserRole;
+import com.example.sales.model.base.BaseEntity;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.*;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+import java.util.Date;
+
+@Builder
+@Document(collection = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class User extends BaseEntity {
+    @Id
+    private String id;
+
+    @Email
+    @NotBlank
+    private String email;
+
+    @NotBlank
+    private String password;
+
+    private String businessType;
+    private String shopName;
+    @Builder.Default
+    private boolean verified = false; // Đã xác thực tài khoản chưa?
+    private String verificationToken;
+    private Date verificationExpiry;
+    private UserRole role = UserRole.ROLE_USER; // Mặc định là USER
+    private String resetToken; // Token dùng để reset password
+    private Date resetTokenExpiry; // Thời hạn token
+    private String fullName;
+    private String phone;
+    private String avatarUrl; // (nếu có ảnh đại diện)
+}
+// File: src/main/java/com/example/sales/repository/AuditLogRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.AuditLog;
+import com.example.sales.repository.base.SoftDeleteRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+
+public interface AuditLogRepository extends SoftDeleteRepository<AuditLog, String> {
+    @Query("{ 'targetId': ?0, 'deleted': false }")
+    List<AuditLog> findByTargetIdOrderByCreatedAtDesc(String targetId);
+}
+
+// File: src/main/java/com/example/sales/repository/BranchRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Branch;
+import com.example.sales.repository.base.SoftDeleteRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+
+public interface BranchRepository extends SoftDeleteRepository<Branch, String> {
+    @Query("{ 'shopId': ?0, 'deleted': false }")
+    List<Branch> findByShopId(String shopId);
+}
+
+// File: src/main/java/com/example/sales/repository/CustomerRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Customer;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+
+public interface CustomerRepository extends MongoRepository<Customer, String> {
+    @Query("{ 'userId': ?0, 'deleted': false }")
+    List<Customer> findByUserId(String userId);
+
+    @Query("{ 'userId': ?0, 'deleted': false }")
+    List<Customer> findByUserIdAndDeletedFalse(String userId);
+
+    @Query("{ 'shopId': ?0, 'deleted': false }")
+    List<Customer> findByShopId(String shopId);
+
+    @Query("{ 'shopId': ?0, 'branchId': ?1, 'deleted': false }")
+    List<Customer> findByShopIdAndBranchId(String shopId, String branchId);
+}
+
+// File: src/main/java/com/example/sales/repository/OrderRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.model.Order;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+
+public interface OrderRepository extends MongoRepository<Order, String> {
+    @Query("{ 'userId': ?0, 'deleted': false }")
+    List<Order> findByUserId(String userId);
+
+    @Query("{ 'status': ?0, 'deleted': false }")
+    List<Order> findAllByStatus(OrderStatus status);
+
+    @Query("{ 'shopId': ?0, 'deleted': false }")
+    List<Order> findByShopId(String shopId);
+
+    @Query("{ 'shopId': ?0, 'branchId': ?1, 'status': ?2, 'deleted': false }")
+    List<Order> findByShopIdAndBranchIdAndStatus(String shopId, String branchId, OrderStatus status);
+}
+
+// File: src/main/java/com/example/sales/repository/ProductRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Product;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+
+public interface ProductRepository extends MongoRepository<Product, String> {
+    @Query("{ 'shopId': ?0, 'deleted': false }")
+    List<Product> findByShopId(String shopId);
+}
+
+// File: src/main/java/com/example/sales/repository/PromotionRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Promotion;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+
+public interface PromotionRepository extends MongoRepository<Promotion, String> {
+    @Query("{ 'shopId': ?0, 'deleted': false }")
+    List<Promotion> findByShopId(String shopId);
+
+    @Query("{ 'shopId': ?0, 'branchId': ?1, 'deleted': false }")
+    List<Promotion> findByShopIdAndBranchId(String shopId, String branchId);
+}
+
+// File: src/main/java/com/example/sales/repository/RefreshTokenRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.RefreshToken;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.Optional;
+
+public interface RefreshTokenRepository extends MongoRepository<RefreshToken, String> {
+    Optional<RefreshToken> findByToken(String token);
+}
+
+// File: src/main/java/com/example/sales/repository/ShopRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Shop;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.Optional;
+
+public interface ShopRepository extends MongoRepository<Shop, String> {
+    @Query("{ 'ownerId': ?0, 'deleted': false }")
+    Optional<Shop> findByOwnerId(String ownerId);
+}
+
+// File: src/main/java/com/example/sales/repository/ShopUserRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.ShopUser;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.Optional;
+
+public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
+    @Query("{ 'shopId': ?0, 'userId': ?1, 'deleted': false }")
+    Optional<ShopUser> findByShopIdAndUserId(String shopId, String userId);
+}
+
+// File: src/main/java/com/example/sales/repository/TableRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Table;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface TableRepository extends MongoRepository<Table, String> {
+    @Query("{ 'shopId': ?0, 'branchId': ?1, 'deleted': false }")
+    List<Table> findByShopIdAndBranchId(String shopId, String branchId);
+
+    @Query("{ 'shopId': ?0, 'deleted': false }")
+    List<Table> findByShopId(String shopId);
+
+    @Query("{ 'shopId': ?0, 'name': ?1, 'deleted': false }")
+    Optional<Table> findByShopIdAndName(String shopId, String name);
+}
+
+// File: src/main/java/com/example/sales/repository/UserRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.User;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.Optional;
+
+public interface UserRepository extends MongoRepository<User, String> {
+    @Query("{ 'email': ?0, 'deleted': false }")
+    Optional<User> findByEmail(String email);
+
+    @Query("{ 'verificationToken': ?0, 'deleted': false }")
+    Optional<User> findByVerificationToken(String token);
+
+    @Query("{ 'resetToken': ?0, 'deleted': false }")
+    Optional<User> findByResetToken(String token);
+}
+
+// File: src/main/java/com/example/sales/security/JwtAuthenticationFilter.java
+package com.example.sales.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.List;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtUtil jwtUtil;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String token = authHeader.substring(7);
+        if (!jwtUtil.isTokenValid(token)) {
+            log.warn("JWT không hợp lệ hoặc hết hạn: {}", token);
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            String userId = jwtUtil.extractUserId(token);
+            String email = jwtUtil.extractEmail(token);
+            String role = jwtUtil.extractRole(token);
+
+            CustomUserDetails userDetails = new CustomUserDetails(
+                    userId,
+                    email,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+            );
+
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+            log.debug("JWT hợp lệ. Gán userId = {}, role = {}", userId, role);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+
+// File: src/main/java/com/example/sales/security/JwtUtil.java
+package com.example.sales.security;
+
+import com.example.sales.model.User;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.util.Date;
+
+@Component
+public class JwtUtil {
+
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
+    private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24h
+
+    private final Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+
+    // Sinh token từ User
+    public String generateToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getId())
+                .claim("email", user.getEmail())
+                .claim("businessType", user.getBusinessType())
+                .claim("role", user.getRole().name()) // ⭐ Thêm role vào token
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String extractUserId(String token) {
+        return getClaims(token).getSubject();
+    }
+
+    public String extractRole(String token) {
+        return getClaims(token).get("role", String.class);
+    }
+
+    public String extractEmail(String token) {
+        return getClaims(token).get("email", String.class);
+    }
+
+    public boolean isTokenValid(String token) {
+        try {
+            getClaims(token);
+            return true;
+        } catch (JwtException e) {
+            return false;
+        }
+    }
+
+    private Claims getClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+}
+
+// File: src/main/java/com/example/sales/service/AdminUserService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class AdminUserService {
+
+    private final UserRepository userRepository;
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    public User getUserById(String id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+    }
+
+    public User updateUser(String id, User update) {
+        User user = getUserById(id);
+        user.setEmail(update.getEmail());
+        user.setFullName(update.getFullName());
+        user.setPhone(update.getPhone());
+        user.setBusinessType(update.getBusinessType());
+        user.setVerified(update.isVerified());
+        user.setRole(update.getRole());
+        return userRepository.save(user);
+    }
+
+    public void deleteUser(String id) {
+        userRepository.deleteById(id);
+    }
+}
+// File: src/main/java/com/example/sales/service/AuditLogService.java
+package com.example.sales.service;
+
+import com.example.sales.model.AuditLog;
+import com.example.sales.model.User;
+import com.example.sales.repository.AuditLogRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class AuditLogService {
+
+    private final AuditLogRepository auditLogRepository;
+
+    public void log(User user, String shopId, String targetId, String targetType, String action, String description) {
+        AuditLog log = AuditLog.builder()
+                .userId(user.getId())
+                .shopId(shopId)
+                .targetId(targetId)
+                .targetType(targetType)
+                .action(action)
+                .description(description)
+                .build();
+
+        auditLogRepository.save(log);
+    }
+}
+// File: src/main/java/com/example/sales/service/AuthService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.dto.JwtResponse;
+import com.example.sales.dto.LoginRequest;
+import com.example.sales.dto.RegisterRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import com.example.sales.security.JwtUtil;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final MailService mailService;
+    private final TokenService tokenService;
+
+    @Value("${app.frontend.verify-url}")
+    private String verifyUrl;
+
+    public void register(RegisterRequest request) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new BusinessException(ApiErrorCode.EMAIL_EXISTS);
+        }
+
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setBusinessType(request.getBusinessType());
+
+        String token = UUID.randomUUID().toString();
+        user.setVerificationToken(token);
+        user.setVerificationExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000));
+        user.setVerified(false);
+
+        userRepository.save(user);
+
+        String verifyLink = verifyUrl + "?token=" + token;
+        String html = "<p>Xin chào,</p>" +
+                "<p>Vui lòng xác thực tài khoản của bạn bằng cách nhấn vào liên kết bên dưới:</p>" +
+                "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
+                "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
+
+        mailService.send(user.getEmail(), "Xác thực tài khoản - Sandro Sales", html);
+    }
+
+
+    public JwtResponse login(LoginRequest request) {
+        // 1. Xác thực tài khoản và mật khẩu
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+        // 2. Lấy user từ DB
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+        // 3. Kiểm tra đã xác thực chưa
+        if (!user.isVerified()) {
+            throw new BusinessException(ApiErrorCode.EMAIL_NOT_VERIFIED);
+        }
+        String accessToken = jwtUtil.generateToken(user);
+        String refreshToken = tokenService.createRefreshToken(user).getToken();
+        return new JwtResponse(accessToken, refreshToken);
+    }
+
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+
+        String token = UUID.randomUUID().toString();
+        user.setResetToken(token);
+        user.setResetTokenExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000)); // 15 phút
+        userRepository.save(user);
+
+        System.out.println("Gửi email tới " + email + ": Token đặt lại mật khẩu: " + token);
+    }
+
+    public void resendVerification(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+
+        if (user.isVerified()) {
+            throw new BusinessException(ApiErrorCode.ALREADY_VERIFIED);
+        }
+
+        // Tạo token mới và cập nhật expiry
+        String newToken = UUID.randomUUID().toString();
+        user.setVerificationToken(newToken);
+        user.setVerificationExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000));
+
+        userRepository.save(user);
+
+        String verifyLink = verifyUrl + "?token=" + newToken;
+
+        String html = "<p>Xin chào,</p>" +
+                "<p>Bạn đã yêu cầu gửi lại email xác thực tài khoản.</p>" +
+                "<p>Vui lòng xác thực tài khoản của bạn bằng cách nhấn vào liên kết bên dưới:</p>" +
+                "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
+                "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
+
+        mailService.send(user.getEmail(), "Gửi lại xác thực tài khoản - Sandro Sales", html);
+    }
+
+    public void verifyEmail(String token) {
+        User user = userRepository.findByVerificationToken(token)
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.INVALID_TOKEN));
+
+        if (user.isVerified()) {
+            throw new BusinessException(ApiErrorCode.ALREADY_VERIFIED);
+        }
+
+        if (user.getVerificationExpiry().before(new Date())) {
+            throw new BusinessException(ApiErrorCode.TOKEN_EXPIRED);
+        }
+
+        user.setVerified(true);
+        user.setVerificationToken(null);
+        user.setVerificationExpiry(null);
+        userRepository.save(user);
+    }
+
+}
+// File: src/main/java/com/example/sales/service/BranchService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.branch.BranchRequest;
+import com.example.sales.dto.branch.BranchResponse;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Branch;
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.repository.BranchRepository;
+import com.example.sales.repository.ShopRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class BranchService {
+
+    private final BranchRepository branchRepository;
+    private final ShopRepository shopRepository;
+    private final ShopUserService shopUserService;
+
+    public List<BranchResponse> getAll(User user) {
+        Shop shop = getShop(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+
+        return branchRepository.findByShopId(shop.getId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public BranchResponse create(User user, BranchRequest req) {
+        Shop shop = getShop(user);
+        shopUserService.requireOwner(shop.getId(), user.getId());
+
+        Branch branch = Branch.builder()
+                .shopId(shop.getId())
+                .name(req.getName())
+                .address(req.getAddress())
+                .phone(req.getPhone())
+                .active(req.isActive())
+                .build();
+
+        return toResponse(branchRepository.save(branch));
+    }
+
+    public BranchResponse update(User user, String id, BranchRequest req) {
+        Shop shop = getShop(user);
+        shopUserService.requireOwner(shop.getId(), user.getId());
+
+        Branch branch = branchRepository.findById(id)
+                .filter(b -> b.getShopId().equals(shop.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.BRANCH_NOT_FOUND));
+
+        branch.setName(req.getName());
+        branch.setAddress(req.getAddress());
+        branch.setPhone(req.getPhone());
+        branch.setActive(req.isActive());
+
+        return toResponse(branchRepository.save(branch));
+    }
+
+    public void delete(User user, String id) {
+        Shop shop = getShop(user);
+        shopUserService.requireOwner(shop.getId(), user.getId());
+
+        Branch branch = branchRepository.findById(id)
+                .filter(b -> b.getShopId().equals(shop.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.BRANCH_NOT_FOUND));
+
+        branchRepository.delete(branch);
+    }
+
+    private Shop getShop(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.SHOP_NOT_FOUND));
+    }
+
+    private BranchResponse toResponse(Branch branch) {
+        return BranchResponse.builder()
+                .id(branch.getId())
+                .name(branch.getName())
+                .address(branch.getAddress())
+                .phone(branch.getPhone())
+                .active(branch.isActive())
+                .createdAt(branch.getCreatedAt() != null ? branch.getCreatedAt().toString() : null)
+                .build();
+    }
+}
+// File: src/main/java/com/example/sales/service/CustomerService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.dto.customer.CustomerRequest;
+import com.example.sales.dto.customer.CustomerResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Customer;
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.repository.CustomerRepository;
+import com.example.sales.repository.ShopRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class CustomerService {
+
+    private final CustomerRepository customerRepository;
+    private final ShopRepository shopRepository;
+
+    // Lấy danh sách khách hàng thuộc shop của user
+    public List<CustomerResponse> getCustomers(User user, String branchId) {
+        Shop shop = getShopOfUser(user);
+        return customerRepository.findByShopIdAndBranchId(shop.getId(), branchId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // Tạo khách hàng mới, gắn shopId
+    public CustomerResponse createCustomer(User user, CustomerRequest request) {
+        Shop shop = getShopOfUser(user);
+
+        Customer customer = new Customer();
+        customer.setShopId(shop.getId());
+        customer.setUserId(user.getId());
+        customer.setName(request.getName());
+        customer.setPhone(request.getPhone());
+        customer.setEmail(request.getEmail());
+        customer.setAddress(request.getAddress());
+        customer.setNote(request.getNote());
+        customer.setBranchId(request.getBranchId());
+
+        return toResponse(customerRepository.save(customer));
+    }
+
+    // Cập nhật khách hàng
+    public CustomerResponse updateCustomer(User user, String id, CustomerRequest request) {
+        Shop shop = getShopOfUser(user);
+
+        Customer existing = customerRepository.findById(id)
+                .filter(c -> c.getShopId().equals(shop.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
+        if (!existing.getBranchId().equals(request.getBranchId())) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
+        existing.setName(request.getName());
+        existing.setPhone(request.getPhone());
+        existing.setEmail(request.getEmail());
+        existing.setAddress(request.getAddress());
+        existing.setNote(request.getNote());
+
+        return toResponse(customerRepository.save(existing));
+    }
+
+    private CustomerResponse toResponse(Customer c) {
+        return CustomerResponse.builder()
+                .id(c.getId())
+                .name(c.getName())
+                .phone(c.getPhone())
+                .email(c.getEmail())
+                .address(c.getAddress())
+                .note(c.getNote())
+                .build();
+    }
+
+    // Xoá khách hàng
+    public void deleteCustomer(User user, String branchId, String id) {
+        Shop shop = getShopOfUser(user);
+
+        Customer customer = customerRepository.findById(id)
+                .filter(c -> c.getShopId().equals(shop.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
+        if (!customer.getBranchId().equals(branchId)) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
+        customerRepository.delete(customer);
+    }
+
+    // Helper: lấy shop của user hiện tại
+    private Shop getShopOfUser(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+    }
+}
+// File: src/main/java/com/example/sales/service/ExcelExportService.java
+package com.example.sales.service;
+
+import com.example.sales.export.GenericExcelExporter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+
+import java.io.InputStream;
+import java.util.List;
+import java.util.function.Function;
+
+@Service
+@RequiredArgsConstructor
+public class ExcelExportService {
+
+    public <T> ResponseEntity<byte[]> exportExcel(String fileName,
+                                                  String sheetName,
+                                                  List<String> headers,
+                                                  List<T> data,
+                                                  Function<T, List<String>> rowMapper) {
+        try {
+            GenericExcelExporter<T> exporter = new GenericExcelExporter<>();
+            InputStream excelStream = exporter.export(sheetName, headers, data, rowMapper);
+            byte[] content = excelStream.readAllBytes();
+
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            responseHeaders.setContentDisposition(ContentDisposition.attachment().filename(fileName).build());
+
+            return new ResponseEntity<>(content, responseHeaders, HttpStatus.OK);
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể export file Excel", e);
+        }
+    }
+}
+// File: src/main/java/com/example/sales/service/FileUploadService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.exception.BusinessException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class FileUploadService {
+
+    @Value("${app.upload.temp-dir:uploads/temp/}")
+    private String tempDir;
+
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final List<String> ALLOWED_MIME_TYPES = List.of(
+            "image/jpeg",
+            "image/png",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    public String upload(MultipartFile file) {
+        try {
+            log.info("Bắt đầu upload file: tên gốc = {}", file.getOriginalFilename());
+
+            if (file.isEmpty()) {
+                throw new BusinessException(ApiErrorCode.VALIDATION_ERROR, "File rỗng.");
+            }
+
+            if (file.getSize() > MAX_FILE_SIZE) {
+                throw new BusinessException(ApiErrorCode.VALIDATION_ERROR, "File vượt quá kích thước cho phép (5MB).");
+            }
+
+            String contentType = file.getContentType();
+            if (!ALLOWED_MIME_TYPES.contains(contentType)) {
+                throw new BusinessException(ApiErrorCode.VALIDATION_ERROR, "Loại file không được hỗ trợ: " + contentType);
+            }
+
+            // Tạo tên file ngẫu nhiên
+            String filename = UUID.randomUUID() + "_" + sanitize(file.getOriginalFilename());
+
+            // Đường dẫn thư mục uploads/temp/
+            Path uploadPath = Path.of(tempDir).toAbsolutePath();
+            Files.createDirectories(uploadPath);
+            log.debug("Thư mục upload: {}", uploadPath);
+
+            // Ghi file vào disk
+            Path filePath = uploadPath.resolve(filename);
+            file.transferTo(filePath);
+            log.info("File đã được lưu tại: {}", filePath);
+
+            // Trả về URL public
+            return "/uploads/temp/" + filename;
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi khi upload file", e);
+            throw new RuntimeException("Không thể upload file", e);
+        }
+    }
+
+    // Dọn tên file cho an toàn
+    private String sanitize(String original) {
+        String sanitized = original.replaceAll("[^a-zA-Z0-9._-]", "_");
+        log.debug("Sanitize tên file: {} -> {}", original, sanitized);
+        return sanitized;
+    }
+
+    public String moveToProduct(String imageUrl) {
+        try {
+            log.info("Di chuyển file từ temp sang product: {}", imageUrl);
+
+            // Chỉ xử lý nếu là ảnh trong uploads/temp
+            if (imageUrl == null || !imageUrl.startsWith("/uploads/temp/")) {
+                log.warn("Bỏ qua file không thuộc temp: {}", imageUrl);
+                return imageUrl; // đã là ảnh final hoặc ảnh CDN thì bỏ qua
+            }
+
+            String filename = Path.of(imageUrl).getFileName().toString();
+
+            Path tempPath = Path.of(tempDir).resolve(filename).toAbsolutePath();
+            Path productDir = Path.of("uploads/product").toAbsolutePath();
+            Files.createDirectories(productDir);
+            Path targetPath = productDir.resolve(filename);
+
+            if (Files.exists(tempPath)) {
+                Files.move(tempPath, targetPath);
+                log.info("Đã chuyển file: {} -> {}", tempPath, targetPath);
+            } else {
+                log.warn("File không tồn tại tại tempPath: {}", tempPath);
+            }
+
+            return "/uploads/product/" + filename;
+
+        } catch (Exception e) {
+            log.error("Lỗi khi di chuyển ảnh từ temp sang product", e);
+            throw new RuntimeException("Không thể chuyển ảnh từ temp sang product", e);
+        }
+    }
+
+}
+
+// File: src/main/java/com/example/sales/service/MailService.java
+package com.example.sales.service;
+
+import jakarta.mail.MessagingException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Service;
+
+import jakarta.mail.internet.MimeMessage;
+
+@Service
+@RequiredArgsConstructor
+public class MailService {
+
+    private final JavaMailSender mailSender;
+
+    @Value("${spring.mail.username}")
+    private String from;
+
+    public void send(String to, String subject, String htmlContent) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, "utf-8");
+
+            helper.setText(htmlContent, true); // true = html
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setFrom(from);
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("Không gửi được email", e);
+        }
+    }
+}
+// File: src/main/java/com/example/sales/service/OrderService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.*;
+import com.example.sales.dto.order.OrderItemResponse;
+import com.example.sales.dto.order.OrderRequest;
+import com.example.sales.dto.order.OrderResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.*;
+import com.example.sales.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+    private final ShopRepository shopRepository;
+    private final TableRepository tableRepository;
+    private final ProductRepository productRepository;
+    private final ShopUserService shopUserService;
+    private final PromotionRepository promotionRepository;
+    private final AuditLogService auditLogService;
+
+    public List<OrderResponse> getOrdersByUser(User user) {
+        Shop shop = getShopOfUser(user);
+        return orderRepository.findByShopId(shop.getId())
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public OrderResponse createOrder(User user, OrderRequest request) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
+
+        Order order = new Order();
+        order.setShopId(shop.getId());
+        order.setTableId(request.getTableId());
+        order.setUserId(user.getId());
+        order.setNote(request.getNote());
+        order.setStatus(OrderStatus.PENDING);
+        order.setPaid(false);
+        String branchId = request.getBranchId();
+        if (branchId != null && !branchId.isBlank()) {
+            order.setBranchId(branchId);
+        }
+
+        double[] totals = {0, 0}; // totals[0] for totalAmount, totals[1] for totalPrice
+
+        List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
+            Product product = productRepository.findById(reqItem.getProductId())
+                    .filter(p -> p.getShopId().equals(shop.getId()))
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+
+            if (requiresInventory(shop.getType()) && product.getQuantity() < reqItem.getQuantity()) {
+                throw new BusinessException(ApiErrorCode.PRODUCT_OUT_OF_STOCK);
+            }
+
+            if (requiresInventory(shop.getType())) {
+                product.setQuantity(product.getQuantity() - reqItem.getQuantity());
+                productRepository.save(product);
+            }
+
+            double basePrice = reqItem.getPrice();
+            double finalPrice = basePrice;
+            String promoId = null;
+
+            // Áp dụng khuyến mãi nếu có
+            Promotion promo = findApplicablePromotion(shop.getId(), branchId, product.getId());
+            if (promo != null) {
+                promoId = promo.getId();
+                if (promo.getDiscountType() == DiscountType.PERCENT) {
+                    finalPrice = basePrice * (1 - promo.getDiscountValue() / 100.0);
+                } else if (promo.getDiscountType() == DiscountType.AMOUNT) {
+                    finalPrice = Math.max(0, basePrice - promo.getDiscountValue());
+                }
+            }
+
+            OrderItem item = new OrderItem();
+            item.setProductId(product.getId());
+            item.setProductName(product.getName());
+            item.setQuantity(reqItem.getQuantity());
+            item.setPrice(basePrice);
+            item.setPriceAfterDiscount(finalPrice);
+            item.setAppliedPromotionId(promoId);
+
+            totals[0] += reqItem.getQuantity(); // Update totalAmount
+            totals[1] += reqItem.getQuantity() * finalPrice; // Update totalPrice
+
+            return item;
+        }).toList();
+
+        order.setItems(orderItems);
+        order.setTotalAmount(totals[0]);
+        order.setTotalPrice(totals[1]);
+
+        Order created = orderRepository.save(order);
+        releaseTable(created);
+        return toResponse(created);
+    }
+
+    public void cancelOrder(User user, String orderId) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
+        Order order = getOrderByShop(orderId, shop.getId());
+
+        if (order.isPaid()) {
+            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
+    }
+
+    public OrderResponse confirmPayment(User user, String orderId, String paymentId, String paymentMethod) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.CASHIER);
+
+        Order order = getOrderByShop(orderId, shop.getId());
+
+        if (order.isPaid()) {
+            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
+        }
+
+        order.setPaid(true);
+        order.setPaymentId(paymentId);
+        order.setPaymentMethod(paymentMethod);
+        order.setPaymentTime(LocalDateTime.now());
+        order.setStatus(OrderStatus.COMPLETED);
+
+        Order updated = orderRepository.save(order);
+        releaseTable(updated);
+        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "PAYMENT_CONFIRMED",
+                "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
+        return toResponse(updated);
+    }
+
+    public OrderResponse updateStatus(User user, String orderId, OrderStatus newStatus) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+        Order order = getOrderByShop(orderId, shop.getId());
+
+        if (shop.getType() == ShopType.RESTAURANT && newStatus == OrderStatus.SHIPPING) {
+            throw new BusinessException(ApiErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
+        }
+
+        order.setStatus(newStatus);
+
+        if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
+            order.setPaid(true);
+            order.setPaymentTime(LocalDateTime.now());
+            order.setPaymentMethod("Cash");
+        }
+
+        Order updated = orderRepository.save(order);
+        if (!order.getStatus().equals(newStatus)) {
+            auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "STATUS_UPDATED",
+                    "Cập nhật trạng thái từ %s → %s".formatted(order.getStatus(), newStatus));
+        }
+
+        return toResponse(updated);
+    }
+
+    public List<OrderResponse> getOrdersByStatus(User user, OrderStatus status, String branchId) {
+        Shop shop = getShopOfUser(user);
+        return orderRepository.findByShopIdAndBranchIdAndStatus(shop.getId(), branchId, status)
+                .stream().map(this::toResponse).toList();
+    }
+
+    // ==== Helpers ====
+
+    private boolean requiresInventory(ShopType type) {
+        return switch (type) {
+            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
+            default -> false;
+        };
+    }
+
+    private Shop getShopOfUser(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+    }
+
+    private Order getOrderByShop(String orderId, String shopId) {
+        return orderRepository.findById(orderId)
+                .filter(o -> o.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private void releaseTable(Order order) {
+        if (order.getTableId() != null) {
+            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+                table.setStatus(TableStatus.AVAILABLE);
+                table.setCurrentOrderId(null);
+                tableRepository.save(table);
+            });
+        }
+    }
+
+    private Promotion findApplicablePromotion(String shopId, String branchId, String productId) {
+        LocalDateTime now = LocalDateTime.now();
+        return promotionRepository.findByShopId(shopId).stream()
+                .filter(Promotion::isActive)
+                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
+                .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))
+                .filter(p -> p.getApplicableProductIds() == null
+                        || p.getApplicableProductIds().isEmpty()
+                        || p.getApplicableProductIds().contains(productId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private OrderResponse toResponse(Order order) {
+        return OrderResponse.builder()
+                .id(order.getId())
+                .tableId(order.getTableId())
+                .note(order.getNote())
+                .status(order.getStatus())
+                .paid(order.isPaid())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentId(order.getPaymentId())
+                .paymentTime(order.getPaymentTime())
+                .totalAmount(order.getTotalAmount())
+                .totalPrice(order.getTotalPrice())
+                .items(order.getItems().stream().map(this::toItemResponse).toList())
+                .build();
+    }
+
+    private OrderItemResponse toItemResponse(OrderItem item) {
+        return OrderItemResponse.builder()
+                .productId(item.getProductId())
+                .productName(item.getProductName())
+                .quantity(item.getQuantity())
+                .price(item.getPrice())
+                .priceAfterDiscount(item.getPriceAfterDiscount())
+                .appliedPromotionId(item.getAppliedPromotionId())
+                .build();
+    }
+}
+// File: src/main/java/com/example/sales/service/ProductImportService.java
+package com.example.sales.service;
+
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.model.User;
+import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
+import java.util.*;
+
+/*
+| Tên          | Mã | Danh mục | Số lượng | Giá   | Đơn vị | Ảnh     | Mô tả    | Trạng thái |
+| ------------ | -- | -------- | -------- | ----- | ------ | ------- | -------- | ---------- |
+| Sữa Vinamilk | A1 | Sữa      | 100      | 15000 | hộp    | url.png | Sữa tươi | Đang bán   |
+*/
+
+@Service
+@RequiredArgsConstructor
+public class ProductImportService {
+
+    private final ProductService productService;
+
+    public Map<String, Object> importExcel(User user, String branchId, MultipartFile file) {
+        int successCount = 0;
+        int failCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        try (InputStream inputStream = file.getInputStream();
+             Workbook workbook = WorkbookFactory.create(inputStream)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            int rows = sheet.getPhysicalNumberOfRows();
+
+            for (int i = 1; i < rows; i++) { // bỏ dòng header
+                Row row = sheet.getRow(i);
+                try {
+                    ProductRequest req = parseRow(row);
+                    req.setBranchId(branchId);
+                    productService.createProduct(user, req);
+                    successCount++;
+                } catch (Exception ex) {
+                    failCount++;
+                    errors.add("Dòng " + (i + 1) + ": " + ex.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể đọc file Excel", e);
+        }
+
+        return Map.of(
+                "success", successCount,
+                "failed", failCount,
+                "errors", errors
+        );
+    }
+
+    private ProductRequest parseRow(Row row) {
+        ProductRequest req = new ProductRequest();
+        req.setName(getString(row, 0));
+        req.setProductCode(getString(row, 1));
+        req.setCategory(getString(row, 2));
+        req.setQuantity(getInt(row, 3));
+        req.setPrice(getDouble(row, 4));
+        req.setUnit(getString(row, 5));
+        req.setImageUrl(getString(row, 6));
+        req.setDescription(getString(row, 7));
+
+        String status = getString(row, 8).toLowerCase();
+        req.setActive(!status.contains("ngưng"));
+
+        return req;
+    }
+
+    private String getString(Row row, int i) {
+        Cell cell = row.getCell(i, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        return cell.toString().trim();
+    }
+
+    private int getInt(Row row, int i) {
+        try {
+            return (int) Double.parseDouble(getString(row, i));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private double getDouble(Row row, int i) {
+        try {
+            return Double.parseDouble(getString(row, i));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+}
+// File: src/main/java/com/example/sales/service/ProductService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.ShopType;
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.dto.product.ProductSearchRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.helper.ProductSearchHelper;
+import com.example.sales.model.Product;
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.repository.ProductRepository;
+import com.example.sales.repository.ShopRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class ProductService {
+
+    private final ProductRepository productRepository;
+    private final ShopRepository shopRepository;
+    private final ProductSearchHelper productSearchHelper;
+    private final ShopUserService shopUserService;
+    private final FileUploadService fileUploadService;
+    private final AuditLogService auditLogService;
+
+    public List<ProductResponse> getAllByUser(User user) {
+        Shop shop = getShopOfUser(user);
+        return productRepository.findByShopId(shop.getId())
+                .stream().map(this::toResponse).toList();
+    }
+
+    public ProductResponse createProduct(User user, ProductRequest request) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+        String productCode = request.getProductCode();
+        if (productCode == null || productCode.isBlank()) {
+            productCode = UUID.randomUUID().toString(); // hoặc custom logic
+        }
+        String finalImageUrl = fileUploadService.moveToProduct(request.getImageUrl());
+        Product product = Product.builder()
+                .name(request.getName())
+                .category(request.getCategory())
+                .price(request.getPrice())
+                .unit(request.getUnit())
+                .imageUrl(finalImageUrl)
+                .description(request.getDescription())
+                .active(request.isActive())
+                .shopId(shop.getId())
+                .productCode(productCode)
+                .branchId(request.getBranchId())
+                .build();
+
+        if (requiresInventory(shop.getType())) {
+            product.setQuantity(request.getQuantity());
+        } else {
+            product.setQuantity(0);
+        }
+
+        return toResponse(productRepository.save(product));
+    }
+
+    public ProductResponse updateProduct(User user, String id, ProductRequest request) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+
+        Product existing = productRepository.findById(id)
+                .filter(p -> p.getShopId().equals(shop.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+
+        existing.setName(request.getName());
+        existing.setCategory(request.getCategory());
+        existing.setPrice(request.getPrice());
+        existing.setUnit(request.getUnit());
+        existing.setImageUrl(request.getImageUrl());
+        existing.setDescription(request.getDescription());
+        existing.setActive(request.isActive());
+
+        if (requiresInventory(shop.getType())) {
+            existing.setQuantity(request.getQuantity());
+        } else {
+            existing.setQuantity(0);
+        }
+
+        Product updatedProduct = productRepository.save(existing);
+        if (existing.getPrice() != request.getPrice()) {
+            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "PRICE_CHANGED",
+                    "Thay đổi giá từ %.2f → %.2f".formatted(existing.getPrice(), request.getPrice()));
+        }
+
+        if (!existing.getCategory().equals(request.getCategory())) {
+            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
+                    "Chuyển danh mục từ %s → %s".formatted(existing.getCategory(), request.getCategory()));
+        }
+
+        if (existing.getQuantity() != request.getQuantity()) {
+            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
+                    "Thay đổi tồn kho từ %d → %d".formatted(existing.getQuantity(), request.getQuantity()));
+        }
+
+        return toResponse(updatedProduct);
+    }
+
+    public void deleteProduct(User user, String id) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+
+        Product existing = productRepository.findById(id)
+                .filter(p -> p.getShopId().equals(shop.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+
+        productRepository.delete(existing);
+    }
+
+    public Page<ProductResponse> search(User user, ProductSearchRequest req) {
+        Shop shop = getShopOfUser(user);
+        Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
+
+        List<Product> results = productSearchHelper.search(shop.getId(), req.getBranchId(), req, pageable);
+        long total = productSearchHelper.counts(shop.getId(), req.getBranchId(), req);
+
+        return new PageImpl<>(
+                results.stream().map(this::toResponse).toList(),
+                pageable,
+                total
+        );
+    }
+
+    public List<Product> searchAllForExport(User user, ProductSearchRequest req) {
+        Shop shop = getShopOfUser(user);
+        return productSearchHelper.search(shop.getId(), req.getBranchId(), req, Pageable.unpaged());
+    }
+
+    public ProductResponse toggleActive(User user, String id) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+
+        Product product = productRepository.findById(id)
+                .filter(p -> p.getShopId().equals(shop.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+
+        product.setActive(!product.isActive());
+        return toResponse(productRepository.save(product));
+    }
+
+    public List<ProductResponse> getLowStock(User user, int threshold) {
+        Shop shop = getShopOfUser(user);
+
+        if (!requiresInventory(shop.getType())) {
+            return List.of();
+        }
+
+        return productRepository.findByShopId(shop.getId()).stream()
+                .filter(p -> p.getQuantity() < threshold)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ============ Helpers ============
+
+    private Shop getShopOfUser(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+    }
+
+    private ProductResponse toResponse(Product product) {
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .category(product.getCategory())
+                .quantity(product.getQuantity())
+                .price(product.getPrice())
+                .unit(product.getUnit())
+                .imageUrl(product.getImageUrl())
+                .description(product.getDescription())
+                .active(product.isActive())
+                .productCode(product.getProductCode())
+                .createdAt(product.getCreatedAt() != null ? product.getCreatedAt().toString() : null)
+                .updatedAt(product.getUpdatedAt() != null ? product.getUpdatedAt().toString() : null)
+                .build();
+    }
+
+    private boolean requiresInventory(ShopType type) {
+        return switch (type) {
+            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
+            case RESTAURANT, CAFE, BAR, OTHER -> false;
+        };
+    }
+}
+// File: src/main/java/com/example/sales/service/PromotionService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.dto.promotion.PromotionRequest;
+import com.example.sales.dto.promotion.PromotionResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Promotion;
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.repository.PromotionRepository;
+import com.example.sales.repository.ShopRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class PromotionService {
+
+    private final PromotionRepository promotionRepository;
+    private final ShopRepository shopRepository;
+
+    public List<PromotionResponse> getAll(User user, String branchId) {
+        String shopId = getShopOfUser(user).getId();
+        return promotionRepository.findByShopIdAndBranchId(shopId, branchId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public PromotionResponse create(User user, PromotionRequest request) {
+        Shop shop = getShopOfUser(user);
+        Promotion promotion = Promotion.builder()
+                .shopId(shop.getId())
+                .name(request.getName())
+                .discountType(request.getDiscountType())
+                .discountValue(request.getDiscountValue())
+                .applicableProductIds(request.getApplicableProductIds())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .active(request.isActive())
+                .branchId(request.getBranchId())
+                .build();
+
+        return toResponse(promotionRepository.save(promotion));
+    }
+
+    public PromotionResponse update(User user, String id, PromotionRequest request) {
+        String shopId = getShopOfUser(user).getId();
+
+        Promotion promotion = promotionRepository.findById(id)
+                .filter(p -> p.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PROMOTION_NOT_FOUND));
+        if (!promotion.getBranchId().equals(request.getBranchId())) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
+
+        promotion.setName(request.getName());
+        promotion.setDiscountType(request.getDiscountType());
+        promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setApplicableProductIds(request.getApplicableProductIds());
+        promotion.setStartDate(request.getStartDate());
+        promotion.setEndDate(request.getEndDate());
+        promotion.setActive(request.isActive());
+
+        return toResponse(promotionRepository.save(promotion));
+    }
+
+    public void delete(User user, String id) {
+        String shopId = getShopOfUser(user).getId();
+        Promotion promotion = promotionRepository.findById(id)
+                .filter(p -> p.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PROMOTION_NOT_FOUND));
+
+        promotionRepository.delete(promotion);
+    }
+
+    private PromotionResponse toResponse(Promotion p) {
+        return PromotionResponse.builder()
+                .id(p.getId())
+                .name(p.getName())
+                .discountType(p.getDiscountType())
+                .discountValue(p.getDiscountValue())
+                .applicableProductIds(p.getApplicableProductIds())
+                .startDate(p.getStartDate())
+                .endDate(p.getEndDate())
+                .active(p.isActive())
+                .build();
+    }
+
+    private Shop getShopOfUser(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.SHOP_NOT_FOUND));
+    }
+}
+// File: src/main/java/com/example/sales/service/ReportService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.dto.report.DailyReportResponse;
+import com.example.sales.dto.report.ReportRequest;
+import com.example.sales.dto.report.ReportResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Order;
+import com.example.sales.model.User;
+import com.example.sales.repository.ShopRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+
+@Service
+@RequiredArgsConstructor
+public class ReportService {
+
+    private final MongoTemplate mongoTemplate;
+    private final ShopRepository shopRepository;
+    private final ExcelExportService excelExportService;
+
+    /**
+     * Tổng hợp báo cáo đơn hàng (tổng doanh thu, tổng đơn, tổng sản phẩm) theo bộ lọc
+     */
+    public ReportResponse getReport(User user, ReportRequest request) {
+        String shopId = getShopIdOfUser(user);
+
+        MatchOperation match = buildMatchOperation(shopId, request);
+
+        Aggregation aggregation = newAggregation(
+                match,
+                unwind("items"),
+                group()
+                        .count().as("totalOrders")
+                        .sum("items.quantity").as("totalProductsSold")
+                        .sum("totalPrice").as("totalRevenue")
+        );
+
+        AggregationResults<ReportResponse> results =
+                mongoTemplate.aggregate(aggregation, Order.class, ReportResponse.class);
+
+        ReportResponse response = results.getUniqueMappedResult();
+
+        return response != null ? response : ReportResponse.builder()
+                .totalOrders(0)
+                .totalProductsSold(0)
+                .totalRevenue(0)
+                .build();
+    }
+
+    /**
+     * Thống kê doanh thu theo ngày (dùng để hiển thị biểu đồ hoặc export)
+     */
+    public List<DailyReportResponse> getDailyReport(User user, ReportRequest request) {
+        String shopId = getShopIdOfUser(user);
+
+        MatchOperation match = buildMatchOperation(shopId, request);
+
+        ProjectionOperation projectDate = project()
+                .andExpression("year(createdAt)").as("year")
+                .andExpression("month(createdAt)").as("month")
+                .andExpression("dayOfMonth(createdAt)").as("day")
+                .and("totalPrice").as("totalPrice")
+                .and("items").as("items");
+
+        Aggregation aggregation = newAggregation(
+                match,
+                projectDate,
+                unwind("items"),
+                group("year", "month", "day")
+                        .count().as("totalOrders")
+                        .sum("items.quantity").as("totalProductsSold")
+                        .sum("totalPrice").as("totalRevenue"),
+                project()
+                        .andExpression("dateFromParts(year: _id.year, month: _id.month, day: _id.day)").as("date")
+                        .andInclude("totalOrders", "totalProductsSold", "totalRevenue"),
+                sort(Sort.Direction.ASC, "date")
+        );
+
+        AggregationResults<DailyReportResponse> results =
+                mongoTemplate.aggregate(aggregation, Order.class, DailyReportResponse.class);
+
+        return results.getMappedResults();
+    }
+
+    /**
+     * Export báo cáo doanh thu theo ngày ra file Excel
+     */
+    public ResponseEntity<byte[]> exportDailyReportExcel(User user,
+                                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        ReportRequest request = new ReportRequest();
+        request.setStartDate(startDate);
+        request.setEndDate(endDate);
+
+        List<DailyReportResponse> data = getDailyReport(user, request);
+
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        return excelExportService.exportExcel(
+                "daily-report.xlsx",
+                "Báo cáo theo ngày",
+                List.of("Ngày", "Tổng đơn", "Tổng sản phẩm", "Tổng doanh thu"),
+                data,
+                r -> List.of(
+                        r.getDate().format(df),
+                        String.valueOf(r.getTotalOrders()),
+                        String.valueOf(r.getTotalProductsSold()),
+                        String.valueOf(r.getTotalRevenue())
+                )
+        );
+    }
+
+    /**
+     * Build điều kiện lọc dữ liệu Mongo
+     */
+    private MatchOperation buildMatchOperation(String shopId, ReportRequest request) {
+        Criteria criteria = Criteria.where("shopId").is(shopId);
+
+        if (request.getStatus() != null) {
+            criteria = criteria.and("status").is(request.getStatus());
+        }
+
+        if (request.getStartDate() != null && request.getEndDate() != null) {
+            LocalDateTime start = request.getStartDate().atStartOfDay();
+            LocalDateTime end = request.getEndDate().atTime(LocalTime.MAX);
+            criteria = criteria.and("createdAt").gte(start).lte(end);
+        }
+
+        return match(criteria);
+    }
+
+    /**
+     * Lấy ID cửa hàng của user hiện tại
+     */
+    private String getShopIdOfUser(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND))
+                .getId();
+    }
+}
+// File: src/main/java/com/example/sales/service/ShopService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.dto.ShopRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.repository.ShopRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class ShopService {
+
+    private final ShopRepository shopRepository;
+
+    public Shop createShop(User owner, ShopRequest request) {
+        if (shopRepository.findByOwnerId(owner.getId()).isPresent()) {
+            throw new BusinessException(ApiErrorCode.SHOP_ALREADY_EXISTS);
+        }
+
+        Shop shop = new Shop();
+        shop.setName(request.getName());
+        shop.setType(request.getType());
+        shop.setAddress(request.getAddress());
+        shop.setPhone(request.getPhone());
+        shop.setLogoUrl(request.getLogoUrl());
+        shop.setOwnerId(owner.getId());
+
+        return shopRepository.save(shop);
+    }
+
+    public Shop getMyShop(User user) {
+        return shopRepository.findByOwnerId(user.getId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+    }
+
+    public Shop updateMyShop(User user, ShopRequest request) {
+        Shop shop = getMyShop(user);
+
+        shop.setName(request.getName());
+        shop.setType(request.getType());
+        shop.setAddress(request.getAddress());
+        shop.setPhone(request.getPhone());
+        shop.setLogoUrl(request.getLogoUrl());
+
+        return shopRepository.save(shop);
+    }
+}
+// File: src/main/java/com/example/sales/service/ShopUserService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.ShopUser;
+import com.example.sales.repository.ShopUserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class ShopUserService {
+
+    private final ShopUserRepository shopUserRepository;
+
+    public ShopRole getUserRoleInShop(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(ShopUser::getRole)
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.UNAUTHORIZED));
+    }
+
+    public boolean isOwner(String shopId, String userId) {
+        return getUserRoleInShop(shopId, userId) != ShopRole.OWNER;
+    }
+
+    public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
+        ShopRole actual = getUserRoleInShop(shopId, userId);
+        if (Arrays.stream(roles).noneMatch(role -> role == actual)) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
+    }
+
+    public void requireOwner(String shopId, String userId) {
+        if (isOwner(shopId, userId)) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
+    }
+
+    public void addUser(String shopId, String userId, ShopRole role) {
+        Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserId(shopId, userId);
+        if (existing.isPresent()) {
+            throw new BusinessException(ApiErrorCode.DUPLICATE_DATA);
+        }
+
+        ShopUser shopUser = ShopUser.builder()
+                .shopId(shopId)
+                .userId(userId)
+                .role(role)
+                .build();
+
+        shopUserRepository.save(shopUser);
+    }
+
+    public void removeUser(String shopId, String userId) {
+        ShopUser user = shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.NOT_FOUND));
+        shopUserRepository.delete(user);
+    }
+}
+// File: src/main/java/com/example/sales/service/TableService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.TableStatus;
+import com.example.sales.dto.TableRequest;
+import com.example.sales.dto.TableResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
+import com.example.sales.model.Table;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.TableRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class TableService {
+
+    private final TableRepository tableRepository;
+    private final ShopRepository shopRepository;
+
+    public TableResponse create(TableRequest request) {
+        Shop shop = shopRepository.findById(request.getShopId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+
+        Table table = Table.builder()
+                .name(request.getName())
+                .shopId(shop.getId())
+                .branchId(request.getBranchId())
+                .status(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE))
+                .capacity(request.getCapacity())
+                .note(request.getNote())
+                .build();
+
+        return toResponse(tableRepository.save(table), shop);
+    }
+
+    public List<TableResponse> getByShop(String shopId, String branchId) {
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+
+        return tableRepository.findByShopIdAndBranchId(shopId, branchId)
+                .stream()
+                .map(table -> toResponse(table, shop))
+                .toList();
+    }
+
+    public TableResponse updateStatus(String tableId, TableStatus status) {
+        Table table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.TABLE_NOT_FOUND));
+
+        table.setStatus(status);
+        return toResponse(tableRepository.save(table));
+    }
+
+    private TableResponse toResponse(Table table) {
+        Shop shop = shopRepository.findById(table.getShopId()).orElse(null);
+
+        return TableResponse.builder()
+                .id(table.getId())
+                .name(table.getName())
+                .status(table.getStatus())
+                .shopId(table.getShopId())
+                .shopName(shop != null ? shop.getName() : null)
+                .capacity(table.getCapacity())
+                .note(table.getNote())
+                .currentOrderId(table.getCurrentOrderId())
+                .build();
+    }
+
+    private TableResponse toResponse(Table table, Shop shop) {
+        return TableResponse.builder()
+                .id(table.getId())
+                .name(table.getName())
+                .status(table.getStatus())
+                .shopId(shop.getId())
+                .branchId(table.getBranchId()) // ✅ include branchId
+                .shopName(shop.getName())
+                .capacity(table.getCapacity())
+                .note(table.getNote())
+                .currentOrderId(table.getCurrentOrderId())
+                .build();
+    }
+}
+
+// File: src/main/java/com/example/sales/service/TokenService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.RefreshToken;
+import com.example.sales.model.User;
+import com.example.sales.repository.RefreshTokenRepository;
+import com.example.sales.repository.UserRepository;
+import com.example.sales.security.JwtUtil;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class TokenService {
+
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+
+    public RefreshToken createRefreshToken(User user) {
+        RefreshToken token = new RefreshToken();
+        token.setToken(UUID.randomUUID().toString());
+        token.setUserId(user.getId());
+        token.setExpiryDate(new Date(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000)); // 7 ngày
+
+        return refreshTokenRepository.save(token);
+    }
+
+    public String refreshAccessToken(String refreshTokenValue) {
+        RefreshToken token = refreshTokenRepository.findByToken(refreshTokenValue)
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.REFRESH_TOKEN_INVALID));
+
+        if (token.getExpiryDate().before(new Date())) {
+            refreshTokenRepository.delete(token);
+            throw new BusinessException(ApiErrorCode.REFRESH_TOKEN_EXPIRED);
+        }
+
+        User user = userRepository.findById(token.getUserId())
+                .orElseThrow(() -> new BusinessException(ApiErrorCode.USER_NOT_FOUND));
+
+        return jwtUtil.generateToken(user);
+    }
+
+    public void revokeToken(String refreshToken) {
+        refreshTokenRepository.findByToken(refreshToken)
+                .ifPresent(refreshTokenRepository::delete);
+    }
+}
+// File: src/main/java/com/example/sales/service/UserService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public User getCurrentUser(User user) {
+        return user;
+    }
+
+    public User updateProfile(User user, String fullName, String phone, String businessType) {
+        user.setFullName(fullName);
+        user.setPhone(phone);
+        user.setBusinessType(businessType);
+        return userRepository.save(user);
+    }
+
+    public void changePassword(User user, String currentPassword, String newPassword) {
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new BusinessException(ApiErrorCode.INCORRECT_PASSWORD);
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+}
+// File: src/main/java/com/example/sales/util/MessageService.java
+package com.example.sales.util;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.stereotype.Component;
+
+import java.util.Locale;
+
+@Component
+@RequiredArgsConstructor
+public class MessageService {
+
+    private final MessageSource messageSource;
+
+    public String get(String code, Locale locale) {
+        return messageSource.getMessage(code, null, code, locale);
+    }
+}
+// File: src/main/java/com/example/sales/SalesApplication.java
+package com.example.sales;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.mongodb.config.EnableMongoAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@EnableMongoAuditing(auditorAwareRef = "auditorAware")
+@EnableScheduling
+@SpringBootApplication
+public class SalesApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(SalesApplication.class, args);
+	}
+
+}
+
+// File: src/main/java/com/example/sales/exception/ApiError.java
+package com.example.sales.exception;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class ApiError {
+    private int status;
+    private String message;
+}
+
+// File: src/main/java/com/example/sales/security/CustomUserDetails.java
+package com.example.sales.security;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+
+@Getter
+@AllArgsConstructor
+public class CustomUserDetails implements UserDetails {
+
+    private final String id;
+    private final String email;
+    private final Collection<? extends GrantedAuthority> authorities;
+
+    @Override public String getUsername() { return email; }
+    @Override public String getPassword() { return null; } // không dùng
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+    @Override public boolean isEnabled() { return true; }
+}
+
+// File: src/main/java/com/example/sales/validation/DateRangeValidator.java
+package com.example.sales.validation;
+
+import com.example.sales.dto.report.ReportRequest;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+
+public class DateRangeValidator implements ConstraintValidator<ValidDateRange, ReportRequest> {
+
+    @Override
+    public boolean isValid(ReportRequest req, ConstraintValidatorContext context) {
+        if (req.getStartDate() == null || req.getEndDate() == null) {
+            return false; // bắt buộc cả 2 phải có
+        }
+        return !req.getStartDate().isAfter(req.getEndDate());
+    }
+}
+
+// File: src/main/java/com/example/sales/security/PermissionChecker.java
+package com.example.sales.security;
+
+import com.example.sales.constant.ShopRole;
+import com.example.sales.repository.ShopUserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+public class PermissionChecker {
+
+    private final ShopUserRepository shopUserRepository;
+
+    public boolean isOwner(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.OWNER)
+                .orElse(false);
+    }
+
+    public boolean isStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.STAFF)
+                .orElse(false);
+    }
+
+    public boolean isOwnerOrStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> {
+                    ShopRole role = shopUser.getRole();
+                    return role == ShopRole.OWNER || role == ShopRole.STAFF;
+                }).orElse(false);
+    }
+}
+
+// File: src/main/java/com/example/sales/repository/base/SoftDeleteRepository.java
+package com.example.sales.repository.base;
+
+import org.springframework.data.mongodb.repository.MongoRepository;
+import java.util.List;
+import java.util.Optional;
+
+public interface SoftDeleteRepository<T, ID> extends MongoRepository<T, ID> {
+    List<T> findAllActive();
+    Optional<T> findActiveById(ID id);
+}
+
+// File: src/main/java/com/example/sales/repository/base/SoftDeleteRepositoryImpl.java
+package com.example.sales.repository.base;
+
+import com.example.sales.model.base.BaseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+
+import java.util.List;
+import java.util.Optional;
+
+public abstract class SoftDeleteRepositoryImpl<T extends BaseEntity, ID> implements SoftDeleteRepository<T, ID> {
+
+    @Autowired
+    protected MongoTemplate mongoTemplate;
+
+    private final Class<T> entityClass;
+
+    public SoftDeleteRepositoryImpl(Class<T> entityClass) {
+        this.entityClass = entityClass;
+    }
+
+    @Override
+    public List<T> findAllActive() {
+        return mongoTemplate.find(Query.query(Criteria.where("deleted").is(false)), entityClass);
+    }
+
+    @Override
+    public Optional<T> findActiveById(ID id) {
+        Query query = new Query(Criteria.where("id").is(id).and("deleted").is(false));
+        return Optional.of(mongoTemplate.findOne(query, entityClass));
+    }
+}
+
+// File: src/main/java/com/example/sales/validation/ValidDateRange.java
+package com.example.sales.validation;
+
+import jakarta.validation.Constraint;
+import jakarta.validation.Payload;
+
+import java.lang.annotation.*;
+
+@Documented
+@Constraint(validatedBy = DateRangeValidator.class)
+@Target({ ElementType.TYPE })
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ValidDateRange {
+    String message() default "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc";
+
+    Class<?>[] groups() default {};
+
+    Class<? extends Payload>[] payload() default {};
+}
+
+[END]

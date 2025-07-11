@@ -34,16 +34,18 @@ public class JwtUtil {
                 .compact();
     }
 
-    public String extractRole(String token) {
-        return getClaims(token).get("role", String.class);
-    }
-
-    // Lấy userId từ token
     public String extractUserId(String token) {
         return getClaims(token).getSubject();
     }
 
-    // Kiểm tra token hợp lệ
+    public String extractRole(String token) {
+        return getClaims(token).get("role", String.class);
+    }
+
+    public String extractEmail(String token) {
+        return getClaims(token).get("email", String.class);
+    }
+
     public boolean isTokenValid(String token) {
         try {
             getClaims(token);
@@ -53,7 +55,6 @@ public class JwtUtil {
         }
     }
 
-    // Parse token ra Claims
     private Claims getClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)

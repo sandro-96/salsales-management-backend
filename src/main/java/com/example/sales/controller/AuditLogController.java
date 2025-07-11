@@ -8,6 +8,7 @@ import com.example.sales.model.AuditLog;
 import com.example.sales.repository.AuditLogRepository;
 import com.example.sales.util.MessageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.Locale;
 @RestController
 @RequestMapping("/api/audit")
 @RequiredArgsConstructor
+@Validated
 public class AuditLogController {
 
     private final AuditLogRepository auditLogRepository;

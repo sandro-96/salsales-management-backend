@@ -2,6 +2,7 @@
 
 package com.example.sales.controller;
 
+import com.example.sales.constant.ApiErrorCode;
 import com.example.sales.constant.ApiMessage;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.ShopRequest;
@@ -11,6 +12,7 @@ import com.example.sales.service.ShopService;
 import com.example.sales.util.MessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Locale;
@@ -18,6 +20,7 @@ import java.util.Locale;
 @RestController
 @RequestMapping("/api/shops")
 @RequiredArgsConstructor
+@Validated
 public class ShopController {
 
     private final ShopService shopService;
@@ -31,8 +34,11 @@ public class ShopController {
     }
 
     @GetMapping("/me")
-    public ApiResponse<Shop> getMyShop(@AuthenticationPrincipal User user, Locale locale) {
+    public ApiResponse<?> getMyShop(@AuthenticationPrincipal User user, Locale locale) {
         Shop shop = shopService.getMyShop(user);
+        if (shop == null) {
+            return ApiResponse.error(ApiErrorCode.SHOP_NOT_FOUND, messageService, locale);
+        }
         return ApiResponse.success(ApiMessage.SUCCESS, shop, messageService, locale);
     }
 

@@ -10,8 +10,8 @@ import com.example.sales.model.User;
 import com.example.sales.service.AdminUserService;
 import com.example.sales.util.MessageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +20,7 @@ import java.util.Locale;
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
+@Validated
 public class AdminUserController {
 
     private final AdminUserService adminUserService;

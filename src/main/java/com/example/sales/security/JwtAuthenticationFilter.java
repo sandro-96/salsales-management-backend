@@ -1,13 +1,12 @@
 // File: src/main/java/com/example/sales/security/JwtAuthenticationFilter.java
 package com.example.sales.security;
 
-import com.example.sales.model.User;
-import com.example.sales.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,12 +16,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,23 +35,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String token = authHeader.substring(7); // bỏ "Bearer "
+        String token = authHeader.substring(7);
         if (!jwtUtil.isTokenValid(token)) {
+            log.warn("JWT không hợp lệ hoặc hết hạn: {}", token);
             filterChain.doFilter(request, response);
             return;
         }
 
-        String userId = jwtUtil.extractUserId(token);
-        User user = userRepository.findById(userId).orElse(null);
-
-        if (user != null) {
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            String userId = jwtUtil.extractUserId(token);
+            String email = jwtUtil.extractEmail(token);
             String role = jwtUtil.extractRole(token);
-            List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
+
+            CustomUserDetails userDetails = new CustomUserDetails(
+                    userId,
+                    email,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+            );
 
             UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(user, null, authorities);
+                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
+            log.debug("JWT hợp lệ. Gán userId = {}, role = {}", userId, role);
         }
 
         filterChain.doFilter(request, response);
