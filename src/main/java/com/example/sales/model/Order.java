@@ -16,6 +16,7 @@ public class Order extends BaseEntity {
     private String id;
 
     private String shopId;             // ✔️ Ràng buộc chặt với 1 shop
+    private String branchId;            // ✔️ Ràng buộc chặt với 1 chi nhánh
     private String tableId;            // ✔️ Gắn bàn (có thể null)
 
     private String userId;             // Ai tạo đơn

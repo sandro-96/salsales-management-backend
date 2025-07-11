@@ -29,6 +29,7 @@ public class TableService {
         Table table = Table.builder()
                 .name(request.getName())
                 .shopId(shop.getId())
+                .branchId(request.getBranchId())
                 .status(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE))
                 .capacity(request.getCapacity())
                 .note(request.getNote())
@@ -37,11 +38,12 @@ public class TableService {
         return toResponse(tableRepository.save(table), shop);
     }
 
-    public List<TableResponse> getByShop(String shopId) {
+    public List<TableResponse> getByShop(String shopId, String branchId) {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
 
-        return tableRepository.findByShopId(shopId).stream()
+        return tableRepository.findByShopIdAndBranchId(shopId, branchId)
+                .stream()
                 .map(table -> toResponse(table, shop))
                 .toList();
     }
@@ -75,6 +77,7 @@ public class TableService {
                 .name(table.getName())
                 .status(table.getStatus())
                 .shopId(shop.getId())
+                .branchId(table.getBranchId()) // ✅ include branchId
                 .shopName(shop.getName())
                 .capacity(table.getCapacity())
                 .note(table.getNote())

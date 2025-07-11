@@ -1,10 +1,11 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.ShopType;
-import com.example.sales.dto.ProductRequest;
-import com.example.sales.dto.ProductResponse;
-import com.example.sales.dto.ProductSearchRequest;
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.helper.ProductSearchHelper;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,9 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
     private final ProductSearchHelper productSearchHelper;
+    private final ShopUserService shopUserService;
+    private final FileUploadService fileUploadService;
+    private final AuditLogService auditLogService;
 
     public List<ProductResponse> getAllByUser(User user) {
         Shop shop = getShopOfUser(user);
@@ -35,16 +40,23 @@ public class ProductService {
 
     public ProductResponse createProduct(User user, ProductRequest request) {
         Shop shop = getShopOfUser(user);
-
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+        String productCode = request.getProductCode();
+        if (productCode == null || productCode.isBlank()) {
+            productCode = UUID.randomUUID().toString(); // hoặc custom logic
+        }
+        String finalImageUrl = fileUploadService.moveToProduct(request.getImageUrl());
         Product product = Product.builder()
                 .name(request.getName())
                 .category(request.getCategory())
                 .price(request.getPrice())
                 .unit(request.getUnit())
-                .imageUrl(request.getImageUrl())
+                .imageUrl(finalImageUrl)
                 .description(request.getDescription())
                 .active(request.isActive())
                 .shopId(shop.getId())
+                .productCode(productCode)
+                .branchId(request.getBranchId())
                 .build();
 
         if (requiresInventory(shop.getType())) {
@@ -58,6 +70,7 @@ public class ProductService {
 
     public ProductResponse updateProduct(User user, String id, ProductRequest request) {
         Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
 
         Product existing = productRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shop.getId()))
@@ -77,11 +90,28 @@ public class ProductService {
             existing.setQuantity(0);
         }
 
-        return toResponse(productRepository.save(existing));
+        Product updatedProduct = productRepository.save(existing);
+        if (existing.getPrice() != request.getPrice()) {
+            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "PRICE_CHANGED",
+                    "Thay đổi giá từ %.2f → %.2f".formatted(existing.getPrice(), request.getPrice()));
+        }
+
+        if (!existing.getCategory().equals(request.getCategory())) {
+            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
+                    "Chuyển danh mục từ %s → %s".formatted(existing.getCategory(), request.getCategory()));
+        }
+
+        if (existing.getQuantity() != request.getQuantity()) {
+            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
+                    "Thay đổi tồn kho từ %d → %d".formatted(existing.getQuantity(), request.getQuantity()));
+        }
+
+        return toResponse(updatedProduct);
     }
 
     public void deleteProduct(User user, String id) {
         Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
 
         Product existing = productRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shop.getId()))
@@ -94,8 +124,8 @@ public class ProductService {
         Shop shop = getShopOfUser(user);
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
 
-        List<Product> results = productSearchHelper.search(shop.getId(), req, pageable);
-        long total = productSearchHelper.counts(shop.getId(), req);
+        List<Product> results = productSearchHelper.search(shop.getId(), req.getBranchId(), req, pageable);
+        long total = productSearchHelper.counts(shop.getId(), req.getBranchId(), req);
 
         return new PageImpl<>(
                 results.stream().map(this::toResponse).toList(),
@@ -106,11 +136,12 @@ public class ProductService {
 
     public List<Product> searchAllForExport(User user, ProductSearchRequest req) {
         Shop shop = getShopOfUser(user);
-        return productSearchHelper.search(shop.getId(), req, Pageable.unpaged());
+        return productSearchHelper.search(shop.getId(), req.getBranchId(), req, Pageable.unpaged());
     }
 
     public ProductResponse toggleActive(User user, String id) {
         Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
 
         Product product = productRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shop.getId()))
@@ -151,6 +182,9 @@ public class ProductService {
                 .imageUrl(product.getImageUrl())
                 .description(product.getDescription())
                 .active(product.isActive())
+                .productCode(product.getProductCode())
+                .createdAt(product.getCreatedAt() != null ? product.getCreatedAt().toString() : null)
+                .updatedAt(product.getUpdatedAt() != null ? product.getUpdatedAt().toString() : null)
                 .build();
     }
 

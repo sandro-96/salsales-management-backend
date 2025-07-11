@@ -1,6 +1,6 @@
 package com.example.sales.helper;
 
-import com.example.sales.dto.CustomerSearchRequest;
+import com.example.sales.dto.customer.CustomerSearchRequest;
 import com.example.sales.model.Customer;
 import org.bson.Document;
 import org.springframework.data.domain.Pageable;

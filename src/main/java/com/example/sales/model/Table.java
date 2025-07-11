@@ -18,6 +18,7 @@ public class Table extends BaseEntity {
     private String id;
 
     private String shopId;               // ✔️ ID của cửa hàng
+    private String branchId;             // ✔️ ID của chi nhánh (có thể null nếu không phân biệt chi nhánh)
     private String name;                 // Tên bàn (B1, B2...)
     private TableStatus status;         // Trạng thái bàn
 

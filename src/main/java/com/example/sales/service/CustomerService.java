@@ -1,6 +1,8 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.dto.customer.CustomerRequest;
+import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Customer;
@@ -21,45 +23,71 @@ public class CustomerService {
     private final ShopRepository shopRepository;
 
     // Lấy danh sách khách hàng thuộc shop của user
-    public List<Customer> getCustomers(User user) {
+    public List<CustomerResponse> getCustomers(User user, String branchId) {
         Shop shop = getShopOfUser(user);
-        return customerRepository.findByShopId(shop.getId());
+        return customerRepository.findByShopIdAndBranchId(shop.getId(), branchId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     // Tạo khách hàng mới, gắn shopId
-    public Customer createCustomer(User user, Customer customer) {
+    public CustomerResponse createCustomer(User user, CustomerRequest request) {
         Shop shop = getShopOfUser(user);
 
-        customer.setId(null);
+        Customer customer = new Customer();
         customer.setShopId(shop.getId());
+        customer.setUserId(user.getId());
+        customer.setName(request.getName());
+        customer.setPhone(request.getPhone());
+        customer.setEmail(request.getEmail());
+        customer.setAddress(request.getAddress());
+        customer.setNote(request.getNote());
+        customer.setBranchId(request.getBranchId());
 
-        return customerRepository.save(customer);
+        return toResponse(customerRepository.save(customer));
     }
 
     // Cập nhật khách hàng
-    public Customer updateCustomer(User user, String id, Customer updated) {
+    public CustomerResponse updateCustomer(User user, String id, CustomerRequest request) {
         Shop shop = getShopOfUser(user);
 
         Customer existing = customerRepository.findById(id)
                 .filter(c -> c.getShopId().equals(shop.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
+        if (!existing.getBranchId().equals(request.getBranchId())) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
+        existing.setName(request.getName());
+        existing.setPhone(request.getPhone());
+        existing.setEmail(request.getEmail());
+        existing.setAddress(request.getAddress());
+        existing.setNote(request.getNote());
 
-        existing.setName(updated.getName());
-        existing.setPhone(updated.getPhone());
-        existing.setEmail(updated.getEmail());
-        existing.setAddress(updated.getAddress());
+        return toResponse(customerRepository.save(existing));
+    }
 
-        return customerRepository.save(existing);
+    private CustomerResponse toResponse(Customer c) {
+        return CustomerResponse.builder()
+                .id(c.getId())
+                .name(c.getName())
+                .phone(c.getPhone())
+                .email(c.getEmail())
+                .address(c.getAddress())
+                .note(c.getNote())
+                .build();
     }
 
     // Xoá khách hàng
-    public void deleteCustomer(User user, String id) {
+    public void deleteCustomer(User user, String branchId, String id) {
         Shop shop = getShopOfUser(user);
 
         Customer customer = customerRepository.findById(id)
                 .filter(c -> c.getShopId().equals(shop.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
-
+        if (!customer.getBranchId().equals(branchId)) {
+            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+        }
         customerRepository.delete(customer);
     }
 

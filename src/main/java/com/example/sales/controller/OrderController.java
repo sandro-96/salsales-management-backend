@@ -3,8 +3,8 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiMessage;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.dto.ApiResponse;
-import com.example.sales.dto.OrderRequest;
-import com.example.sales.model.Order;
+import com.example.sales.dto.order.OrderRequest;
+import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.model.User;
 import com.example.sales.service.OrderService;
 import com.example.sales.util.MessageService;
@@ -24,19 +24,23 @@ public class OrderController {
     private final OrderService orderService;
     private final MessageService messageService;
 
+    // ✅ 1. Lấy danh sách đơn hàng của user (shop owner)
     @GetMapping
-    public ApiResponse<List<Order>> getMyOrders(@AuthenticationPrincipal User user, Locale locale) {
-        return ApiResponse.success(ApiMessage.ORDER_LIST, orderService.getOrdersByUser(user), messageService, locale);
+    public ApiResponse<List<OrderResponse>> getMyOrders(@AuthenticationPrincipal User user, Locale locale) {
+        List<OrderResponse> orders = orderService.getOrdersByUser(user);
+        return ApiResponse.success(ApiMessage.ORDER_LIST, orders, messageService, locale);
     }
 
+    // ✅ 2. Tạo đơn hàng mới
     @PostMapping
-    public ApiResponse<Order> createOrder(@AuthenticationPrincipal User user,
-                                          @RequestBody @Valid OrderRequest request,
-                                          Locale locale) {
-        Order created = orderService.createOrder(user, request);
+    public ApiResponse<OrderResponse> createOrder(@AuthenticationPrincipal User user,
+                                                  @RequestBody @Valid OrderRequest request,
+                                                  Locale locale) {
+        OrderResponse created = orderService.createOrder(user, request);
         return ApiResponse.success(ApiMessage.ORDER_CREATED, created, messageService, locale);
     }
 
+    // ✅ 3. Hủy đơn
     @PutMapping("/{id}/cancel")
     public ApiResponse<?> cancelOrder(@AuthenticationPrincipal User user,
                                       @PathVariable String id,
@@ -45,30 +49,34 @@ public class OrderController {
         return ApiResponse.success(ApiMessage.ORDER_CANCELLED, messageService, locale);
     }
 
+    // ✅ 4. Xác nhận thanh toán
     @PostMapping("/{orderId}/confirm-payment")
-    public ApiResponse<?> confirmPayment(@PathVariable String orderId,
-                                         @RequestParam String paymentId,
-                                         @RequestParam String paymentMethod,
-                                         @AuthenticationPrincipal User user) {
-        Order confirmed = orderService.confirmPayment(user, orderId, paymentId, paymentMethod);
-        return ApiResponse.success(ApiMessage.ORDER_PAYMENT_CONFIRMED, confirmed, messageService, Locale.getDefault());
+    public ApiResponse<OrderResponse> confirmPayment(@PathVariable String orderId,
+                                                     @RequestParam String paymentId,
+                                                     @RequestParam String paymentMethod,
+                                                     @AuthenticationPrincipal User user,
+                                                     Locale locale) {
+        OrderResponse confirmed = orderService.confirmPayment(user, orderId, paymentId, paymentMethod);
+        return ApiResponse.success(ApiMessage.ORDER_PAYMENT_CONFIRMED, confirmed, messageService, locale);
     }
 
+    // ✅ 5. Cập nhật trạng thái đơn hàng
     @PutMapping("/{id}/status")
-    public ApiResponse<Order> updateStatus(@AuthenticationPrincipal User user,
-                                           @PathVariable String id,
-                                           @RequestParam OrderStatus status,
-                                           Locale locale) {
-        Order updated = orderService.updateStatus(user, id, status);
+    public ApiResponse<OrderResponse> updateStatus(@AuthenticationPrincipal User user,
+                                                   @PathVariable String id,
+                                                   @RequestParam OrderStatus status,
+                                                   Locale locale) {
+        OrderResponse updated = orderService.updateStatus(user, id, status);
         return ApiResponse.success(ApiMessage.ORDER_STATUS_UPDATED, updated, messageService, locale);
     }
 
+    // ✅ 6. Lọc đơn theo trạng thái
     @GetMapping("/filter")
-    public ApiResponse<List<Order>> getByStatus(@AuthenticationPrincipal User user,
-                                                @RequestParam OrderStatus status,
-                                                Locale locale) {
-        return ApiResponse.success(ApiMessage.ORDER_LIST, orderService.getOrdersByStatus(user, status), messageService, locale);
+    public ApiResponse<List<OrderResponse>> getByStatus(@AuthenticationPrincipal User user,
+                                                        @RequestParam OrderStatus status,
+                                                        @RequestParam(required = false) String branchId,
+                                                        Locale locale) {
+        List<OrderResponse> filtered = orderService.getOrdersByStatus(user, status, branchId);
+        return ApiResponse.success(ApiMessage.ORDER_LIST, filtered, messageService, locale);
     }
-
 }
-

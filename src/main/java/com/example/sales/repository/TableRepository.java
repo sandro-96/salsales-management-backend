@@ -7,5 +7,6 @@ import java.util.List;
 
 public interface TableRepository extends MongoRepository<Table, String> {
     List<Table> findByShopId(String shopId);
+    List<Table> findByShopIdAndBranchId(String shopId, String branchId);
 }
 

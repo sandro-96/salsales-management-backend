@@ -15,5 +15,6 @@ public class TableRequest {
     private String shopId;
     private Integer capacity;
     private String note;
+    private String branchId; // Có thể null nếu không phân biệt chi nhánh
 }
 

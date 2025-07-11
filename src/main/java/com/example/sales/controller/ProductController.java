@@ -2,12 +2,14 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiMessage;
 import com.example.sales.dto.ApiResponse;
-import com.example.sales.dto.ProductRequest;
-import com.example.sales.dto.ProductResponse;
-import com.example.sales.dto.ProductSearchRequest;
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.model.Product;
 import com.example.sales.model.User;
 import com.example.sales.service.ExcelExportService;
+import com.example.sales.service.FileUploadService;
+import com.example.sales.service.ProductImportService;
 import com.example.sales.service.ProductService;
 import com.example.sales.util.MessageService;
 import jakarta.validation.Valid;
@@ -16,9 +18,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Function;
 
 // File: ProductController.java
@@ -30,6 +34,8 @@ public class ProductController {
     private final ProductService productService;
     private final MessageService messageService;
     private final ExcelExportService excelExportService;
+    private final ProductImportService productImportService;
+    private final FileUploadService fileUploadService;
 
     // Trả về List<ProductResponse> thay vì List<Product>
     @GetMapping
@@ -107,6 +113,21 @@ public class ProductController {
                                                           Locale locale) {
         List<ProductResponse> results = productService.getLowStock(user, threshold);
         return ApiResponse.success(ApiMessage.PRODUCT_LIST, results, messageService, locale);
+    }
+
+    @PostMapping("/import")
+    public ApiResponse<Map<String, Object>> importExcel(@AuthenticationPrincipal User user,
+                                                        @RequestParam("file") MultipartFile file,
+                                                        @RequestParam(required = false) String branchId,
+                                                        Locale locale) {
+        Map<String, Object> result = productImportService.importExcel(user, branchId, file);
+        return ApiResponse.success(ApiMessage.PRODUCT_IMPORT_SUCCESS, result, messageService, locale);
+    }
+
+    @PostMapping("/upload-image")
+    public ApiResponse<String> uploadImage(@RequestParam("file") MultipartFile file, Locale locale) {
+        String imageUrl = fileUploadService.upload(file);
+        return ApiResponse.success(ApiMessage.PRODUCT_UPLOAD_IMAGE_SUCCESS, imageUrl, messageService, locale);
     }
 
 }

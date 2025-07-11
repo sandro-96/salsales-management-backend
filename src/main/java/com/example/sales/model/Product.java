@@ -35,8 +35,10 @@ public class Product extends BaseEntity {
 
     private String description;
 
-    private String shopId; // Chỉ gắn shopId, không cần userId
+    private String shopId;
+    private String branchId;
 
     @Builder.Default
     private boolean active = true; // Có đang bán hay tạm ngưng
+    private String productCode; // mã sản phẩm duy nhất
 }

@@ -1,5 +1,5 @@
 // File: ProductResponse.java
-package com.example.sales.dto;
+package com.example.sales.dto.product;
 
 import lombok.Builder;
 import lombok.Data;
@@ -16,4 +16,7 @@ public class ProductResponse {
     private String imageUrl;
     private String description;
     private boolean active;
+    private String productCode;
+    private String createdAt;
+    private String updatedAt;
 }

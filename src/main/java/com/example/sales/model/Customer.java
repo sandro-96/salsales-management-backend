@@ -20,4 +20,5 @@ public class Customer extends BaseEntity {
     private String address;
     private String note;
     private String shopId;
+    private String branchId; // Có thể null nếu không phân biệt chi nhánh
 }

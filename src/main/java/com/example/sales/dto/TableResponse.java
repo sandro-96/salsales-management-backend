@@ -15,6 +15,7 @@ public class TableResponse {
     private Integer capacity;
     private String note;
     private String currentOrderId;
+    private String branchId; // Có thể null nếu không phân biệt chi nhánh
 }
 
 

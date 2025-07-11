@@ -35,9 +35,10 @@ public class TableController {
     @GetMapping("/shop/{shopId}")
     public ResponseEntity<ApiResponse<List<TableResponse>>> getByShop(
             @PathVariable String shopId,
+            @RequestParam(required = false) String branchId,
             Locale locale
     ) {
-        List<TableResponse> tables = tableService.getByShop(shopId);
+        List<TableResponse> tables = tableService.getByShop(shopId, branchId);
         return ResponseEntity.ok(ApiResponse.success(ApiMessage.TABLE_LIST, tables, messageService, locale));
     }
 

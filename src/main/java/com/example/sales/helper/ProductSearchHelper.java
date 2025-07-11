@@ -1,7 +1,6 @@
-// File: ProductSearchHelper.java
 package com.example.sales.helper;
 
-import com.example.sales.dto.ProductSearchRequest;
+import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.model.Product;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
@@ -12,9 +11,7 @@ import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
 
@@ -24,9 +21,9 @@ public class ProductSearchHelper {
 
     private final MongoTemplate mongoTemplate;
 
-    public List<Product> search(String shopId, ProductSearchRequest req, Pageable pageable) {
+    public List<Product> search(String shopId, String branchId, ProductSearchRequest req, Pageable pageable) {
         Aggregation agg = newAggregation(
-                buildMatch(shopId, req),
+                buildMatch(shopId, branchId, req),
                 sort(Sort.Direction.fromString(req.getSortDir()), req.getSortBy()),
                 skip((long) pageable.getPageNumber() * pageable.getPageSize()),
                 limit(pageable.getPageSize())
@@ -35,9 +32,9 @@ public class ProductSearchHelper {
         return mongoTemplate.aggregate(agg, "products", Product.class).getMappedResults();
     }
 
-    public long counts(String shopId, ProductSearchRequest req) {
+    public long counts(String shopId, String branchId, ProductSearchRequest req) {
         Aggregation agg = newAggregation(
-                buildMatch(shopId, req),
+                buildMatch(shopId, branchId, req),
                 count().as("total")
         );
 
@@ -46,10 +43,12 @@ public class ProductSearchHelper {
         ).map(d -> ((Number) d.get("total")).longValue()).orElse(0L);
     }
 
-    private MatchOperation buildMatch(String shopId, ProductSearchRequest req) {
+    private MatchOperation buildMatch(String shopId, String branchId, ProductSearchRequest req) {
         List<Criteria> criteria = new ArrayList<>();
         criteria.add(Criteria.where("shopId").is(shopId));
-
+        if (branchId != null && !branchId.isBlank()) {
+            criteria.add(Criteria.where("branchId").is(branchId));
+        }
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
             String pattern = ".*" + req.getKeyword().trim() + ".*";
             criteria.add(new Criteria().orOperator(

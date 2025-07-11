@@ -1,5 +1,5 @@
 // File: ProductSearchRequest.java
-package com.example.sales.dto;
+package com.example.sales.dto.product;
 
 import lombok.Data;
 
@@ -14,4 +14,5 @@ public class ProductSearchRequest {
     private int size = 20;
     private String sortBy = "createdAt";
     private String sortDir = "desc";
+    private String branchId; // nếu có chi nhánh, có thể để null nếu không có
 }

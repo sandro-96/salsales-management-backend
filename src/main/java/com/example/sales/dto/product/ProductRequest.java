@@ -1,5 +1,5 @@
 // File: ProductRequest.java
-package com.example.sales.dto;
+package com.example.sales.dto.product;
 
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -28,4 +28,6 @@ public class ProductRequest {
     private String description;
 
     private boolean active = true;
+    private String productCode;
+    private String branchId; // nếu có chi nhánh, có thể để null nếu không có
 }

@@ -1,17 +1,13 @@
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
-import com.example.sales.constant.OrderStatus;
-import com.example.sales.constant.ShopType;
-import com.example.sales.constant.TableStatus;
-import com.example.sales.dto.OrderRequest;
+import com.example.sales.constant.*;
+import com.example.sales.dto.order.OrderItemResponse;
+import com.example.sales.dto.order.OrderRequest;
+import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
-import com.example.sales.repository.OrderRepository;
-import com.example.sales.repository.ProductRepository;
-import com.example.sales.repository.ShopRepository;
-import com.example.sales.repository.TableRepository;
+import com.example.sales.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,66 +23,90 @@ public class OrderService {
     private final ShopRepository shopRepository;
     private final TableRepository tableRepository;
     private final ProductRepository productRepository;
+    private final ShopUserService shopUserService;
+    private final PromotionRepository promotionRepository;
+    private final AuditLogService auditLogService;
 
-    public List<Order> getOrdersByUser(User user) {
+    public List<OrderResponse> getOrdersByUser(User user) {
         Shop shop = getShopOfUser(user);
-        return orderRepository.findByShopId(shop.getId());
+        return orderRepository.findByShopId(shop.getId())
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional
-    public Order createOrder(User user, OrderRequest request) {
+    public OrderResponse createOrder(User user, OrderRequest request) {
         Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
 
         Order order = new Order();
         order.setShopId(shop.getId());
         order.setTableId(request.getTableId());
         order.setUserId(user.getId());
-        order.setItems(request.getItems());
         order.setNote(request.getNote());
-
         order.setStatus(OrderStatus.PENDING);
         order.setPaid(false);
-
-        // Tính tổng tiền/tổng SL
-        double totalAmount = 0;
-        double totalPrice = 0;
-
-        for (OrderItem item : request.getItems()) {
-            totalAmount += item.getQuantity();
-            totalPrice += item.getQuantity() * item.getPrice();
+        String branchId = request.getBranchId();
+        if (branchId != null && !branchId.isBlank()) {
+            order.setBranchId(branchId);
         }
 
-        order.setTotalAmount(totalAmount);
-        order.setTotalPrice(totalPrice);
-        if (requiresInventory(shop.getType())) {
-            for (OrderItem item : order.getItems()) {
-                Product product = productRepository.findById(item.getProductId())
-                        .filter(p -> p.getShopId().equals(shop.getId()))
-                        .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+        double[] totals = {0, 0}; // totals[0] for totalAmount, totals[1] for totalPrice
 
-                if (product.getQuantity() < item.getQuantity()) {
-                    throw new BusinessException(ApiErrorCode.PRODUCT_OUT_OF_STOCK);
-                }
+        List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
+            Product product = productRepository.findById(reqItem.getProductId())
+                    .filter(p -> p.getShopId().equals(shop.getId()))
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
 
-                product.setQuantity(product.getQuantity() - item.getQuantity());
+            if (requiresInventory(shop.getType()) && product.getQuantity() < reqItem.getQuantity()) {
+                throw new BusinessException(ApiErrorCode.PRODUCT_OUT_OF_STOCK);
+            }
+
+            if (requiresInventory(shop.getType())) {
+                product.setQuantity(product.getQuantity() - reqItem.getQuantity());
                 productRepository.save(product);
             }
-        }
 
-        Order createdOrder = orderRepository.save(order);
-        releaseTable(createdOrder);
-        return createdOrder;
-    }
+            double basePrice = reqItem.getPrice();
+            double finalPrice = basePrice;
+            String promoId = null;
 
-    private boolean requiresInventory(ShopType type) {
-        return switch (type) {
-            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
-            case RESTAURANT, CAFE, BAR, OTHER -> false;
-        };
+            // Áp dụng khuyến mãi nếu có
+            Promotion promo = findApplicablePromotion(shop.getId(), branchId, product.getId());
+            if (promo != null) {
+                promoId = promo.getId();
+                if (promo.getDiscountType() == DiscountType.PERCENT) {
+                    finalPrice = basePrice * (1 - promo.getDiscountValue() / 100.0);
+                } else if (promo.getDiscountType() == DiscountType.AMOUNT) {
+                    finalPrice = Math.max(0, basePrice - promo.getDiscountValue());
+                }
+            }
+
+            OrderItem item = new OrderItem();
+            item.setProductId(product.getId());
+            item.setProductName(product.getName());
+            item.setQuantity(reqItem.getQuantity());
+            item.setPrice(basePrice);
+            item.setPriceAfterDiscount(finalPrice);
+            item.setAppliedPromotionId(promoId);
+
+            totals[0] += reqItem.getQuantity(); // Update totalAmount
+            totals[1] += reqItem.getQuantity() * finalPrice; // Update totalPrice
+
+            return item;
+        }).toList();
+
+        order.setItems(orderItems);
+        order.setTotalAmount(totals[0]);
+        order.setTotalPrice(totals[1]);
+
+        Order created = orderRepository.save(order);
+        releaseTable(created);
+        return toResponse(created);
     }
 
     public void cancelOrder(User user, String orderId) {
         Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
         Order order = getOrderByShop(orderId, shop.getId());
 
         if (order.isPaid()) {
@@ -95,10 +115,13 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
+        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
     }
 
-    public Order confirmPayment(User user, String orderId, String paymentId, String paymentMethod) {
+    public OrderResponse confirmPayment(User user, String orderId, String paymentId, String paymentMethod) {
         Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.CASHIER);
+
         Order order = getOrderByShop(orderId, shop.getId());
 
         if (order.isPaid()) {
@@ -109,10 +132,58 @@ public class OrderService {
         order.setPaymentId(paymentId);
         order.setPaymentMethod(paymentMethod);
         order.setPaymentTime(LocalDateTime.now());
-        order.setStatus(OrderStatus.COMPLETED); // ✔️ thanh toán xong thì hoàn tất
-        Order updatedOrder = orderRepository.save(order);
-        releaseTable(updatedOrder);
-        return updatedOrder;
+        order.setStatus(OrderStatus.COMPLETED);
+
+        Order updated = orderRepository.save(order);
+        releaseTable(updated);
+        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "PAYMENT_CONFIRMED",
+                "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
+        return toResponse(updated);
+    }
+
+    public OrderResponse updateStatus(User user, String orderId, OrderStatus newStatus) {
+        Shop shop = getShopOfUser(user);
+        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+        Order order = getOrderByShop(orderId, shop.getId());
+
+        if (shop.getType() == ShopType.RESTAURANT && newStatus == OrderStatus.SHIPPING) {
+            throw new BusinessException(ApiErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
+        }
+
+        order.setStatus(newStatus);
+
+        if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
+            order.setPaid(true);
+            order.setPaymentTime(LocalDateTime.now());
+            order.setPaymentMethod("Cash");
+        }
+
+        Order updated = orderRepository.save(order);
+        if (!order.getStatus().equals(newStatus)) {
+            auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "STATUS_UPDATED",
+                    "Cập nhật trạng thái từ %s → %s".formatted(order.getStatus(), newStatus));
+        }
+
+        return toResponse(updated);
+    }
+
+    public List<OrderResponse> getOrdersByStatus(User user, OrderStatus status, String branchId) {
+        Shop shop = getShopOfUser(user);
+        return orderRepository.findByShopIdAndBranchIdAndStatus(shop.getId(), branchId, status)
+                .stream().map(this::toResponse).toList();
+    }
+
+    // ==== Helpers ====
+
+    private boolean requiresInventory(ShopType type) {
+        return switch (type) {
+            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
+            default -> false;
+        };
     }
 
     private Shop getShopOfUser(User user) {
@@ -126,40 +197,6 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.ORDER_NOT_FOUND));
     }
 
-    public Order updateStatus(User user, String orderId, OrderStatus newStatus) {
-        Shop shop = getShopOfUser(user);
-        Order order = getOrderByShop(orderId, shop.getId());
-
-        // Nếu là quán ăn → không cho phép chuyển sang SHIPPING
-        if (shop.getType() == ShopType.RESTAURANT && newStatus == OrderStatus.SHIPPING) {
-            throw new BusinessException(ApiErrorCode.INVALID_STATUS_TRANSITION);
-        }
-
-        // Nếu đơn đã huỷ thì không thay đổi
-        if (order.getStatus() == OrderStatus.CANCELLED) {
-            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
-        }
-
-        order.setStatus(newStatus);
-
-        // Nếu COMPLETED → auto paid
-        if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
-            order.setPaid(true);
-            order.setPaymentTime(LocalDateTime.now());
-            order.setPaymentMethod("Cash");
-        }
-
-        return orderRepository.save(order);
-    }
-
-
-    public List<Order> getOrdersByStatus(User user, OrderStatus status) {
-        Shop shop = getShopOfUser(user);
-        return orderRepository.findByShopId(shop.getId()).stream()
-                .filter(order -> order.getStatus() == status)
-                .toList();
-    }
-
     private void releaseTable(Order order) {
         if (order.getTableId() != null) {
             tableRepository.findById(order.getTableId()).ifPresent(table -> {
@@ -170,5 +207,43 @@ public class OrderService {
         }
     }
 
-}
+    private Promotion findApplicablePromotion(String shopId, String branchId, String productId) {
+        LocalDateTime now = LocalDateTime.now();
+        return promotionRepository.findByShopId(shopId).stream()
+                .filter(Promotion::isActive)
+                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
+                .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))
+                .filter(p -> p.getApplicableProductIds() == null
+                        || p.getApplicableProductIds().isEmpty()
+                        || p.getApplicableProductIds().contains(productId))
+                .findFirst()
+                .orElse(null);
+    }
 
+    private OrderResponse toResponse(Order order) {
+        return OrderResponse.builder()
+                .id(order.getId())
+                .tableId(order.getTableId())
+                .note(order.getNote())
+                .status(order.getStatus())
+                .paid(order.isPaid())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentId(order.getPaymentId())
+                .paymentTime(order.getPaymentTime())
+                .totalAmount(order.getTotalAmount())
+                .totalPrice(order.getTotalPrice())
+                .items(order.getItems().stream().map(this::toItemResponse).toList())
+                .build();
+    }
+
+    private OrderItemResponse toItemResponse(OrderItem item) {
+        return OrderItemResponse.builder()
+                .productId(item.getProductId())
+                .productName(item.getProductName())
+                .quantity(item.getQuantity())
+                .price(item.getPrice())
+                .priceAfterDiscount(item.getPriceAfterDiscount())
+                .appliedPromotionId(item.getAppliedPromotionId())
+                .build();
+    }
+}
