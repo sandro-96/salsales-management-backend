@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/FileUploadService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -35,16 +34,16 @@ public class FileUploadService {
             log.info("Bắt đầu upload file: tên gốc = {}", file.getOriginalFilename());
 
             if (file.isEmpty()) {
-                throw new BusinessException(ApiErrorCode.VALIDATION_ERROR, "File rỗng.");
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
             }
 
             if (file.getSize() > MAX_FILE_SIZE) {
-                throw new BusinessException(ApiErrorCode.VALIDATION_ERROR, "File vượt quá kích thước cho phép (5MB).");
+                throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
             }
 
             String contentType = file.getContentType();
             if (!ALLOWED_MIME_TYPES.contains(contentType)) {
-                throw new BusinessException(ApiErrorCode.VALIDATION_ERROR, "Loại file không được hỗ trợ: " + contentType);
+                throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
             }
 
             // Tạo tên file ngẫu nhiên

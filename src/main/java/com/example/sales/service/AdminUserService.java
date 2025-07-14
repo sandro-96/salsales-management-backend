@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/AdminUserService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
@@ -22,7 +22,7 @@ public class AdminUserService {
 
     public User getUserById(String id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
     }
 
     public User updateUser(String id, User update) {

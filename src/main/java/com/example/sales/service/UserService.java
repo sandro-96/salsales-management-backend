@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/UserService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
@@ -29,7 +29,7 @@ public class UserService {
 
     public void changePassword(User user, String currentPassword, String newPassword) {
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new BusinessException(ApiErrorCode.INCORRECT_PASSWORD);
+            throw new BusinessException(ApiCode.INCORRECT_PASSWORD);
         }
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);

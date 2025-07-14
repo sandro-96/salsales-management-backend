@@ -1,19 +1,15 @@
 // File: src/main/java/com/example/sales/exception/BusinessException.java
 package com.example.sales.exception;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import lombok.Getter;
 
 @Getter
 public class BusinessException extends RuntimeException {
-    private final ApiErrorCode error;
+    private final ApiCode error;
 
-    public BusinessException(ApiErrorCode error) {
-        super(error.getMessage());
-        this.error = error;
-    }
-    public BusinessException(ApiErrorCode error, String message) {
-        super(message);
+    public BusinessException(ApiCode error) {
+        super(error.name());
         this.error = error;
     }
 }

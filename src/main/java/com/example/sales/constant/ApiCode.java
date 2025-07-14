@@ -1,0 +1,57 @@
+// File: src/main/java/com/example/sales/constant/ApiCode.java
+package com.example.sales.constant;
+
+public enum ApiCode {
+
+    // ===== Success =====
+    SUCCESS,
+    PRODUCT_CREATED,
+    USER_UPDATED,
+    PASSWORD_CHANGED,
+    EMAIL_SENT,
+
+    // ===== Validation & Client Errors =====
+    VALIDATION_ERROR,
+    UNAUTHORIZED,
+    ACCESS_DENIED,
+    NOT_FOUND,
+    INVALID_TOKEN,
+    ACCOUNT_LOCKED,
+    REFRESH_TOKEN_EXPIRED,
+    REFRESH_TOKEN_INVALID,
+    INCORRECT_PASSWORD,
+
+    // ===== System Errors =====
+    INTERNAL_ERROR,
+    FILE_UPLOAD_FAILED,
+    FILE_TYPE_NOT_ALLOWED,
+
+    // ===== Business Logic =====
+    SHOP_REQUIRED,
+    CANNOT_DELETE_SELF,
+    SHOP_ALREADY_EXISTS,
+    ORDER_ALREADY_COMPLETED,
+    PRODUCT_UPDATED,
+    SHOP_NOT_FOUND,
+    TABLE_CREATED,
+    TABLE_LIST,
+    TABLE_STATUS_UPDATED,
+    USER_INFO,
+    USER_NOT_FOUND,
+    EMAIL_EXISTS,
+    EMAIL_NOT_VERIFIED,
+    ALREADY_VERIFIED,
+    TOKEN_EXPIRED,
+    BRANCH_NOT_FOUND,
+    CUSTOMER_NOT_FOUND,
+    VALIDATION_FILE_ERROR,
+    ORDER_NOT_FOUND,
+    ORDER_ALREADY_PAID,
+    INVALID_STATUS_TRANSITION,
+    PRODUCT_OUT_OF_STOCK,
+    PRODUCT_NOT_FOUND,
+    PROMOTION_NOT_FOUND,
+    DUPLICATE_DATA,
+    TABLE_NOT_FOUND,
+    USER_DELETED
+}

@@ -56,10 +56,10 @@ public class OrderService {
         List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
             Product product = productRepository.findById(reqItem.getProductId())
                     .filter(p -> p.getShopId().equals(shop.getId()))
-                    .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
             if (requiresInventory(shop.getType()) && product.getQuantity() < reqItem.getQuantity()) {
-                throw new BusinessException(ApiErrorCode.PRODUCT_OUT_OF_STOCK);
+                throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
             }
 
             if (requiresInventory(shop.getType())) {
@@ -111,7 +111,7 @@ public class OrderService {
         Order order = getOrderByShop(orderId, shop.getId());
 
         if (order.isPaid()) {
-            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
 
         order.setStatus(OrderStatus.CANCELLED);
@@ -126,7 +126,7 @@ public class OrderService {
         Order order = getOrderByShop(orderId, shop.getId());
 
         if (order.isPaid()) {
-            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
 
         order.setPaid(true);
@@ -148,11 +148,11 @@ public class OrderService {
         Order order = getOrderByShop(orderId, shop.getId());
 
         if (shop.getType() == ShopType.RESTAURANT && newStatus == OrderStatus.SHIPPING) {
-            throw new BusinessException(ApiErrorCode.INVALID_STATUS_TRANSITION);
+            throw new BusinessException(ApiCode.INVALID_STATUS_TRANSITION);
         }
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
-            throw new BusinessException(ApiErrorCode.ORDER_ALREADY_PAID);
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
 
         order.setStatus(newStatus);
@@ -189,13 +189,13 @@ public class OrderService {
 
     private Shop getShopOfUser(User user) {
         return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private Order getOrderByShop(String orderId, String shopId) {
         return orderRepository.findById(orderId)
                 .filter(o -> o.getShopId().equals(shopId))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.ORDER_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
     }
 
     private void releaseTable(Order order) {

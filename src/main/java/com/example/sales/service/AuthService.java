@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/AuthService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.JwtResponse;
 import com.example.sales.dto.LoginRequest;
 import com.example.sales.dto.RegisterRequest;
@@ -36,7 +36,7 @@ public class AuthService {
 
     public void register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new BusinessException(ApiErrorCode.EMAIL_EXISTS);
+            throw new BusinessException(ApiCode.EMAIL_EXISTS);
         }
 
         User user = new User();
@@ -68,10 +68,10 @@ public class AuthService {
         );
         // 2. Lấy user từ DB
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
         // 3. Kiểm tra đã xác thực chưa
         if (!user.isVerified()) {
-            throw new BusinessException(ApiErrorCode.EMAIL_NOT_VERIFIED);
+            throw new BusinessException(ApiCode.EMAIL_NOT_VERIFIED);
         }
         String accessToken = jwtUtil.generateToken(user);
         String refreshToken = tokenService.createRefreshToken(user).getToken();
@@ -80,7 +80,7 @@ public class AuthService {
 
     public void forgotPassword(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
@@ -92,10 +92,10 @@ public class AuthService {
 
     public void resendVerification(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
         if (user.isVerified()) {
-            throw new BusinessException(ApiErrorCode.ALREADY_VERIFIED);
+            throw new BusinessException(ApiCode.ALREADY_VERIFIED);
         }
 
         // Tạo token mới và cập nhật expiry
@@ -118,14 +118,14 @@ public class AuthService {
 
     public void verifyEmail(String token) {
         User user = userRepository.findByVerificationToken(token)
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.INVALID_TOKEN));
+                .orElseThrow(() -> new BusinessException(ApiCode.INVALID_TOKEN));
 
         if (user.isVerified()) {
-            throw new BusinessException(ApiErrorCode.ALREADY_VERIFIED);
+            throw new BusinessException(ApiCode.ALREADY_VERIFIED);
         }
 
         if (user.getVerificationExpiry().before(new Date())) {
-            throw new BusinessException(ApiErrorCode.TOKEN_EXPIRED);
+            throw new BusinessException(ApiCode.TOKEN_EXPIRED);
         }
 
         user.setVerified(true);

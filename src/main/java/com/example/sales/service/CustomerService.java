@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/CustomerService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.exception.BusinessException;
@@ -55,9 +55,9 @@ public class CustomerService {
 
         Customer existing = customerRepository.findById(id)
                 .filter(c -> c.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
         if (!existing.getBranchId().equals(request.getBranchId())) {
-            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
         existing.setName(request.getName());
         existing.setPhone(request.getPhone());
@@ -85,9 +85,9 @@ public class CustomerService {
 
         Customer customer = customerRepository.findById(id)
                 .filter(c -> c.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.CUSTOMER_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
         if (!customer.getBranchId().equals(branchId)) {
-            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
         customerRepository.delete(customer);
     }
@@ -95,6 +95,6 @@ public class CustomerService {
     // Helper: lấy shop của user hiện tại
     private Shop getShopOfUser(User user) {
         return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 }

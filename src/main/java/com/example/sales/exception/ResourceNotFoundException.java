@@ -1,15 +1,15 @@
 // File: src/main/java/com/example/sales/exception/ResourceNotFoundException.java
 package com.example.sales.exception;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import lombok.Getter;
 
 @Getter
 public class ResourceNotFoundException extends RuntimeException {
-    private final ApiErrorCode error;
+    private final ApiCode error;
 
-    public ResourceNotFoundException(ApiErrorCode error) {
-        super(error.getMessage());
+    public ResourceNotFoundException(ApiCode error) {
+        super(error.name());
         this.error = error;
     }
 }

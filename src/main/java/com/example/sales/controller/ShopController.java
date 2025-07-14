@@ -2,20 +2,16 @@
 
 package com.example.sales.controller;
 
-import com.example.sales.constant.ApiErrorCode;
-import com.example.sales.constant.ApiMessage;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.ShopRequest;
 import com.example.sales.model.Shop;
 import com.example.sales.model.User;
 import com.example.sales.service.ShopService;
-import com.example.sales.util.MessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/shops")
@@ -24,28 +20,27 @@ import java.util.Locale;
 public class ShopController {
 
     private final ShopService shopService;
-    private final MessageService messageService;
 
     @PostMapping
     public ApiResponse<Shop> createShop(@AuthenticationPrincipal User user,
-                                        @RequestBody ShopRequest request, Locale locale) {
+                                        @RequestBody ShopRequest request) {
         Shop created = shopService.createShop(user, request);
-        return ApiResponse.success(ApiMessage.SUCCESS, created, messageService, locale);
+        return ApiResponse.success(ApiCode.SUCCESS, created);
     }
 
     @GetMapping("/me")
-    public ApiResponse<?> getMyShop(@AuthenticationPrincipal User user, Locale locale) {
+    public ApiResponse<?> getMyShop(@AuthenticationPrincipal User user) {
         Shop shop = shopService.getMyShop(user);
         if (shop == null) {
-            return ApiResponse.error(ApiErrorCode.SHOP_NOT_FOUND, messageService, locale);
+            return ApiResponse.error(ApiCode.SHOP_NOT_FOUND);
         }
-        return ApiResponse.success(ApiMessage.SUCCESS, shop, messageService, locale);
+        return ApiResponse.success(ApiCode.SUCCESS, shop);
     }
 
     @PutMapping
     public ApiResponse<Shop> updateMyShop(@AuthenticationPrincipal User user,
-                                          @RequestBody ShopRequest request, Locale locale) {
+                                          @RequestBody ShopRequest request) {
         Shop updated = shopService.updateMyShop(user, request);
-        return ApiResponse.success(ApiMessage.SUCCESS, updated, messageService, locale);
+        return ApiResponse.success(ApiCode.SUCCESS, updated);
     }
 }

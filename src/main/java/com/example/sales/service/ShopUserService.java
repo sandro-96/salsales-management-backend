@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/ShopUserService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.ShopUser;
@@ -21,7 +21,7 @@ public class ShopUserService {
     public ShopRole getUserRoleInShop(String shopId, String userId) {
         return shopUserRepository.findByShopIdAndUserId(shopId, userId)
                 .map(ShopUser::getRole)
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.UNAUTHORIZED));
+                .orElseThrow(() -> new BusinessException(ApiCode.UNAUTHORIZED));
     }
 
     public boolean isOwner(String shopId, String userId) {
@@ -31,20 +31,20 @@ public class ShopUserService {
     public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
         ShopRole actual = getUserRoleInShop(shopId, userId);
         if (Arrays.stream(roles).noneMatch(role -> role == actual)) {
-            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
     }
 
     public void requireOwner(String shopId, String userId) {
         if (isOwner(shopId, userId)) {
-            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
     }
 
     public void addUser(String shopId, String userId, ShopRole role) {
         Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserId(shopId, userId);
         if (existing.isPresent()) {
-            throw new BusinessException(ApiErrorCode.DUPLICATE_DATA);
+            throw new BusinessException(ApiCode.DUPLICATE_DATA);
         }
 
         ShopUser shopUser = ShopUser.builder()
@@ -58,7 +58,7 @@ public class ShopUserService {
 
     public void removeUser(String shopId, String userId) {
         ShopUser user = shopUserRepository.findByShopIdAndUserId(shopId, userId)
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUserRepository.delete(user);
     }
 }

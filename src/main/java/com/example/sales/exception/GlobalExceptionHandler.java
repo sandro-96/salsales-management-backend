@@ -1,10 +1,8 @@
 // File: src/main/java/com/example/sales/exception/GlobalExceptionHandler.java
 package com.example.sales.exception;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponse;
-import com.example.sales.util.MessageService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -12,55 +10,36 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Locale;
-
 @RestControllerAdvice
-@RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
-    private final MessageService messageService;
-
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<?> handleNotFound(ResourceNotFoundException ex, Locale locale) {
+    public ResponseEntity<?> handleNotFound(ResourceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getError(), messageService, locale));
+                .body(ApiResponse.error(ex.getError()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex, Locale locale) {
+    public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error(ApiErrorCode.VALIDATION_ERROR, messageService, locale));
+                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex, Locale locale) {
+    public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(ApiErrorCode.ACCESS_DENIED, messageService, locale));
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleGeneral(Exception ex, Locale locale) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(ApiErrorCode.INTERNAL_ERROR, messageService, locale));
+                .body(ApiResponse.error(ApiCode.ACCESS_DENIED));
     }
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<?> handleBusiness(BusinessException ex, Locale locale) {
+    public ResponseEntity<?> handleBusiness(BusinessException ex) {
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error(ex.getError(), messageService, locale));
+                .body(ApiResponse.error(ex.getError()));
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(new ApiError(HttpStatus.BAD_REQUEST.value(), ex.getMessage()));
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<?> handleRuntimeException(RuntimeException ex) {
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ApiError(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Lỗi hệ thống"));
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleGeneral(Exception ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ApiCode.INTERNAL_ERROR));
     }
 }

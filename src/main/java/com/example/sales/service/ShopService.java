@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/ShopService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ShopRequest;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
@@ -18,7 +18,7 @@ public class ShopService {
 
     public Shop createShop(User owner, ShopRequest request) {
         if (shopRepository.findByOwnerId(owner.getId()).isPresent()) {
-            throw new BusinessException(ApiErrorCode.SHOP_ALREADY_EXISTS);
+            throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
 
         Shop shop = new Shop();
@@ -34,7 +34,7 @@ public class ShopService {
 
     public Shop getMyShop(User user) {
         return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
     public Shop updateMyShop(User user, ShopRequest request) {

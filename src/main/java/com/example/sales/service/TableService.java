@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/TableService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.TableRequest;
 import com.example.sales.dto.TableResponse;
@@ -25,7 +25,7 @@ public class TableService {
 
     public TableResponse create(TableRequest request) {
         Shop shop = shopRepository.findById(request.getShopId())
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
         Table table = Table.builder()
                 .name(request.getName())
@@ -41,7 +41,7 @@ public class TableService {
 
     public List<TableResponse> getByShop(String shopId, String branchId) {
         Shop shop = shopRepository.findById(shopId)
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
         return tableRepository.findByShopIdAndBranchId(shopId, branchId)
                 .stream()
@@ -51,7 +51,7 @@ public class TableService {
 
     public TableResponse updateStatus(String tableId, TableStatus status) {
         Table table = tableRepository.findById(tableId)
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.TABLE_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.TABLE_NOT_FOUND));
 
         table.setStatus(status);
         return toResponse(tableRepository.save(table));

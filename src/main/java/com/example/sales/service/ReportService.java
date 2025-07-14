@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/ReportService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
@@ -12,7 +12,10 @@ import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
+import org.springframework.data.mongodb.core.aggregation.ProjectionOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -151,7 +154,7 @@ public class ReportService {
      */
     private String getShopIdOfUser(User user) {
         return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND))
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
                 .getId();
     }
 }

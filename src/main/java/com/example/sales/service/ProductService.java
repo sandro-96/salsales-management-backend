@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/ProductService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.ShopType;
 import com.example.sales.dto.product.ProductRequest;
@@ -16,7 +16,10 @@ import com.example.sales.model.User;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -75,7 +78,7 @@ public class ProductService {
 
         Product existing = productRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         existing.setName(request.getName());
         existing.setCategory(request.getCategory());
@@ -116,7 +119,7 @@ public class ProductService {
 
         Product existing = productRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         productRepository.delete(existing);
     }
@@ -146,7 +149,7 @@ public class ProductService {
 
         Product product = productRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PRODUCT_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         product.setActive(!product.isActive());
         return toResponse(productRepository.save(product));
@@ -169,7 +172,7 @@ public class ProductService {
 
     private Shop getShopOfUser(User user) {
         return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private ProductResponse toResponse(Product product) {

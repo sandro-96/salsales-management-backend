@@ -2,7 +2,7 @@
 
 package com.example.sales.controller;
 
-import com.example.sales.constant.ApiMessage;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
@@ -13,7 +13,6 @@ import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ProductImportService;
 import com.example.sales.service.ProductService;
-import com.example.sales.util.MessageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -35,46 +33,39 @@ import java.util.function.Function;
 public class ProductController {
 
     private final ProductService productService;
-    private final MessageService messageService;
     private final ExcelExportService excelExportService;
     private final ProductImportService productImportService;
     private final FileUploadService fileUploadService;
 
-    // Trả về List<ProductResponse> thay vì List<Product>
     @GetMapping
-    public ApiResponse<List<ProductResponse>> getAllByUser(@AuthenticationPrincipal User user, Locale locale) {
-        return ApiResponse.success(ApiMessage.PRODUCT_LIST, productService.getAllByUser(user), messageService, locale);
+    public ApiResponse<List<ProductResponse>> getAllByUser(@AuthenticationPrincipal User user) {
+        return ApiResponse.success(ApiCode.SUCCESS, productService.getAllByUser(user));
     }
 
     @PostMapping
     public ApiResponse<ProductResponse> createProduct(@AuthenticationPrincipal User user,
-                                                      @RequestBody @Valid ProductRequest request,
-                                                      Locale locale) {
-        return ApiResponse.success(ApiMessage.PRODUCT_CREATED, productService.createProduct(user, request), messageService, locale);
+                                                      @RequestBody @Valid ProductRequest request) {
+        return ApiResponse.success(ApiCode.PRODUCT_CREATED, productService.createProduct(user, request));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<ProductResponse> updateProduct(@AuthenticationPrincipal User user,
                                                       @PathVariable String id,
-                                                      @RequestBody @Valid ProductRequest request,
-                                                      Locale locale) {
-        return ApiResponse.success(ApiMessage.PRODUCT_UPDATED, productService.updateProduct(user, id, request), messageService, locale);
+                                                      @RequestBody @Valid ProductRequest request) {
+        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.updateProduct(user, id, request));
     }
-
 
     @DeleteMapping("/{id}")
     public ApiResponse<?> deleteProduct(@AuthenticationPrincipal User user,
-                                        @PathVariable String id,
-                                        Locale locale) {
+                                        @PathVariable String id) {
         productService.deleteProduct(user, id);
-        return ApiResponse.success(ApiMessage.PRODUCT_DELETED, messageService, locale);
+        return ApiResponse.success(ApiCode.SUCCESS);
     }
 
     @PostMapping("/search")
     public ApiResponse<Page<ProductResponse>> searchProducts(@AuthenticationPrincipal User user,
-                                                             @RequestBody ProductSearchRequest req,
-                                                             Locale locale) {
-        return ApiResponse.success(ApiMessage.PRODUCT_LIST, productService.search(user, req), messageService, locale);
+                                                             @RequestBody ProductSearchRequest req) {
+        return ApiResponse.success(ApiCode.SUCCESS, productService.search(user, req));
     }
 
     @GetMapping("/export")
@@ -104,34 +95,29 @@ public class ProductController {
 
     @PutMapping("/{id}/toggle-active")
     public ApiResponse<ProductResponse> toggleActive(@AuthenticationPrincipal User user,
-                                                     @PathVariable String id,
-                                                     Locale locale) {
+                                                     @PathVariable String id) {
         ProductResponse result = productService.toggleActive(user, id);
-        return ApiResponse.success(ApiMessage.PRODUCT_UPDATED, result, messageService, locale);
+        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, result);
     }
 
     @GetMapping("/low-stock")
     public ApiResponse<List<ProductResponse>> getLowStock(@AuthenticationPrincipal User user,
-                                                          @RequestParam(defaultValue = "5") int threshold,
-                                                          Locale locale) {
+                                                          @RequestParam(defaultValue = "5") int threshold) {
         List<ProductResponse> results = productService.getLowStock(user, threshold);
-        return ApiResponse.success(ApiMessage.PRODUCT_LIST, results, messageService, locale);
+        return ApiResponse.success(ApiCode.SUCCESS, results);
     }
 
     @PostMapping("/import")
     public ApiResponse<Map<String, Object>> importExcel(@AuthenticationPrincipal User user,
                                                         @RequestParam("file") MultipartFile file,
-                                                        @RequestParam(required = false) String branchId,
-                                                        Locale locale) {
+                                                        @RequestParam(required = false) String branchId) {
         Map<String, Object> result = productImportService.importExcel(user, branchId, file);
-        return ApiResponse.success(ApiMessage.PRODUCT_IMPORT_SUCCESS, result, messageService, locale);
+        return ApiResponse.success(ApiCode.SUCCESS, result);
     }
 
     @PostMapping("/upload-image")
-    public ApiResponse<String> uploadImage(@RequestParam("file") MultipartFile file, Locale locale) {
+    public ApiResponse<String> uploadImage(@RequestParam("file") MultipartFile file) {
         String imageUrl = fileUploadService.upload(file);
-        return ApiResponse.success(ApiMessage.PRODUCT_UPLOAD_IMAGE_SUCCESS, imageUrl, messageService, locale);
+        return ApiResponse.success(ApiCode.SUCCESS, imageUrl);
     }
-
 }
-

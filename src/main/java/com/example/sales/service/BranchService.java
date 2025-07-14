@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/BranchService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
@@ -14,7 +14,6 @@ import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -56,7 +55,7 @@ public class BranchService {
 
         Branch branch = branchRepository.findById(id)
                 .filter(b -> b.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.BRANCH_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branch.setName(req.getName());
         branch.setAddress(req.getAddress());
@@ -72,14 +71,14 @@ public class BranchService {
 
         Branch branch = branchRepository.findById(id)
                 .filter(b -> b.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.BRANCH_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branchRepository.delete(branch);
     }
 
     private Shop getShop(User user) {
         return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private BranchResponse toResponse(Branch branch) {

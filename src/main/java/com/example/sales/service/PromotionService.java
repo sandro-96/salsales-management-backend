@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/PromotionService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
 import com.example.sales.exception.BusinessException;
@@ -53,9 +53,9 @@ public class PromotionService {
 
         Promotion promotion = promotionRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shopId))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PROMOTION_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
         if (!promotion.getBranchId().equals(request.getBranchId())) {
-            throw new BusinessException(ApiErrorCode.UNAUTHORIZED);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
         promotion.setName(request.getName());
@@ -73,7 +73,7 @@ public class PromotionService {
         String shopId = getShopOfUser(user).getId();
         Promotion promotion = promotionRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shopId))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.PROMOTION_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
 
         promotionRepository.delete(promotion);
     }
@@ -93,6 +93,6 @@ public class PromotionService {
 
     private Shop getShopOfUser(User user) {
         return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(ApiErrorCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
     }
 }

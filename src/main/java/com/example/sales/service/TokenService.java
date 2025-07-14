@@ -1,7 +1,7 @@
 // File: src/main/java/com/example/sales/service/TokenService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiErrorCode;
+import com.example.sales.constant.ApiCode;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.RefreshToken;
 import com.example.sales.model.User;
@@ -33,15 +33,15 @@ public class TokenService {
 
     public String refreshAccessToken(String refreshTokenValue) {
         RefreshToken token = refreshTokenRepository.findByToken(refreshTokenValue)
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.REFRESH_TOKEN_INVALID));
+                .orElseThrow(() -> new BusinessException(ApiCode.REFRESH_TOKEN_INVALID));
 
         if (token.getExpiryDate().before(new Date())) {
             refreshTokenRepository.delete(token);
-            throw new BusinessException(ApiErrorCode.REFRESH_TOKEN_EXPIRED);
+            throw new BusinessException(ApiCode.REFRESH_TOKEN_EXPIRED);
         }
 
         User user = userRepository.findById(token.getUserId())
-                .orElseThrow(() -> new BusinessException(ApiErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
 
         return jwtUtil.generateToken(user);
     }

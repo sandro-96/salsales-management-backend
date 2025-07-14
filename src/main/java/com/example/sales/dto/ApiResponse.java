@@ -1,33 +1,28 @@
 // File: src/main/java/com/example/sales/dto/ApiResponse.java
 package com.example.sales.dto;
 
-import com.example.sales.constant.ApiErrorCode;
-import com.example.sales.constant.ApiMessage;
-import com.example.sales.util.MessageService;
+import com.example.sales.constant.ApiCode;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
-import java.util.Locale;
+import lombok.NoArgsConstructor;
 
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class ApiResponse<T> {
     private boolean success;
-    private String code;
-    private String message;
+    private ApiCode code;
     private T data;
 
-    // ✅ Success with i18n
-    public static <T> ApiResponse<T> success(ApiMessage msg, T data, MessageService ms, Locale locale) {
-        return new ApiResponse<>(true, msg.getCode(), ms.get(msg.getMessage(), locale), data);
+    public static <T> ApiResponse<T> success(ApiCode code, T data) {
+        return new ApiResponse<>(true, code, data);
     }
 
-    public static ApiResponse<?> success(ApiMessage msg, MessageService ms, Locale locale) {
-        return success(msg, null, ms, locale);
+    public static <T> ApiResponse<T> success(ApiCode code) {
+        return new ApiResponse<>(true, code, null);
     }
 
-    // ✅ Error with i18n
-    public static ApiResponse<?> error(ApiErrorCode error, MessageService ms, Locale locale) {
-        return new ApiResponse<>(false, error.getCode(), ms.get(error.getMessage(), locale), null);
+    public static ApiResponse<?> error(ApiCode code) {
+        return new ApiResponse<>(false, code, null);
     }
 }
