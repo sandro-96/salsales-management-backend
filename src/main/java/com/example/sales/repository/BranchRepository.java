@@ -2,13 +2,14 @@
 package com.example.sales.repository;
 
 import com.example.sales.model.Branch;
-import com.example.sales.repository.base.SoftDeleteRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface BranchRepository extends SoftDeleteRepository<Branch, String> {
+@Repository
+public interface BranchRepository extends MongoRepository<Branch, String> {
     List<Branch> findByShopIdAndDeletedFalse(String shopId);
     Optional<Branch> findByIdAndDeletedFalse(String id);
-
 }

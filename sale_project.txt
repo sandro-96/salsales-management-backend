@@ -365,11 +365,10 @@ public class AuditLogController {
 
     @GetMapping("/{targetId}")
     public ApiResponse<List<AuditLog>> getLogs(@PathVariable String targetId) {
-        List<AuditLog> logs = auditLogRepository.findByTargetIdOrderByCreatedAtDesc(targetId);
+        List<AuditLog> logs = auditLogRepository.findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(targetId);
         return ApiResponse.success(ApiCode.SUCCESS, logs);
     }
 }
-
 
 // File: src/main/java/com/example/sales/controller/AuthController.java
 package com.example.sales.controller;
@@ -1970,7 +1969,6 @@ public class ImageCleanupJob {
 package com.example.sales.model.base;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;
@@ -1981,7 +1979,6 @@ import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
-@Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
@@ -2000,7 +1997,6 @@ public abstract class BaseEntity {
     private String updatedBy;
 
     @Field("deleted")
-    @Builder.Default
     private boolean deleted = false;
 
     private LocalDateTime deletedAt;
@@ -2116,7 +2112,7 @@ public class Order extends BaseEntity {
     private List<OrderItem> items;     // Danh sách sản phẩm
     private double totalPrice;
     private double totalAmount;
-
+    @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
     // Thông tin thanh toán
@@ -2281,12 +2277,17 @@ public class Shop extends BaseEntity {
     private String address;
     private String phone;
     private String logoUrl; // nếu cần logo
+    @Builder.Default
     private boolean active = true;
 
     // ====== Nâng cao (SS) ======
+    @Builder.Default
     private boolean trackInventory = true; // Có quản lý tồn kho không
+    @Builder.Default
     private String currency = "VND";       // Đơn vị tiền tệ mặc định
+    @Builder.Default
     private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
+    @Builder.Default
     private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
 
 }
@@ -2383,6 +2384,7 @@ public class User extends BaseEntity {
     private boolean verified = false; // Đã xác thực tài khoản chưa?
     private String verificationToken;
     private Date verificationExpiry;
+    @Builder.Default
     private UserRole role = UserRole.ROLE_USER; // Mặc định là USER
     private String resetToken; // Token dùng để reset password
     private Date resetTokenExpiry; // Thời hạn token
@@ -2395,29 +2397,28 @@ public class User extends BaseEntity {
 package com.example.sales.repository;
 
 import com.example.sales.model.AuditLog;
-import com.example.sales.repository.base.SoftDeleteRepository;
-import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 
-public interface AuditLogRepository extends SoftDeleteRepository<AuditLog, String> {
-    @Query("{ 'targetId': ?0, 'deleted': false }")
-    List<AuditLog> findByTargetIdOrderByCreatedAtDesc(String targetId);
+public interface AuditLogRepository extends MongoRepository<AuditLog, String> {
+    List<AuditLog> findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(String targetId);
 }
 
 // File: src/main/java/com/example/sales/repository/BranchRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.Branch;
-import com.example.sales.repository.base.SoftDeleteRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface BranchRepository extends SoftDeleteRepository<Branch, String> {
+@Repository
+public interface BranchRepository extends MongoRepository<Branch, String> {
     List<Branch> findByShopIdAndDeletedFalse(String shopId);
     Optional<Branch> findByIdAndDeletedFalse(String id);
-
 }
 
 // File: src/main/java/com/example/sales/repository/CustomerRepository.java
@@ -2634,30 +2635,38 @@ package com.example.sales.security;
 import com.example.sales.model.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
+    @Value("${app.jwt.secret}")
     private String jwtSecret;
+
+    private Key key;
 
     private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24h
 
-    private final Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    @PostConstruct
+    public void init() {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException("❌ JWT secret is missing. Please define 'app.jwt.secret' in application.properties.");
+        }
+        this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
-    // Sinh token từ User
     public String generateToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getId())
                 .claim("email", user.getEmail())
                 .claim("businessType", user.getBusinessType())
-                .claim("role", user.getRole().name()) // ⭐ Thêm role vào token
+                .claim("role", user.getRole().name())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -4589,53 +4598,6 @@ public class PermissionChecker {
         return branchRepository.findByIdAndDeletedFalse(branchId)
                 .map(branch -> hasRole(branch.getShopId(), userId, roles))
                 .orElse(false);
-    }
-}
-
-// File: src/main/java/com/example/sales/repository/base/SoftDeleteRepository.java
-package com.example.sales.repository.base;
-
-import org.springframework.data.mongodb.repository.MongoRepository;
-import java.util.List;
-import java.util.Optional;
-
-public interface SoftDeleteRepository<T, ID> extends MongoRepository<T, ID> {
-    List<T> findAllActive();
-    Optional<T> findActiveById(ID id);
-}
-
-// File: src/main/java/com/example/sales/repository/base/SoftDeleteRepositoryImpl.java
-package com.example.sales.repository.base;
-
-import com.example.sales.model.base.BaseEntity;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-
-import java.util.List;
-import java.util.Optional;
-
-public abstract class SoftDeleteRepositoryImpl<T extends BaseEntity, ID> implements SoftDeleteRepository<T, ID> {
-
-    @Autowired
-    protected MongoTemplate mongoTemplate;
-
-    private final Class<T> entityClass;
-
-    public SoftDeleteRepositoryImpl(Class<T> entityClass) {
-        this.entityClass = entityClass;
-    }
-
-    @Override
-    public List<T> findAllActive() {
-        return mongoTemplate.find(Query.query(Criteria.where("deleted").is(false)), entityClass);
-    }
-
-    @Override
-    public Optional<T> findActiveById(ID id) {
-        Query query = new Query(Criteria.where("id").is(id).and("deleted").is(false));
-        return Optional.of(mongoTemplate.findOne(query, entityClass));
     }
 }
 

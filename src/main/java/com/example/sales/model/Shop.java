@@ -24,12 +24,17 @@ public class Shop extends BaseEntity {
     private String address;
     private String phone;
     private String logoUrl; // nếu cần logo
+    @Builder.Default
     private boolean active = true;
 
     // ====== Nâng cao (SS) ======
+    @Builder.Default
     private boolean trackInventory = true; // Có quản lý tồn kho không
+    @Builder.Default
     private String currency = "VND";       // Đơn vị tiền tệ mặc định
+    @Builder.Default
     private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
+    @Builder.Default
     private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
 
 }

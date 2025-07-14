@@ -34,6 +34,7 @@ public class User extends BaseEntity {
     private boolean verified = false; // Đã xác thực tài khoản chưa?
     private String verificationToken;
     private Date verificationExpiry;
+    @Builder.Default
     private UserRole role = UserRole.ROLE_USER; // Mặc định là USER
     private String resetToken; // Token dùng để reset password
     private Date resetTokenExpiry; // Thời hạn token

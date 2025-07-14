@@ -22,7 +22,7 @@ public class AuditLogController {
 
     @GetMapping("/{targetId}")
     public ApiResponse<List<AuditLog>> getLogs(@PathVariable String targetId) {
-        List<AuditLog> logs = auditLogRepository.findByTargetIdOrderByCreatedAtDesc(targetId);
+        List<AuditLog> logs = auditLogRepository.findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(targetId);
         return ApiResponse.success(ApiCode.SUCCESS, logs);
     }
 }

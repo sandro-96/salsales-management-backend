@@ -29,7 +29,7 @@ public class Order extends BaseEntity {
     private List<OrderItem> items;     // Danh sách sản phẩm
     private double totalPrice;
     private double totalAmount;
-
+    @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
     // Thông tin thanh toán
