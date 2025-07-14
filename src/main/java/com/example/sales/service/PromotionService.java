@@ -7,10 +7,7 @@ import com.example.sales.dto.promotion.PromotionResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Promotion;
-import com.example.sales.model.Shop;
-import com.example.sales.model.User;
 import com.example.sales.repository.PromotionRepository;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,20 +18,17 @@ import java.util.List;
 public class PromotionService {
 
     private final PromotionRepository promotionRepository;
-    private final ShopRepository shopRepository;
 
-    public List<PromotionResponse> getAll(User user, String branchId) {
-        String shopId = getShopOfUser(user).getId();
+    public List<PromotionResponse> getAll(String shopId, String branchId) {
         return promotionRepository.findByShopIdAndBranchId(shopId, branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public PromotionResponse create(User user, PromotionRequest request) {
-        Shop shop = getShopOfUser(user);
+    public PromotionResponse create(String shopId, PromotionRequest request) {
         Promotion promotion = Promotion.builder()
-                .shopId(shop.getId())
+                .shopId(shopId)
                 .name(request.getName())
                 .discountType(request.getDiscountType())
                 .discountValue(request.getDiscountValue())
@@ -48,12 +42,11 @@ public class PromotionService {
         return toResponse(promotionRepository.save(promotion));
     }
 
-    public PromotionResponse update(User user, String id, PromotionRequest request) {
-        String shopId = getShopOfUser(user).getId();
-
+    public PromotionResponse update(String shopId, String id, PromotionRequest request) {
         Promotion promotion = promotionRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
+
         if (!promotion.getBranchId().equals(request.getBranchId())) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
@@ -69,8 +62,7 @@ public class PromotionService {
         return toResponse(promotionRepository.save(promotion));
     }
 
-    public void delete(User user, String id) {
-        String shopId = getShopOfUser(user).getId();
+    public void delete(String shopId, String id) {
         Promotion promotion = promotionRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
@@ -89,10 +81,5 @@ public class PromotionService {
                 .endDate(p.getEndDate())
                 .active(p.isActive())
                 .build();
-    }
-
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
     }
 }

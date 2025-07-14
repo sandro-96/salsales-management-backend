@@ -21,58 +21,43 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final ShopRepository shopRepository;
     private final TableRepository tableRepository;
     private final ProductRepository productRepository;
-    private final ShopUserService shopUserService;
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
 
-    public List<OrderResponse> getOrdersByUser(User user) {
-        Shop shop = getShopOfUser(user);
-        return orderRepository.findByShopId(shop.getId())
+    public List<OrderResponse> getOrdersByUser(User user, String shopId) {
+        return orderRepository.findByShopId(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
     @Transactional
-    public OrderResponse createOrder(User user, OrderRequest request) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
-
+    public OrderResponse createOrder(User user, String shopId, OrderRequest request) {
         Order order = new Order();
-        order.setShopId(shop.getId());
+        order.setShopId(shopId);
         order.setTableId(request.getTableId());
         order.setUserId(user.getId());
         order.setNote(request.getNote());
         order.setStatus(OrderStatus.PENDING);
         order.setPaid(false);
+
         String branchId = request.getBranchId();
         if (branchId != null && !branchId.isBlank()) {
             order.setBranchId(branchId);
         }
 
-        double[] totals = {0, 0}; // totals[0] for totalAmount, totals[1] for totalPrice
+        double[] totals = {0, 0};
 
         List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
             Product product = productRepository.findById(reqItem.getProductId())
-                    .filter(p -> p.getShopId().equals(shop.getId()))
+                    .filter(p -> p.getShopId().equals(shopId))
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-            if (requiresInventory(shop.getType()) && product.getQuantity() < reqItem.getQuantity()) {
-                throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
-            }
-
-            if (requiresInventory(shop.getType())) {
-                product.setQuantity(product.getQuantity() - reqItem.getQuantity());
-                productRepository.save(product);
-            }
 
             double basePrice = reqItem.getPrice();
             double finalPrice = basePrice;
             String promoId = null;
 
-            // Áp dụng khuyến mãi nếu có
-            Promotion promo = findApplicablePromotion(shop.getId(), branchId, product.getId());
+            Promotion promo = findApplicablePromotion(shopId, branchId, product.getId());
             if (promo != null) {
                 promoId = promo.getId();
                 if (promo.getDiscountType() == DiscountType.PERCENT) {
@@ -90,8 +75,8 @@ public class OrderService {
             item.setPriceAfterDiscount(finalPrice);
             item.setAppliedPromotionId(promoId);
 
-            totals[0] += reqItem.getQuantity(); // Update totalAmount
-            totals[1] += reqItem.getQuantity() * finalPrice; // Update totalPrice
+            totals[0] += reqItem.getQuantity();
+            totals[1] += reqItem.getQuantity() * finalPrice;
 
             return item;
         }).toList();
@@ -105,10 +90,8 @@ public class OrderService {
         return toResponse(created);
     }
 
-    public void cancelOrder(User user, String orderId) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
-        Order order = getOrderByShop(orderId, shop.getId());
+    public void cancelOrder(User user, String shopId, String orderId) {
+        Order order = getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -116,14 +99,11 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
-        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
+        auditLogService.log(user, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
     }
 
-    public OrderResponse confirmPayment(User user, String orderId, String paymentId, String paymentMethod) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.CASHIER);
-
-        Order order = getOrderByShop(orderId, shop.getId());
+    public OrderResponse confirmPayment(User user, String shopId, String orderId, String paymentId, String paymentMethod) {
+        Order order = getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -137,24 +117,19 @@ public class OrderService {
 
         Order updated = orderRepository.save(order);
         releaseTable(updated);
-        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "PAYMENT_CONFIRMED",
+        auditLogService.log(user, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
                 "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
         return toResponse(updated);
     }
 
-    public OrderResponse updateStatus(User user, String orderId, OrderStatus newStatus) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-        Order order = getOrderByShop(orderId, shop.getId());
-
-        if (shop.getType() == ShopType.RESTAURANT && newStatus == OrderStatus.SHIPPING) {
-            throw new BusinessException(ApiCode.INVALID_STATUS_TRANSITION);
-        }
+    public OrderResponse updateStatus(User user, String shopId, String orderId, OrderStatus newStatus) {
+        Order order = getOrderByShop(orderId, shopId);
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
 
+        OrderStatus oldStatus = order.getStatus();
         order.setStatus(newStatus);
 
         if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
@@ -164,32 +139,17 @@ public class OrderService {
         }
 
         Order updated = orderRepository.save(order);
-        if (!order.getStatus().equals(newStatus)) {
-            auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "STATUS_UPDATED",
-                    "Cập nhật trạng thái từ %s → %s".formatted(order.getStatus(), newStatus));
+        if (!oldStatus.equals(newStatus)) {
+            auditLogService.log(user, shopId, order.getId(), "ORDER", "STATUS_UPDATED",
+                    "Cập nhật trạng thái từ %s → %s".formatted(oldStatus, newStatus));
         }
 
         return toResponse(updated);
     }
 
-    public List<OrderResponse> getOrdersByStatus(User user, OrderStatus status, String branchId) {
-        Shop shop = getShopOfUser(user);
-        return orderRepository.findByShopIdAndBranchIdAndStatus(shop.getId(), branchId, status)
+    public List<OrderResponse> getOrdersByStatus(User user, String shopId, OrderStatus status, String branchId) {
+        return orderRepository.findByShopIdAndBranchIdAndStatus(shopId, branchId, status)
                 .stream().map(this::toResponse).toList();
-    }
-
-    // ==== Helpers ====
-
-    private boolean requiresInventory(ShopType type) {
-        return switch (type) {
-            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
-            default -> false;
-        };
-    }
-
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private Order getOrderByShop(String orderId, String shopId) {

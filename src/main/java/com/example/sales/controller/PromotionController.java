@@ -3,14 +3,14 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
-import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.PromotionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,28 +25,32 @@ public class PromotionController {
     private final PromotionService promotionService;
 
     @GetMapping
-    public ApiResponse<List<PromotionResponse>> getAll(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<PromotionResponse>> getAll(@RequestParam String shopId,
                                                        @RequestParam(required = false) String branchId) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.getAll(user, branchId));
+        return ApiResponse.success(ApiCode.SUCCESS, promotionService.getAll(shopId, branchId));
     }
 
     @PostMapping
-    public ApiResponse<PromotionResponse> create(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<PromotionResponse> create(@RequestParam String shopId,
                                                  @RequestBody @Valid PromotionRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.create(user, request));
+        return ApiResponse.success(ApiCode.SUCCESS, promotionService.create(shopId, request));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<PromotionResponse> update(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<PromotionResponse> update(@RequestParam String shopId,
                                                  @PathVariable String id,
                                                  @RequestBody @Valid PromotionRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.update(user, id, request));
+        return ApiResponse.success(ApiCode.SUCCESS, promotionService.update(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<?> delete(@RequestParam String shopId,
                                  @PathVariable String id) {
-        promotionService.delete(user, id);
+        promotionService.delete(shopId, id);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
 }

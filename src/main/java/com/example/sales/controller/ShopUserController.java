@@ -1,12 +1,11 @@
 // File: src/main/java/com/example/sales/controller/ShopUserController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
-import com.example.sales.exception.BusinessException;
 import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.ShopUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,25 +21,20 @@ public class ShopUserController {
     private final ShopUserService shopUserService;
 
     @PostMapping("/add")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<?> addUser(@AuthenticationPrincipal User admin,
                                   @RequestParam String shopId,
                                   @RequestParam String userId,
                                   @RequestParam ShopRole role) {
-        if (!shopUserService.isOwner(shopId, admin.getId())) {
-            throw new BusinessException(ApiCode.UNAUTHORIZED);
-        }
-
         shopUserService.addUser(shopId, userId, role);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
 
     @DeleteMapping("/remove")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<?> removeUser(@AuthenticationPrincipal User admin,
                                      @RequestParam String shopId,
                                      @RequestParam String userId) {
-        if (shopUserService.isOwner(shopId, admin.getId())) {
-            throw new BusinessException(ApiCode.UNAUTHORIZED);
-        }
         shopUserService.removeUser(shopId, userId);
         return ApiResponse.success(ApiCode.SUCCESS);
     }

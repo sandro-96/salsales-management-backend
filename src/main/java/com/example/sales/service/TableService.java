@@ -24,13 +24,16 @@ public class TableService {
     private final ShopRepository shopRepository;
 
     public TableResponse create(TableRequest request) {
-        Shop shop = shopRepository.findById(request.getShopId())
+        String shopId = request.getShopId();
+        String branchId = request.getBranchId();
+
+        Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
         Table table = Table.builder()
                 .name(request.getName())
-                .shopId(shop.getId())
-                .branchId(request.getBranchId())
+                .shopId(shopId)
+                .branchId(branchId)
                 .status(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE))
                 .capacity(request.getCapacity())
                 .note(request.getNote())
@@ -65,6 +68,7 @@ public class TableService {
                 .name(table.getName())
                 .status(table.getStatus())
                 .shopId(table.getShopId())
+                .branchId(table.getBranchId())
                 .shopName(shop != null ? shop.getName() : null)
                 .capacity(table.getCapacity())
                 .note(table.getNote())
@@ -78,7 +82,7 @@ public class TableService {
                 .name(table.getName())
                 .status(table.getStatus())
                 .shopId(shop.getId())
-                .branchId(table.getBranchId()) // ✅ include branchId
+                .branchId(table.getBranchId())
                 .shopName(shop.getName())
                 .capacity(table.getCapacity())
                 .note(table.getNote())
@@ -86,4 +90,3 @@ public class TableService {
                 .build();
     }
 }
-

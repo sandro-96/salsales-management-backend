@@ -2,12 +2,10 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.ShopType;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
-import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.helper.ProductSearchHelper;
 import com.example.sales.model.Product;
@@ -30,25 +28,23 @@ import java.util.UUID;
 public class ProductService {
 
     private final ProductRepository productRepository;
-    private final ShopRepository shopRepository;
     private final ProductSearchHelper productSearchHelper;
-    private final ShopUserService shopUserService;
     private final FileUploadService fileUploadService;
     private final AuditLogService auditLogService;
+    private final ShopRepository shopRepository;
 
-    public List<ProductResponse> getAllByUser(User user) {
-        Shop shop = getShopOfUser(user);
-        return productRepository.findByShopId(shop.getId())
+    public List<ProductResponse> getAllByShop(String shopId) {
+        return productRepository.findByShopId(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
-    public ProductResponse createProduct(User user, ProductRequest request) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+    public ProductResponse createProduct(String shopId, ProductRequest request) {
         String productCode = request.getProductCode();
         if (productCode == null || productCode.isBlank()) {
-            productCode = UUID.randomUUID().toString(); // hoặc custom logic
+            productCode = UUID.randomUUID().toString();
         }
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
         String finalImageUrl = fileUploadService.moveToProduct(request.getImageUrl());
         Product product = Product.builder()
                 .name(request.getName())
@@ -58,26 +54,19 @@ public class ProductService {
                 .imageUrl(finalImageUrl)
                 .description(request.getDescription())
                 .active(request.isActive())
-                .shopId(shop.getId())
+                .shopId(shopId)
                 .productCode(productCode)
                 .branchId(request.getBranchId())
                 .build();
 
-        if (requiresInventory(shop.getType())) {
-            product.setQuantity(request.getQuantity());
-        } else {
-            product.setQuantity(0);
-        }
+        product.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
 
         return toResponse(productRepository.save(product));
     }
 
-    public ProductResponse updateProduct(User user, String id, ProductRequest request) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
+    public ProductResponse updateProduct(User user, String shopId, ShopType shopType, String id, ProductRequest request) {
         Product existing = productRepository.findById(id)
-                .filter(p -> p.getShopId().equals(shop.getId()))
+                .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         existing.setName(request.getName());
@@ -87,49 +76,40 @@ public class ProductService {
         existing.setImageUrl(request.getImageUrl());
         existing.setDescription(request.getDescription());
         existing.setActive(request.isActive());
-
-        if (requiresInventory(shop.getType())) {
-            existing.setQuantity(request.getQuantity());
-        } else {
-            existing.setQuantity(0);
-        }
+        existing.setQuantity(requiresInventory(shopType) ? request.getQuantity() : 0);
 
         Product updatedProduct = productRepository.save(existing);
+
         if (existing.getPrice() != request.getPrice()) {
-            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "PRICE_CHANGED",
+            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "PRICE_CHANGED",
                     "Thay đổi giá từ %.2f → %.2f".formatted(existing.getPrice(), request.getPrice()));
         }
 
         if (!existing.getCategory().equals(request.getCategory())) {
-            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
+            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
                     "Chuyển danh mục từ %s → %s".formatted(existing.getCategory(), request.getCategory()));
         }
 
         if (existing.getQuantity() != request.getQuantity()) {
-            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
+            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
                     "Thay đổi tồn kho từ %d → %d".formatted(existing.getQuantity(), request.getQuantity()));
         }
 
         return toResponse(updatedProduct);
     }
 
-    public void deleteProduct(User user, String id) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
+    public void deleteProduct(String shopId, String id) {
         Product existing = productRepository.findById(id)
-                .filter(p -> p.getShopId().equals(shop.getId()))
+                .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         productRepository.delete(existing);
     }
 
-    public Page<ProductResponse> search(User user, ProductSearchRequest req) {
-        Shop shop = getShopOfUser(user);
+    public Page<ProductResponse> search(String shopId, ProductSearchRequest req) {
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
-
-        List<Product> results = productSearchHelper.search(shop.getId(), req.getBranchId(), req, pageable);
-        long total = productSearchHelper.counts(shop.getId(), req.getBranchId(), req);
+        List<Product> results = productSearchHelper.search(shopId, req.getBranchId(), req, pageable);
+        long total = productSearchHelper.counts(shopId, req.getBranchId(), req);
 
         return new PageImpl<>(
                 results.stream().map(this::toResponse).toList(),
@@ -138,41 +118,28 @@ public class ProductService {
         );
     }
 
-    public List<Product> searchAllForExport(User user, ProductSearchRequest req) {
-        Shop shop = getShopOfUser(user);
-        return productSearchHelper.search(shop.getId(), req.getBranchId(), req, Pageable.unpaged());
+    public List<Product> searchAllForExport(String shopId, ProductSearchRequest req) {
+        return productSearchHelper.search(shopId, req.getBranchId(), req, Pageable.unpaged());
     }
 
-    public ProductResponse toggleActive(User user, String id) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
+    public ProductResponse toggleActive(String shopId, String id) {
         Product product = productRepository.findById(id)
-                .filter(p -> p.getShopId().equals(shop.getId()))
+                .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         product.setActive(!product.isActive());
         return toResponse(productRepository.save(product));
     }
 
-    public List<ProductResponse> getLowStock(User user, int threshold) {
-        Shop shop = getShopOfUser(user);
-
-        if (!requiresInventory(shop.getType())) {
+    public List<ProductResponse> getLowStock(String shopId, int threshold, ShopType shopType) {
+        if (!requiresInventory(shopType)) {
             return List.of();
         }
 
-        return productRepository.findByShopId(shop.getId()).stream()
+        return productRepository.findByShopId(shopId).stream()
                 .filter(p -> p.getQuantity() < threshold)
                 .map(this::toResponse)
                 .toList();
-    }
-
-    // ============ Helpers ============
-
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private ProductResponse toResponse(Product product) {

@@ -32,13 +32,13 @@ public class ShopService {
         return shopRepository.save(shop);
     }
 
-    public Shop getMyShop(User user) {
-        return shopRepository.findByOwnerId(user.getId())
+    public Shop getShopByOwner(String ownerId) {
+        return shopRepository.findByOwnerId(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
-    public Shop updateMyShop(User user, ShopRequest request) {
-        Shop shop = getMyShop(user);
+    public Shop updateShop(String ownerId, ShopRequest request) {
+        Shop shop = getShopByOwner(ownerId);
 
         shop.setName(request.getName());
         shop.setType(request.getType());
@@ -47,5 +47,11 @@ public class ShopService {
         shop.setLogoUrl(request.getLogoUrl());
 
         return shopRepository.save(shop);
+    }
+
+    public String getShopIdByOwner(String ownerId) {
+        return shopRepository.findByOwnerId(ownerId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
+                .getId();
     }
 }

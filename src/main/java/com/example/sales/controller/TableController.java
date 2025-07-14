@@ -3,21 +3,22 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.TableRequest;
 import com.example.sales.dto.TableResponse;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.TableService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/table")
+@RequestMapping("/api/tables")
 @RequiredArgsConstructor
 @Validated
 public class TableController {
@@ -25,28 +26,22 @@ public class TableController {
     private final TableService tableService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<TableResponse>> create(
-            @Valid @RequestBody TableRequest request
-    ) {
-        TableResponse response = tableService.create(request);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.TABLE_CREATED, response));
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<TableResponse> create(@RequestBody @Valid TableRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, tableService.create(request));
     }
 
-    @GetMapping("/shop/{shopId}")
-    public ResponseEntity<ApiResponse<List<TableResponse>>> getByShop(
-            @PathVariable String shopId,
-            @RequestParam(required = false) String branchId
-    ) {
-        List<TableResponse> tables = tableService.getByShop(shopId, branchId);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.TABLE_LIST, tables));
+    @GetMapping
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<TableResponse>> getByShop(@RequestParam String shopId,
+                                                      @RequestParam String branchId) {
+        return ApiResponse.success(ApiCode.SUCCESS, tableService.getByShop(shopId, branchId));
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<ApiResponse<TableResponse>> updateStatus(
-            @PathVariable String id,
-            @RequestParam TableStatus status
-    ) {
-        TableResponse response = tableService.updateStatus(id, status);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.TABLE_STATUS_UPDATED, response));
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<TableResponse> updateStatus(@PathVariable String id,
+                                                   @RequestParam TableStatus status) {
+        return ApiResponse.success(ApiCode.SUCCESS, tableService.updateStatus(id, status));
     }
 }

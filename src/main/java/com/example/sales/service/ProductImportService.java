@@ -2,20 +2,15 @@
 package com.example.sales.service;
 
 import com.example.sales.dto.product.ProductRequest;
-import com.example.sales.model.User;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
-import java.util.*;
-
-/*
-| Tên          | Mã | Danh mục | Số lượng | Giá   | Đơn vị | Ảnh     | Mô tả    | Trạng thái |
-| ------------ | -- | -------- | -------- | ----- | ------ | ------- | -------- | ---------- |
-| Sữa Vinamilk | A1 | Sữa      | 100      | 15000 | hộp    | url.png | Sữa tươi | Đang bán   |
-*/
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +18,7 @@ public class ProductImportService {
 
     private final ProductService productService;
 
-    public Map<String, Object> importExcel(User user, String branchId, MultipartFile file) {
+    public Map<String, Object> importExcel(String shopId, String branchId, MultipartFile file) {
         int successCount = 0;
         int failCount = 0;
         List<String> errors = new ArrayList<>();
@@ -34,12 +29,12 @@ public class ProductImportService {
             Sheet sheet = workbook.getSheetAt(0);
             int rows = sheet.getPhysicalNumberOfRows();
 
-            for (int i = 1; i < rows; i++) { // bỏ dòng header
+            for (int i = 1; i < rows; i++) {
                 Row row = sheet.getRow(i);
                 try {
                     ProductRequest req = parseRow(row);
                     req.setBranchId(branchId);
-                    productService.createProduct(user, req);
+                    productService.createProduct(shopId, req);
                     successCount++;
                 } catch (Exception ex) {
                     failCount++;

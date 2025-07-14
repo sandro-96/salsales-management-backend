@@ -25,7 +25,24 @@ public class ShopUserService {
     }
 
     public boolean isOwner(String shopId, String userId) {
-        return getUserRoleInShop(shopId, userId) != ShopRole.OWNER;
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.OWNER)
+                .orElse(false);
+    }
+
+    public boolean isStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.STAFF)
+                .orElse(false);
+    }
+
+    public boolean isOwnerOrStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> {
+                    ShopRole role = shopUser.getRole();
+                    return role == ShopRole.OWNER || role == ShopRole.STAFF;
+                })
+                .orElse(false);
     }
 
     public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
@@ -36,7 +53,7 @@ public class ShopUserService {
     }
 
     public void requireOwner(String shopId, String userId) {
-        if (isOwner(shopId, userId)) {
+        if (!isOwner(shopId, userId)) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
     }

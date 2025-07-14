@@ -8,13 +8,14 @@ import com.example.sales.dto.ShopRequest;
 import com.example.sales.model.Shop;
 import com.example.sales.model.User;
 import com.example.sales.service.ShopService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/shops")
+@RequestMapping("/api/shop")
 @RequiredArgsConstructor
 @Validated
 public class ShopController {
@@ -22,25 +23,19 @@ public class ShopController {
     private final ShopService shopService;
 
     @PostMapping
-    public ApiResponse<Shop> createShop(@AuthenticationPrincipal User user,
-                                        @RequestBody ShopRequest request) {
-        Shop created = shopService.createShop(user, request);
-        return ApiResponse.success(ApiCode.SUCCESS, created);
+    public ApiResponse<Shop> create(@AuthenticationPrincipal User user,
+                                    @RequestBody @Valid ShopRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopService.createShop(user, request));
     }
 
     @GetMapping("/me")
-    public ApiResponse<?> getMyShop(@AuthenticationPrincipal User user) {
-        Shop shop = shopService.getMyShop(user);
-        if (shop == null) {
-            return ApiResponse.error(ApiCode.SHOP_NOT_FOUND);
-        }
-        return ApiResponse.success(ApiCode.SUCCESS, shop);
+    public ApiResponse<Shop> getMyShop(@AuthenticationPrincipal User user) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopService.getShopByOwner(user.getId()));
     }
 
-    @PutMapping
-    public ApiResponse<Shop> updateMyShop(@AuthenticationPrincipal User user,
-                                          @RequestBody ShopRequest request) {
-        Shop updated = shopService.updateMyShop(user, request);
-        return ApiResponse.success(ApiCode.SUCCESS, updated);
+    @PutMapping("/me")
+    public ApiResponse<Shop> update(@AuthenticationPrincipal User user,
+                                    @RequestBody @Valid ShopRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopService.updateShop(user.getId(), request));
     }
 }

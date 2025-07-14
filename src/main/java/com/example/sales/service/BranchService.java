@@ -2,15 +2,11 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
-import com.example.sales.model.Shop;
-import com.example.sales.model.User;
 import com.example.sales.repository.BranchRepository;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,25 +17,17 @@ import java.util.List;
 public class BranchService {
 
     private final BranchRepository branchRepository;
-    private final ShopRepository shopRepository;
-    private final ShopUserService shopUserService;
 
-    public List<BranchResponse> getAll(User user) {
-        Shop shop = getShop(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
-        return branchRepository.findByShopId(shop.getId())
+    public List<BranchResponse> getAll(String shopId) {
+        return branchRepository.findByShopId(shopId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public BranchResponse create(User user, BranchRequest req) {
-        Shop shop = getShop(user);
-        shopUserService.requireOwner(shop.getId(), user.getId());
-
+    public BranchResponse create(String shopId, BranchRequest req) {
         Branch branch = Branch.builder()
-                .shopId(shop.getId())
+                .shopId(shopId)
                 .name(req.getName())
                 .address(req.getAddress())
                 .phone(req.getPhone())
@@ -49,12 +37,9 @@ public class BranchService {
         return toResponse(branchRepository.save(branch));
     }
 
-    public BranchResponse update(User user, String id, BranchRequest req) {
-        Shop shop = getShop(user);
-        shopUserService.requireOwner(shop.getId(), user.getId());
-
+    public BranchResponse update(String shopId, String id, BranchRequest req) {
         Branch branch = branchRepository.findById(id)
-                .filter(b -> b.getShopId().equals(shop.getId()))
+                .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branch.setName(req.getName());
@@ -65,20 +50,12 @@ public class BranchService {
         return toResponse(branchRepository.save(branch));
     }
 
-    public void delete(User user, String id) {
-        Shop shop = getShop(user);
-        shopUserService.requireOwner(shop.getId(), user.getId());
-
+    public void delete(String shopId, String id) {
         Branch branch = branchRepository.findById(id)
-                .filter(b -> b.getShopId().equals(shop.getId()))
+                .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branchRepository.delete(branch);
-    }
-
-    private Shop getShop(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private BranchResponse toResponse(Branch branch) {

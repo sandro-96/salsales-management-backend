@@ -1,14 +1,10 @@
 // File: src/main/java/com/example/sales/service/ReportService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
-import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Order;
-import com.example.sales.model.User;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -34,15 +30,9 @@ import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
 public class ReportService {
 
     private final MongoTemplate mongoTemplate;
-    private final ShopRepository shopRepository;
     private final ExcelExportService excelExportService;
 
-    /**
-     * Tổng hợp báo cáo đơn hàng (tổng doanh thu, tổng đơn, tổng sản phẩm) theo bộ lọc
-     */
-    public ReportResponse getReport(User user, ReportRequest request) {
-        String shopId = getShopIdOfUser(user);
-
+    public ReportResponse getReport(String shopId, ReportRequest request) {
         MatchOperation match = buildMatchOperation(shopId, request);
 
         Aggregation aggregation = newAggregation(
@@ -66,12 +56,7 @@ public class ReportService {
                 .build();
     }
 
-    /**
-     * Thống kê doanh thu theo ngày (dùng để hiển thị biểu đồ hoặc export)
-     */
-    public List<DailyReportResponse> getDailyReport(User user, ReportRequest request) {
-        String shopId = getShopIdOfUser(user);
-
+    public List<DailyReportResponse> getDailyReport(String shopId, ReportRequest request) {
         MatchOperation match = buildMatchOperation(shopId, request);
 
         ProjectionOperation projectDate = project()
@@ -101,10 +86,7 @@ public class ReportService {
         return results.getMappedResults();
     }
 
-    /**
-     * Export báo cáo doanh thu theo ngày ra file Excel
-     */
-    public ResponseEntity<byte[]> exportDailyReportExcel(User user,
+    public ResponseEntity<byte[]> exportDailyReportExcel(String shopId,
                                                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                                                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
@@ -112,7 +94,7 @@ public class ReportService {
         request.setStartDate(startDate);
         request.setEndDate(endDate);
 
-        List<DailyReportResponse> data = getDailyReport(user, request);
+        List<DailyReportResponse> data = getDailyReport(shopId, request);
 
         DateTimeFormatter df = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -130,9 +112,6 @@ public class ReportService {
         );
     }
 
-    /**
-     * Build điều kiện lọc dữ liệu Mongo
-     */
     private MatchOperation buildMatchOperation(String shopId, ReportRequest request) {
         Criteria criteria = Criteria.where("shopId").is(shopId);
 
@@ -147,14 +126,5 @@ public class ReportService {
         }
 
         return match(criteria);
-    }
-
-    /**
-     * Lấy ID cửa hàng của user hiện tại
-     */
-    private String getShopIdOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
-                .getId();
     }
 }

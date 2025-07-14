@@ -3,10 +3,12 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.CustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,29 +27,34 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @GetMapping
-    public ApiResponse<List<CustomerResponse>> getAll(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<CustomerResponse>> getAll(@RequestParam String shopId,
                                                       @RequestParam(required = false) String branchId) {
-        return ApiResponse.success(ApiCode.SUCCESS, customerService.getCustomers(user, branchId));
+        return ApiResponse.success(ApiCode.CUSTOMER_LIST, customerService.getCustomers(shopId, branchId));
     }
 
     @PostMapping
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<CustomerResponse> create(@AuthenticationPrincipal User user,
+                                                @RequestParam String shopId,
                                                 @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, customerService.createCustomer(user, request));
+        return ApiResponse.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user, request));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<CustomerResponse> update(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<CustomerResponse> update(@RequestParam String shopId,
                                                 @PathVariable String id,
                                                 @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, customerService.updateCustomer(user, id, request));
+        return ApiResponse.success(ApiCode.CUSTOMER_UPDATED, customerService.updateCustomer(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
-                                 @PathVariable String id,
-                                 @RequestParam(required = false) String branchId) {
-        customerService.deleteCustomer(user, branchId, id);
-        return ApiResponse.success(ApiCode.SUCCESS);
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<?> delete(@RequestParam String shopId,
+                                 @RequestParam String branchId,
+                                 @PathVariable String id) {
+        customerService.deleteCustomer(shopId, branchId, id);
+        return ApiResponse.success(ApiCode.CUSTOMER_DELETED);
     }
 }

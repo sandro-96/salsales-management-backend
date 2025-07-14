@@ -104,6 +104,23 @@
 			<artifactId>poi-ooxml</artifactId>
 			<version>5.2.5</version> <!-- hoặc version mới nhất -->
 		</dependency>
+		<!-- Spring AOP for Aspect-Oriented Programming -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-aspects</artifactId>
+		</dependency>
+
+		<!-- AspectJ Runtime -->
+		<dependency>
+			<groupId>org.aspectj</groupId>
+			<artifactId>aspectjrt</artifactId>
+		</dependency>
+
+		<!-- AspectJ Weaver (optional, for advanced weaving) -->
+		<dependency>
+			<groupId>org.aspectj</groupId>
+			<artifactId>aspectjweaver</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

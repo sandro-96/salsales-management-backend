@@ -238,10 +238,12 @@ public enum OrderStatus {
 package com.example.sales.constant;
 
 public enum ShopRole {
+    ADMIN,
     OWNER,
     STAFF,
     CASHIER
 }
+
 // File: ShopType.java
 
 package com.example.sales.constant;
@@ -430,14 +432,14 @@ public class AuthController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
-import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.BranchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -452,41 +454,46 @@ public class BranchController {
     private final BranchService branchService;
 
     @GetMapping
-    public ApiResponse<List<BranchResponse>> getAll(@AuthenticationPrincipal User user) {
-        return ApiResponse.success(ApiCode.SUCCESS, branchService.getAll(user));
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<BranchResponse>> getAll(@RequestParam String shopId) {
+        return ApiResponse.success(ApiCode.SUCCESS, branchService.getAll(shopId));
     }
 
     @PostMapping
-    public ApiResponse<BranchResponse> create(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<BranchResponse> create(@RequestParam String shopId,
                                               @RequestBody @Valid BranchRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, branchService.create(user, request));
+        return ApiResponse.success(ApiCode.SUCCESS, branchService.create(shopId, request));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<BranchResponse> update(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<BranchResponse> update(@RequestParam String shopId,
                                               @PathVariable String id,
                                               @RequestBody @Valid BranchRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, branchService.update(user, id, request));
+        return ApiResponse.success(ApiCode.SUCCESS, branchService.update(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<?> delete(@RequestParam String shopId,
                                  @PathVariable String id) {
-        branchService.delete(user, id);
+        branchService.delete(shopId, id);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
 }
-
 
 // File: src/main/java/com/example/sales/controller/CustomerController.java
 
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.CustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -505,32 +512,38 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @GetMapping
-    public ApiResponse<List<CustomerResponse>> getAll(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<CustomerResponse>> getAll(@RequestParam String shopId,
                                                       @RequestParam(required = false) String branchId) {
-        return ApiResponse.success(ApiCode.SUCCESS, customerService.getCustomers(user, branchId));
+        return ApiResponse.success(ApiCode.CUSTOMER_LIST, customerService.getCustomers(shopId, branchId));
     }
 
     @PostMapping
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<CustomerResponse> create(@AuthenticationPrincipal User user,
+                                                @RequestParam String shopId,
                                                 @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, customerService.createCustomer(user, request));
+        return ApiResponse.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user, request));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<CustomerResponse> update(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<CustomerResponse> update(@RequestParam String shopId,
                                                 @PathVariable String id,
                                                 @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, customerService.updateCustomer(user, id, request));
+        return ApiResponse.success(ApiCode.CUSTOMER_UPDATED, customerService.updateCustomer(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
-                                 @PathVariable String id,
-                                 @RequestParam(required = false) String branchId) {
-        customerService.deleteCustomer(user, branchId, id);
-        return ApiResponse.success(ApiCode.SUCCESS);
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<?> delete(@RequestParam String shopId,
+                                 @RequestParam String branchId,
+                                 @PathVariable String id) {
+        customerService.deleteCustomer(shopId, branchId, id);
+        return ApiResponse.success(ApiCode.CUSTOMER_DELETED);
     }
 }
+
 
 
 // File: src/main/java/com/example/sales/controller/OrderController.java
@@ -539,10 +552,12 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.OrderStatus;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -561,63 +576,77 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
-    public ApiResponse<List<OrderResponse>> getMyOrders(@AuthenticationPrincipal User user) {
-        List<OrderResponse> orders = orderService.getOrdersByUser(user);
-        return ApiResponse.success(ApiCode.SUCCESS, orders);
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<OrderResponse>> getMyOrders(@AuthenticationPrincipal User user,
+                                                        @RequestParam String shopId) {
+        List<OrderResponse> orders = orderService.getOrdersByUser(user, shopId);
+        return ApiResponse.success(ApiCode.ORDER_LIST, orders);
     }
 
     @PostMapping
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<OrderResponse> createOrder(@AuthenticationPrincipal User user,
+                                                  @RequestParam String shopId,
                                                   @RequestBody @Valid OrderRequest request) {
-        OrderResponse created = orderService.createOrder(user, request);
-        return ApiResponse.success(ApiCode.SUCCESS, created);
+        OrderResponse created = orderService.createOrder(user, shopId, request);
+        return ApiResponse.success(ApiCode.ORDER_CREATED, created);
     }
 
     @PutMapping("/{id}/cancel")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<?> cancelOrder(@AuthenticationPrincipal User user,
+                                      @RequestParam String shopId,
                                       @PathVariable String id) {
-        orderService.cancelOrder(user, id);
-        return ApiResponse.success(ApiCode.SUCCESS);
+        orderService.cancelOrder(user, shopId, id);
+        return ApiResponse.success(ApiCode.ORDER_CANCELLED);
     }
 
     @PostMapping("/{orderId}/confirm-payment")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<OrderResponse> confirmPayment(@PathVariable String orderId,
                                                      @RequestParam String paymentId,
                                                      @RequestParam String paymentMethod,
+                                                     @RequestParam String shopId,
                                                      @AuthenticationPrincipal User user) {
-        OrderResponse confirmed = orderService.confirmPayment(user, orderId, paymentId, paymentMethod);
-        return ApiResponse.success(ApiCode.SUCCESS, confirmed);
+        OrderResponse confirmed = orderService.confirmPayment(user, shopId, orderId, paymentId, paymentMethod);
+        return ApiResponse.success(ApiCode.ORDER_PAYMENT_CONFIRMED, confirmed);
     }
 
     @PutMapping("/{id}/status")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<OrderResponse> updateStatus(@AuthenticationPrincipal User user,
+                                                   @RequestParam String shopId,
                                                    @PathVariable String id,
                                                    @RequestParam OrderStatus status) {
-        OrderResponse updated = orderService.updateStatus(user, id, status);
-        return ApiResponse.success(ApiCode.SUCCESS, updated);
+        OrderResponse updated = orderService.updateStatus(user, shopId, id, status);
+        return ApiResponse.success(ApiCode.ORDER_STATUS_UPDATED, updated);
     }
 
     @GetMapping("/filter")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<List<OrderResponse>> getByStatus(@AuthenticationPrincipal User user,
+                                                        @RequestParam String shopId,
                                                         @RequestParam OrderStatus status,
                                                         @RequestParam(required = false) String branchId) {
-        List<OrderResponse> filtered = orderService.getOrdersByStatus(user, status, branchId);
-        return ApiResponse.success(ApiCode.SUCCESS, filtered);
+        List<OrderResponse> filtered = orderService.getOrdersByStatus(user, shopId, status, branchId);
+        return ApiResponse.success(ApiCode.ORDER_LIST, filtered);
     }
 }
-
 
 // File: src/main/java/com/example/sales/controller/ProductController.java
 
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.ShopType;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.model.Product;
 import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ProductImportService;
@@ -647,40 +676,48 @@ public class ProductController {
     private final FileUploadService fileUploadService;
 
     @GetMapping
-    public ApiResponse<List<ProductResponse>> getAllByUser(@AuthenticationPrincipal User user) {
-        return ApiResponse.success(ApiCode.SUCCESS, productService.getAllByUser(user));
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<ProductResponse>> getAllByUser(@RequestParam String shopId) {
+        return ApiResponse.success(ApiCode.SUCCESS, productService.getAllByShop(shopId));
     }
 
     @PostMapping
-    public ApiResponse<ProductResponse> createProduct(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<ProductResponse> createProduct(@RequestParam String shopId,
                                                       @RequestBody @Valid ProductRequest request) {
-        return ApiResponse.success(ApiCode.PRODUCT_CREATED, productService.createProduct(user, request));
+        return ApiResponse.success(ApiCode.PRODUCT_CREATED, productService.createProduct(shopId, request));
     }
 
     @PutMapping("/{id}")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<ProductResponse> updateProduct(@AuthenticationPrincipal User user,
+                                                      @RequestParam String shopId,
+                                                      @RequestParam ShopType shopType,
                                                       @PathVariable String id,
                                                       @RequestBody @Valid ProductRequest request) {
-        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.updateProduct(user, id, request));
+        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.updateProduct(user, shopId, shopType, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> deleteProduct(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<?> deleteProduct(@RequestParam String shopId,
                                         @PathVariable String id) {
-        productService.deleteProduct(user, id);
+        productService.deleteProduct(shopId, id);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
 
     @PostMapping("/search")
-    public ApiResponse<Page<ProductResponse>> searchProducts(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<Page<ProductResponse>> searchProducts(@RequestParam String shopId,
                                                              @RequestBody ProductSearchRequest req) {
-        return ApiResponse.success(ApiCode.SUCCESS, productService.search(user, req));
+        return ApiResponse.success(ApiCode.SUCCESS, productService.search(shopId, req));
     }
 
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportProducts(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ResponseEntity<byte[]> exportProducts(@RequestParam String shopId,
                                                  @ModelAttribute ProductSearchRequest req) {
-        List<Product> products = productService.searchAllForExport(user, req);
+        List<Product> products = productService.searchAllForExport(shopId, req);
 
         List<String> headers = List.of("Tên", "Danh mục", "Số lượng", "Đơn giá", "Đơn vị", "Trạng thái");
 
@@ -703,24 +740,28 @@ public class ProductController {
     }
 
     @PutMapping("/{id}/toggle-active")
-    public ApiResponse<ProductResponse> toggleActive(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<ProductResponse> toggleActive(@RequestParam String shopId,
                                                      @PathVariable String id) {
-        ProductResponse result = productService.toggleActive(user, id);
-        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, result);
+        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.toggleActive(shopId, id));
     }
 
     @GetMapping("/low-stock")
-    public ApiResponse<List<ProductResponse>> getLowStock(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<ProductResponse>> getLowStock(@RequestParam String shopId,
+                                                          @RequestParam ShopType shopType,
                                                           @RequestParam(defaultValue = "5") int threshold) {
-        List<ProductResponse> results = productService.getLowStock(user, threshold);
+        List<ProductResponse> results = productService.getLowStock(shopId, threshold, shopType);
         return ApiResponse.success(ApiCode.SUCCESS, results);
     }
 
     @PostMapping("/import")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<Map<String, Object>> importExcel(@AuthenticationPrincipal User user,
                                                         @RequestParam("file") MultipartFile file,
+                                                        @RequestParam String shopId,
                                                         @RequestParam(required = false) String branchId) {
-        Map<String, Object> result = productImportService.importExcel(user, branchId, file);
+        Map<String, Object> result = productImportService.importExcel(shopId, branchId, file);
         return ApiResponse.success(ApiCode.SUCCESS, result);
     }
 
@@ -737,14 +778,14 @@ public class ProductController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
-import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.PromotionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -759,28 +800,32 @@ public class PromotionController {
     private final PromotionService promotionService;
 
     @GetMapping
-    public ApiResponse<List<PromotionResponse>> getAll(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<PromotionResponse>> getAll(@RequestParam String shopId,
                                                        @RequestParam(required = false) String branchId) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.getAll(user, branchId));
+        return ApiResponse.success(ApiCode.SUCCESS, promotionService.getAll(shopId, branchId));
     }
 
     @PostMapping
-    public ApiResponse<PromotionResponse> create(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<PromotionResponse> create(@RequestParam String shopId,
                                                  @RequestBody @Valid PromotionRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.create(user, request));
+        return ApiResponse.success(ApiCode.SUCCESS, promotionService.create(shopId, request));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<PromotionResponse> update(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<PromotionResponse> update(@RequestParam String shopId,
                                                  @PathVariable String id,
                                                  @RequestBody @Valid PromotionRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.update(user, id, request));
+        return ApiResponse.success(ApiCode.SUCCESS, promotionService.update(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> delete(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<?> delete(@RequestParam String shopId,
                                  @PathVariable String id) {
-        promotionService.delete(user, id);
+        promotionService.delete(shopId, id);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
 }
@@ -791,17 +836,16 @@ public class PromotionController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
-import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.ReportService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -816,37 +860,28 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    /**
-     * API tổng hợp báo cáo đơn hàng (doanh thu, tổng đơn, số lượng SP)
-     */
-    @PostMapping
-    public ApiResponse<ReportResponse> getReport(@AuthenticationPrincipal User user,
-                                                 @RequestBody @Valid ReportRequest request) {
-        ReportResponse result = reportService.getReport(user, request);
-        return ApiResponse.success(ApiCode.SUCCESS, result);
+    @PostMapping("/summary")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<ReportResponse> getReport(@RequestParam String shopId,
+                                                 @RequestBody ReportRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, reportService.getReport(shopId, request));
     }
 
-    /**
-     * API thống kê doanh thu theo từng ngày
-     */
     @PostMapping("/daily")
-    public ApiResponse<List<DailyReportResponse>> getDailyReport(@AuthenticationPrincipal User user,
-                                                                 @RequestBody @Valid ReportRequest request) {
-        List<DailyReportResponse> result = reportService.getDailyReport(user, request);
-        return ApiResponse.success(ApiCode.SUCCESS, result);
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<DailyReportResponse>> getDaily(@RequestParam String shopId,
+                                                           @RequestBody ReportRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, reportService.getDailyReport(shopId, request));
     }
 
-    /**
-     * API xuất file Excel báo cáo doanh thu theo ngày
-     */
     @GetMapping("/daily/export")
-    public ResponseEntity<byte[]> exportDailyReport(@AuthenticationPrincipal User user,
-                                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return reportService.exportDailyReportExcel(user, startDate, endDate);
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ResponseEntity<byte[]> exportDaily(@RequestParam String shopId,
+                                              @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                              @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return reportService.exportDailyReportExcel(shopId, startDate, endDate);
     }
 }
-
 
 // File: src/main/java/com/example/sales/controller/ShopController.java
 
@@ -858,13 +893,14 @@ import com.example.sales.dto.ShopRequest;
 import com.example.sales.model.Shop;
 import com.example.sales.model.User;
 import com.example.sales.service.ShopService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/shops")
+@RequestMapping("/api/shop")
 @RequiredArgsConstructor
 @Validated
 public class ShopController {
@@ -872,39 +908,32 @@ public class ShopController {
     private final ShopService shopService;
 
     @PostMapping
-    public ApiResponse<Shop> createShop(@AuthenticationPrincipal User user,
-                                        @RequestBody ShopRequest request) {
-        Shop created = shopService.createShop(user, request);
-        return ApiResponse.success(ApiCode.SUCCESS, created);
+    public ApiResponse<Shop> create(@AuthenticationPrincipal User user,
+                                    @RequestBody @Valid ShopRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopService.createShop(user, request));
     }
 
     @GetMapping("/me")
-    public ApiResponse<?> getMyShop(@AuthenticationPrincipal User user) {
-        Shop shop = shopService.getMyShop(user);
-        if (shop == null) {
-            return ApiResponse.error(ApiCode.SHOP_NOT_FOUND);
-        }
-        return ApiResponse.success(ApiCode.SUCCESS, shop);
+    public ApiResponse<Shop> getMyShop(@AuthenticationPrincipal User user) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopService.getShopByOwner(user.getId()));
     }
 
-    @PutMapping
-    public ApiResponse<Shop> updateMyShop(@AuthenticationPrincipal User user,
-                                          @RequestBody ShopRequest request) {
-        Shop updated = shopService.updateMyShop(user, request);
-        return ApiResponse.success(ApiCode.SUCCESS, updated);
+    @PutMapping("/me")
+    public ApiResponse<Shop> update(@AuthenticationPrincipal User user,
+                                    @RequestBody @Valid ShopRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopService.updateShop(user.getId(), request));
     }
 }
 
 
 // File: src/main/java/com/example/sales/controller/ShopUserController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
-import com.example.sales.exception.BusinessException;
 import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.ShopUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -920,25 +949,20 @@ public class ShopUserController {
     private final ShopUserService shopUserService;
 
     @PostMapping("/add")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<?> addUser(@AuthenticationPrincipal User admin,
                                   @RequestParam String shopId,
                                   @RequestParam String userId,
                                   @RequestParam ShopRole role) {
-        if (!shopUserService.isOwner(shopId, admin.getId())) {
-            throw new BusinessException(ApiCode.UNAUTHORIZED);
-        }
-
         shopUserService.addUser(shopId, userId, role);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
 
     @DeleteMapping("/remove")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<?> removeUser(@AuthenticationPrincipal User admin,
                                      @RequestParam String shopId,
                                      @RequestParam String userId) {
-        if (shopUserService.isOwner(shopId, admin.getId())) {
-            throw new BusinessException(ApiCode.UNAUTHORIZED);
-        }
         shopUserService.removeUser(shopId, userId);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
@@ -949,21 +973,22 @@ public class ShopUserController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.TableRequest;
 import com.example.sales.dto.TableResponse;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.TableService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/table")
+@RequestMapping("/api/tables")
 @RequiredArgsConstructor
 @Validated
 public class TableController {
@@ -971,29 +996,23 @@ public class TableController {
     private final TableService tableService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<TableResponse>> create(
-            @Valid @RequestBody TableRequest request
-    ) {
-        TableResponse response = tableService.create(request);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.TABLE_CREATED, response));
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<TableResponse> create(@RequestBody @Valid TableRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, tableService.create(request));
     }
 
-    @GetMapping("/shop/{shopId}")
-    public ResponseEntity<ApiResponse<List<TableResponse>>> getByShop(
-            @PathVariable String shopId,
-            @RequestParam(required = false) String branchId
-    ) {
-        List<TableResponse> tables = tableService.getByShop(shopId, branchId);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.TABLE_LIST, tables));
+    @GetMapping
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<TableResponse>> getByShop(@RequestParam String shopId,
+                                                      @RequestParam String branchId) {
+        return ApiResponse.success(ApiCode.SUCCESS, tableService.getByShop(shopId, branchId));
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<ApiResponse<TableResponse>> updateStatus(
-            @PathVariable String id,
-            @RequestParam TableStatus status
-    ) {
-        TableResponse response = tableService.updateStatus(id, status);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.TABLE_STATUS_UPDATED, response));
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<TableResponse> updateStatus(@PathVariable String id,
+                                                   @RequestParam TableStatus status) {
+        return ApiResponse.success(ApiCode.SUCCESS, tableService.updateStatus(id, status));
     }
 }
 
@@ -2860,15 +2879,11 @@ public class AuthService {
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
-import com.example.sales.model.Shop;
-import com.example.sales.model.User;
 import com.example.sales.repository.BranchRepository;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -2879,25 +2894,17 @@ import java.util.List;
 public class BranchService {
 
     private final BranchRepository branchRepository;
-    private final ShopRepository shopRepository;
-    private final ShopUserService shopUserService;
 
-    public List<BranchResponse> getAll(User user) {
-        Shop shop = getShop(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
-        return branchRepository.findByShopId(shop.getId())
+    public List<BranchResponse> getAll(String shopId) {
+        return branchRepository.findByShopId(shopId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public BranchResponse create(User user, BranchRequest req) {
-        Shop shop = getShop(user);
-        shopUserService.requireOwner(shop.getId(), user.getId());
-
+    public BranchResponse create(String shopId, BranchRequest req) {
         Branch branch = Branch.builder()
-                .shopId(shop.getId())
+                .shopId(shopId)
                 .name(req.getName())
                 .address(req.getAddress())
                 .phone(req.getPhone())
@@ -2907,12 +2914,9 @@ public class BranchService {
         return toResponse(branchRepository.save(branch));
     }
 
-    public BranchResponse update(User user, String id, BranchRequest req) {
-        Shop shop = getShop(user);
-        shopUserService.requireOwner(shop.getId(), user.getId());
-
+    public BranchResponse update(String shopId, String id, BranchRequest req) {
         Branch branch = branchRepository.findById(id)
-                .filter(b -> b.getShopId().equals(shop.getId()))
+                .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branch.setName(req.getName());
@@ -2923,20 +2927,12 @@ public class BranchService {
         return toResponse(branchRepository.save(branch));
     }
 
-    public void delete(User user, String id) {
-        Shop shop = getShop(user);
-        shopUserService.requireOwner(shop.getId(), user.getId());
-
+    public void delete(String shopId, String id) {
         Branch branch = branchRepository.findById(id)
-                .filter(b -> b.getShopId().equals(shop.getId()))
+                .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branchRepository.delete(branch);
-    }
-
-    private Shop getShop(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private BranchResponse toResponse(Branch branch) {
@@ -2960,10 +2956,8 @@ import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Customer;
-import com.example.sales.model.Shop;
 import com.example.sales.model.User;
 import com.example.sales.repository.CustomerRepository;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -2974,23 +2968,17 @@ import java.util.List;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final ShopRepository shopRepository;
 
-    // Lấy danh sách khách hàng thuộc shop của user
-    public List<CustomerResponse> getCustomers(User user, String branchId) {
-        Shop shop = getShopOfUser(user);
-        return customerRepository.findByShopIdAndBranchId(shop.getId(), branchId)
+    public List<CustomerResponse> getCustomers(String shopId, String branchId) {
+        return customerRepository.findByShopIdAndBranchId(shopId, branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    // Tạo khách hàng mới, gắn shopId
-    public CustomerResponse createCustomer(User user, CustomerRequest request) {
-        Shop shop = getShopOfUser(user);
-
+    public CustomerResponse createCustomer(String shopId, User user, CustomerRequest request) {
         Customer customer = new Customer();
-        customer.setShopId(shop.getId());
+        customer.setShopId(shopId);
         customer.setUserId(user.getId());
         customer.setName(request.getName());
         customer.setPhone(request.getPhone());
@@ -3002,16 +2990,15 @@ public class CustomerService {
         return toResponse(customerRepository.save(customer));
     }
 
-    // Cập nhật khách hàng
-    public CustomerResponse updateCustomer(User user, String id, CustomerRequest request) {
-        Shop shop = getShopOfUser(user);
-
+    public CustomerResponse updateCustomer(String shopId, String id, CustomerRequest request) {
         Customer existing = customerRepository.findById(id)
-                .filter(c -> c.getShopId().equals(shop.getId()))
+                .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+
         if (!existing.getBranchId().equals(request.getBranchId())) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
+
         existing.setName(request.getName());
         existing.setPhone(request.getPhone());
         existing.setEmail(request.getEmail());
@@ -3019,6 +3006,18 @@ public class CustomerService {
         existing.setNote(request.getNote());
 
         return toResponse(customerRepository.save(existing));
+    }
+
+    public void deleteCustomer(String shopId, String branchId, String id) {
+        Customer customer = customerRepository.findById(id)
+                .filter(c -> c.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+
+        if (!customer.getBranchId().equals(branchId)) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        customerRepository.delete(customer);
     }
 
     private CustomerResponse toResponse(Customer c) {
@@ -3030,25 +3029,6 @@ public class CustomerService {
                 .address(c.getAddress())
                 .note(c.getNote())
                 .build();
-    }
-
-    // Xoá khách hàng
-    public void deleteCustomer(User user, String branchId, String id) {
-        Shop shop = getShopOfUser(user);
-
-        Customer customer = customerRepository.findById(id)
-                .filter(c -> c.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
-        if (!customer.getBranchId().equals(branchId)) {
-            throw new BusinessException(ApiCode.UNAUTHORIZED);
-        }
-        customerRepository.delete(customer);
-    }
-
-    // Helper: lấy shop của user hiện tại
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 }
 
@@ -3263,58 +3243,43 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final ShopRepository shopRepository;
     private final TableRepository tableRepository;
     private final ProductRepository productRepository;
-    private final ShopUserService shopUserService;
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
 
-    public List<OrderResponse> getOrdersByUser(User user) {
-        Shop shop = getShopOfUser(user);
-        return orderRepository.findByShopId(shop.getId())
+    public List<OrderResponse> getOrdersByUser(User user, String shopId) {
+        return orderRepository.findByShopId(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
     @Transactional
-    public OrderResponse createOrder(User user, OrderRequest request) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
-
+    public OrderResponse createOrder(User user, String shopId, OrderRequest request) {
         Order order = new Order();
-        order.setShopId(shop.getId());
+        order.setShopId(shopId);
         order.setTableId(request.getTableId());
         order.setUserId(user.getId());
         order.setNote(request.getNote());
         order.setStatus(OrderStatus.PENDING);
         order.setPaid(false);
+
         String branchId = request.getBranchId();
         if (branchId != null && !branchId.isBlank()) {
             order.setBranchId(branchId);
         }
 
-        double[] totals = {0, 0}; // totals[0] for totalAmount, totals[1] for totalPrice
+        double[] totals = {0, 0};
 
         List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
             Product product = productRepository.findById(reqItem.getProductId())
-                    .filter(p -> p.getShopId().equals(shop.getId()))
+                    .filter(p -> p.getShopId().equals(shopId))
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-            if (requiresInventory(shop.getType()) && product.getQuantity() < reqItem.getQuantity()) {
-                throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
-            }
-
-            if (requiresInventory(shop.getType())) {
-                product.setQuantity(product.getQuantity() - reqItem.getQuantity());
-                productRepository.save(product);
-            }
 
             double basePrice = reqItem.getPrice();
             double finalPrice = basePrice;
             String promoId = null;
 
-            // Áp dụng khuyến mãi nếu có
-            Promotion promo = findApplicablePromotion(shop.getId(), branchId, product.getId());
+            Promotion promo = findApplicablePromotion(shopId, branchId, product.getId());
             if (promo != null) {
                 promoId = promo.getId();
                 if (promo.getDiscountType() == DiscountType.PERCENT) {
@@ -3332,8 +3297,8 @@ public class OrderService {
             item.setPriceAfterDiscount(finalPrice);
             item.setAppliedPromotionId(promoId);
 
-            totals[0] += reqItem.getQuantity(); // Update totalAmount
-            totals[1] += reqItem.getQuantity() * finalPrice; // Update totalPrice
+            totals[0] += reqItem.getQuantity();
+            totals[1] += reqItem.getQuantity() * finalPrice;
 
             return item;
         }).toList();
@@ -3347,10 +3312,8 @@ public class OrderService {
         return toResponse(created);
     }
 
-    public void cancelOrder(User user, String orderId) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.STAFF);
-        Order order = getOrderByShop(orderId, shop.getId());
+    public void cancelOrder(User user, String shopId, String orderId) {
+        Order order = getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -3358,14 +3321,11 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
-        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
+        auditLogService.log(user, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
     }
 
-    public OrderResponse confirmPayment(User user, String orderId, String paymentId, String paymentMethod) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER, ShopRole.CASHIER);
-
-        Order order = getOrderByShop(orderId, shop.getId());
+    public OrderResponse confirmPayment(User user, String shopId, String orderId, String paymentId, String paymentMethod) {
+        Order order = getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -3379,24 +3339,19 @@ public class OrderService {
 
         Order updated = orderRepository.save(order);
         releaseTable(updated);
-        auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "PAYMENT_CONFIRMED",
+        auditLogService.log(user, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
                 "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
         return toResponse(updated);
     }
 
-    public OrderResponse updateStatus(User user, String orderId, OrderStatus newStatus) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-        Order order = getOrderByShop(orderId, shop.getId());
-
-        if (shop.getType() == ShopType.RESTAURANT && newStatus == OrderStatus.SHIPPING) {
-            throw new BusinessException(ApiCode.INVALID_STATUS_TRANSITION);
-        }
+    public OrderResponse updateStatus(User user, String shopId, String orderId, OrderStatus newStatus) {
+        Order order = getOrderByShop(orderId, shopId);
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
 
+        OrderStatus oldStatus = order.getStatus();
         order.setStatus(newStatus);
 
         if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
@@ -3406,32 +3361,17 @@ public class OrderService {
         }
 
         Order updated = orderRepository.save(order);
-        if (!order.getStatus().equals(newStatus)) {
-            auditLogService.log(user, shop.getId(), order.getId(), "ORDER", "STATUS_UPDATED",
-                    "Cập nhật trạng thái từ %s → %s".formatted(order.getStatus(), newStatus));
+        if (!oldStatus.equals(newStatus)) {
+            auditLogService.log(user, shopId, order.getId(), "ORDER", "STATUS_UPDATED",
+                    "Cập nhật trạng thái từ %s → %s".formatted(oldStatus, newStatus));
         }
 
         return toResponse(updated);
     }
 
-    public List<OrderResponse> getOrdersByStatus(User user, OrderStatus status, String branchId) {
-        Shop shop = getShopOfUser(user);
-        return orderRepository.findByShopIdAndBranchIdAndStatus(shop.getId(), branchId, status)
+    public List<OrderResponse> getOrdersByStatus(User user, String shopId, OrderStatus status, String branchId) {
+        return orderRepository.findByShopIdAndBranchIdAndStatus(shopId, branchId, status)
                 .stream().map(this::toResponse).toList();
-    }
-
-    // ==== Helpers ====
-
-    private boolean requiresInventory(ShopType type) {
-        return switch (type) {
-            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
-            default -> false;
-        };
-    }
-
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private Order getOrderByShop(String orderId, String shopId) {
@@ -3495,20 +3435,15 @@ public class OrderService {
 package com.example.sales.service;
 
 import com.example.sales.dto.product.ProductRequest;
-import com.example.sales.model.User;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
-import java.util.*;
-
-/*
-| Tên          | Mã | Danh mục | Số lượng | Giá   | Đơn vị | Ảnh     | Mô tả    | Trạng thái |
-| ------------ | -- | -------- | -------- | ----- | ------ | ------- | -------- | ---------- |
-| Sữa Vinamilk | A1 | Sữa      | 100      | 15000 | hộp    | url.png | Sữa tươi | Đang bán   |
-*/
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -3516,7 +3451,7 @@ public class ProductImportService {
 
     private final ProductService productService;
 
-    public Map<String, Object> importExcel(User user, String branchId, MultipartFile file) {
+    public Map<String, Object> importExcel(String shopId, String branchId, MultipartFile file) {
         int successCount = 0;
         int failCount = 0;
         List<String> errors = new ArrayList<>();
@@ -3527,12 +3462,12 @@ public class ProductImportService {
             Sheet sheet = workbook.getSheetAt(0);
             int rows = sheet.getPhysicalNumberOfRows();
 
-            for (int i = 1; i < rows; i++) { // bỏ dòng header
+            for (int i = 1; i < rows; i++) {
                 Row row = sheet.getRow(i);
                 try {
                     ProductRequest req = parseRow(row);
                     req.setBranchId(branchId);
-                    productService.createProduct(user, req);
+                    productService.createProduct(shopId, req);
                     successCount++;
                 } catch (Exception ex) {
                     failCount++;
@@ -3594,12 +3529,10 @@ public class ProductImportService {
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.ShopType;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
-import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.helper.ProductSearchHelper;
 import com.example.sales.model.Product;
@@ -3622,25 +3555,23 @@ import java.util.UUID;
 public class ProductService {
 
     private final ProductRepository productRepository;
-    private final ShopRepository shopRepository;
     private final ProductSearchHelper productSearchHelper;
-    private final ShopUserService shopUserService;
     private final FileUploadService fileUploadService;
     private final AuditLogService auditLogService;
+    private final ShopRepository shopRepository;
 
-    public List<ProductResponse> getAllByUser(User user) {
-        Shop shop = getShopOfUser(user);
-        return productRepository.findByShopId(shop.getId())
+    public List<ProductResponse> getAllByShop(String shopId) {
+        return productRepository.findByShopId(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
-    public ProductResponse createProduct(User user, ProductRequest request) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
+    public ProductResponse createProduct(String shopId, ProductRequest request) {
         String productCode = request.getProductCode();
         if (productCode == null || productCode.isBlank()) {
-            productCode = UUID.randomUUID().toString(); // hoặc custom logic
+            productCode = UUID.randomUUID().toString();
         }
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
         String finalImageUrl = fileUploadService.moveToProduct(request.getImageUrl());
         Product product = Product.builder()
                 .name(request.getName())
@@ -3650,26 +3581,19 @@ public class ProductService {
                 .imageUrl(finalImageUrl)
                 .description(request.getDescription())
                 .active(request.isActive())
-                .shopId(shop.getId())
+                .shopId(shopId)
                 .productCode(productCode)
                 .branchId(request.getBranchId())
                 .build();
 
-        if (requiresInventory(shop.getType())) {
-            product.setQuantity(request.getQuantity());
-        } else {
-            product.setQuantity(0);
-        }
+        product.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
 
         return toResponse(productRepository.save(product));
     }
 
-    public ProductResponse updateProduct(User user, String id, ProductRequest request) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
+    public ProductResponse updateProduct(User user, String shopId, ShopType shopType, String id, ProductRequest request) {
         Product existing = productRepository.findById(id)
-                .filter(p -> p.getShopId().equals(shop.getId()))
+                .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         existing.setName(request.getName());
@@ -3679,49 +3603,40 @@ public class ProductService {
         existing.setImageUrl(request.getImageUrl());
         existing.setDescription(request.getDescription());
         existing.setActive(request.isActive());
-
-        if (requiresInventory(shop.getType())) {
-            existing.setQuantity(request.getQuantity());
-        } else {
-            existing.setQuantity(0);
-        }
+        existing.setQuantity(requiresInventory(shopType) ? request.getQuantity() : 0);
 
         Product updatedProduct = productRepository.save(existing);
+
         if (existing.getPrice() != request.getPrice()) {
-            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "PRICE_CHANGED",
+            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "PRICE_CHANGED",
                     "Thay đổi giá từ %.2f → %.2f".formatted(existing.getPrice(), request.getPrice()));
         }
 
         if (!existing.getCategory().equals(request.getCategory())) {
-            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
+            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
                     "Chuyển danh mục từ %s → %s".formatted(existing.getCategory(), request.getCategory()));
         }
 
         if (existing.getQuantity() != request.getQuantity()) {
-            auditLogService.log(user, shop.getId(), existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
+            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
                     "Thay đổi tồn kho từ %d → %d".formatted(existing.getQuantity(), request.getQuantity()));
         }
 
         return toResponse(updatedProduct);
     }
 
-    public void deleteProduct(User user, String id) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
+    public void deleteProduct(String shopId, String id) {
         Product existing = productRepository.findById(id)
-                .filter(p -> p.getShopId().equals(shop.getId()))
+                .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         productRepository.delete(existing);
     }
 
-    public Page<ProductResponse> search(User user, ProductSearchRequest req) {
-        Shop shop = getShopOfUser(user);
+    public Page<ProductResponse> search(String shopId, ProductSearchRequest req) {
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
-
-        List<Product> results = productSearchHelper.search(shop.getId(), req.getBranchId(), req, pageable);
-        long total = productSearchHelper.counts(shop.getId(), req.getBranchId(), req);
+        List<Product> results = productSearchHelper.search(shopId, req.getBranchId(), req, pageable);
+        long total = productSearchHelper.counts(shopId, req.getBranchId(), req);
 
         return new PageImpl<>(
                 results.stream().map(this::toResponse).toList(),
@@ -3730,41 +3645,28 @@ public class ProductService {
         );
     }
 
-    public List<Product> searchAllForExport(User user, ProductSearchRequest req) {
-        Shop shop = getShopOfUser(user);
-        return productSearchHelper.search(shop.getId(), req.getBranchId(), req, Pageable.unpaged());
+    public List<Product> searchAllForExport(String shopId, ProductSearchRequest req) {
+        return productSearchHelper.search(shopId, req.getBranchId(), req, Pageable.unpaged());
     }
 
-    public ProductResponse toggleActive(User user, String id) {
-        Shop shop = getShopOfUser(user);
-        shopUserService.requireAnyRole(shop.getId(), user.getId(), ShopRole.OWNER);
-
+    public ProductResponse toggleActive(String shopId, String id) {
         Product product = productRepository.findById(id)
-                .filter(p -> p.getShopId().equals(shop.getId()))
+                .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         product.setActive(!product.isActive());
         return toResponse(productRepository.save(product));
     }
 
-    public List<ProductResponse> getLowStock(User user, int threshold) {
-        Shop shop = getShopOfUser(user);
-
-        if (!requiresInventory(shop.getType())) {
+    public List<ProductResponse> getLowStock(String shopId, int threshold, ShopType shopType) {
+        if (!requiresInventory(shopType)) {
             return List.of();
         }
 
-        return productRepository.findByShopId(shop.getId()).stream()
+        return productRepository.findByShopId(shopId).stream()
                 .filter(p -> p.getQuantity() < threshold)
                 .map(this::toResponse)
                 .toList();
-    }
-
-    // ============ Helpers ============
-
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
     private ProductResponse toResponse(Product product) {
@@ -3801,10 +3703,7 @@ import com.example.sales.dto.promotion.PromotionResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Promotion;
-import com.example.sales.model.Shop;
-import com.example.sales.model.User;
 import com.example.sales.repository.PromotionRepository;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -3815,20 +3714,17 @@ import java.util.List;
 public class PromotionService {
 
     private final PromotionRepository promotionRepository;
-    private final ShopRepository shopRepository;
 
-    public List<PromotionResponse> getAll(User user, String branchId) {
-        String shopId = getShopOfUser(user).getId();
+    public List<PromotionResponse> getAll(String shopId, String branchId) {
         return promotionRepository.findByShopIdAndBranchId(shopId, branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public PromotionResponse create(User user, PromotionRequest request) {
-        Shop shop = getShopOfUser(user);
+    public PromotionResponse create(String shopId, PromotionRequest request) {
         Promotion promotion = Promotion.builder()
-                .shopId(shop.getId())
+                .shopId(shopId)
                 .name(request.getName())
                 .discountType(request.getDiscountType())
                 .discountValue(request.getDiscountValue())
@@ -3842,12 +3738,11 @@ public class PromotionService {
         return toResponse(promotionRepository.save(promotion));
     }
 
-    public PromotionResponse update(User user, String id, PromotionRequest request) {
-        String shopId = getShopOfUser(user).getId();
-
+    public PromotionResponse update(String shopId, String id, PromotionRequest request) {
         Promotion promotion = promotionRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
+
         if (!promotion.getBranchId().equals(request.getBranchId())) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
@@ -3863,8 +3758,7 @@ public class PromotionService {
         return toResponse(promotionRepository.save(promotion));
     }
 
-    public void delete(User user, String id) {
-        String shopId = getShopOfUser(user).getId();
+    public void delete(String shopId, String id) {
         Promotion promotion = promotionRepository.findById(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
@@ -3884,24 +3778,15 @@ public class PromotionService {
                 .active(p.isActive())
                 .build();
     }
-
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-    }
 }
 
 // File: src/main/java/com/example/sales/service/ReportService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
-import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Order;
-import com.example.sales.model.User;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -3927,15 +3812,9 @@ import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
 public class ReportService {
 
     private final MongoTemplate mongoTemplate;
-    private final ShopRepository shopRepository;
     private final ExcelExportService excelExportService;
 
-    /**
-     * Tổng hợp báo cáo đơn hàng (tổng doanh thu, tổng đơn, tổng sản phẩm) theo bộ lọc
-     */
-    public ReportResponse getReport(User user, ReportRequest request) {
-        String shopId = getShopIdOfUser(user);
-
+    public ReportResponse getReport(String shopId, ReportRequest request) {
         MatchOperation match = buildMatchOperation(shopId, request);
 
         Aggregation aggregation = newAggregation(
@@ -3959,12 +3838,7 @@ public class ReportService {
                 .build();
     }
 
-    /**
-     * Thống kê doanh thu theo ngày (dùng để hiển thị biểu đồ hoặc export)
-     */
-    public List<DailyReportResponse> getDailyReport(User user, ReportRequest request) {
-        String shopId = getShopIdOfUser(user);
-
+    public List<DailyReportResponse> getDailyReport(String shopId, ReportRequest request) {
         MatchOperation match = buildMatchOperation(shopId, request);
 
         ProjectionOperation projectDate = project()
@@ -3994,10 +3868,7 @@ public class ReportService {
         return results.getMappedResults();
     }
 
-    /**
-     * Export báo cáo doanh thu theo ngày ra file Excel
-     */
-    public ResponseEntity<byte[]> exportDailyReportExcel(User user,
+    public ResponseEntity<byte[]> exportDailyReportExcel(String shopId,
                                                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                                                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
@@ -4005,7 +3876,7 @@ public class ReportService {
         request.setStartDate(startDate);
         request.setEndDate(endDate);
 
-        List<DailyReportResponse> data = getDailyReport(user, request);
+        List<DailyReportResponse> data = getDailyReport(shopId, request);
 
         DateTimeFormatter df = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -4023,9 +3894,6 @@ public class ReportService {
         );
     }
 
-    /**
-     * Build điều kiện lọc dữ liệu Mongo
-     */
     private MatchOperation buildMatchOperation(String shopId, ReportRequest request) {
         Criteria criteria = Criteria.where("shopId").is(shopId);
 
@@ -4040,15 +3908,6 @@ public class ReportService {
         }
 
         return match(criteria);
-    }
-
-    /**
-     * Lấy ID cửa hàng của user hiện tại
-     */
-    private String getShopIdOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
-                .getId();
     }
 }
 
@@ -4086,13 +3945,13 @@ public class ShopService {
         return shopRepository.save(shop);
     }
 
-    public Shop getMyShop(User user) {
-        return shopRepository.findByOwnerId(user.getId())
+    public Shop getShopByOwner(String ownerId) {
+        return shopRepository.findByOwnerId(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
-    public Shop updateMyShop(User user, ShopRequest request) {
-        Shop shop = getMyShop(user);
+    public Shop updateShop(String ownerId, ShopRequest request) {
+        Shop shop = getShopByOwner(ownerId);
 
         shop.setName(request.getName());
         shop.setType(request.getType());
@@ -4101,6 +3960,12 @@ public class ShopService {
         shop.setLogoUrl(request.getLogoUrl());
 
         return shopRepository.save(shop);
+    }
+
+    public String getShopIdByOwner(String ownerId) {
+        return shopRepository.findByOwnerId(ownerId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
+                .getId();
     }
 }
 
@@ -4131,7 +3996,24 @@ public class ShopUserService {
     }
 
     public boolean isOwner(String shopId, String userId) {
-        return getUserRoleInShop(shopId, userId) != ShopRole.OWNER;
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.OWNER)
+                .orElse(false);
+    }
+
+    public boolean isStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.STAFF)
+                .orElse(false);
+    }
+
+    public boolean isOwnerOrStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+                .map(shopUser -> {
+                    ShopRole role = shopUser.getRole();
+                    return role == ShopRole.OWNER || role == ShopRole.STAFF;
+                })
+                .orElse(false);
     }
 
     public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
@@ -4142,7 +4024,7 @@ public class ShopUserService {
     }
 
     public void requireOwner(String shopId, String userId) {
-        if (isOwner(shopId, userId)) {
+        if (!isOwner(shopId, userId)) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
     }
@@ -4195,13 +4077,16 @@ public class TableService {
     private final ShopRepository shopRepository;
 
     public TableResponse create(TableRequest request) {
-        Shop shop = shopRepository.findById(request.getShopId())
+        String shopId = request.getShopId();
+        String branchId = request.getBranchId();
+
+        Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
         Table table = Table.builder()
                 .name(request.getName())
-                .shopId(shop.getId())
-                .branchId(request.getBranchId())
+                .shopId(shopId)
+                .branchId(branchId)
                 .status(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE))
                 .capacity(request.getCapacity())
                 .note(request.getNote())
@@ -4236,6 +4121,7 @@ public class TableService {
                 .name(table.getName())
                 .status(table.getStatus())
                 .shopId(table.getShopId())
+                .branchId(table.getBranchId())
                 .shopName(shop != null ? shop.getName() : null)
                 .capacity(table.getCapacity())
                 .note(table.getNote())
@@ -4249,7 +4135,7 @@ public class TableService {
                 .name(table.getName())
                 .status(table.getStatus())
                 .shopId(shop.getId())
-                .branchId(table.getBranchId()) // ✅ include branchId
+                .branchId(table.getBranchId())
                 .shopName(shop.getName())
                 .capacity(table.getCapacity())
                 .note(table.getNote())
@@ -4500,43 +4386,65 @@ public enum ApiCode {
     PROMOTION_NOT_FOUND,
     DUPLICATE_DATA,
     TABLE_NOT_FOUND,
-	USER_DELETED
+    USER_DELETED,
+    ORDER_PAYMENT_CONFIRMED,
+    ORDER_STATUS_UPDATED,
+    ORDER_LIST,
+    ORDER_CANCELLED,
+    ORDER_CREATED,
+    CUSTOMER_CREATED,
+    CUSTOMER_UPDATED,
+    CUSTOMER_DELETED,
+    CUSTOMER_LIST
 }
 
 // File: src/main/java/com/example/sales/security/PermissionChecker.java
 package com.example.sales.security;
 
 import com.example.sales.constant.ShopRole;
+import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 public class PermissionChecker {
 
     private final ShopUserRepository shopUserRepository;
+    private final BranchRepository branchRepository;
 
     public boolean isOwner(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
-                .map(shopUser -> shopUser.getRole() == ShopRole.OWNER)
-                .orElse(false);
+        return hasRole(shopId, userId, ShopRole.OWNER);
     }
 
     public boolean isStaff(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
-                .map(shopUser -> shopUser.getRole() == ShopRole.STAFF)
-                .orElse(false);
+        return hasRole(shopId, userId, ShopRole.STAFF);
     }
 
     public boolean isOwnerOrStaff(String shopId, String userId) {
+        return hasRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+    }
+
+    public boolean isAdmin(String shopId, String userId) {
+        return hasRole(shopId, userId, ShopRole.ADMIN);
+    }
+
+    public boolean hasRole(String shopId, String userId, ShopRole... roles) {
+        Set<ShopRole> allowed = Set.of(roles);
         return shopUserRepository.findByShopIdAndUserId(shopId, userId)
-                .map(shopUser -> {
-                    ShopRole role = shopUser.getRole();
-                    return role == ShopRole.OWNER || role == ShopRole.STAFF;
-                }).orElse(false);
+                .map(user -> allowed.contains(user.getRole()))
+                .orElse(false);
+    }
+    public boolean hasBranchRole(String branchId, String userId, ShopRole... roles) {
+        return branchRepository.findById(branchId)
+                .map(branch -> hasRole(branch.getShopId(), userId, roles))
+                .orElse(false);
     }
 }
+
 
 // File: src/main/java/com/example/sales/repository/base/SoftDeleteRepository.java
 package com.example.sales.repository.base;
@@ -4603,6 +4511,174 @@ public @interface ValidDateRange {
     Class<?>[] groups() default {};
 
     Class<? extends Payload>[] payload() default {};
+}
+
+// File: src/main/java/com/example/sales/security/RequireBranchRole.java
+package com.example.sales.security;
+
+import com.example.sales.constant.ShopRole;
+
+import java.lang.annotation.*;
+
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface RequireBranchRole {
+    ShopRole[] value();
+}
+
+// File: src/main/java/com/example/sales/security/RequireBranchRoleAspect.java
+package com.example.sales.security;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.User;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.stereotype.Component;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+
+@Aspect
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class RequireBranchRoleAspect {
+
+    private final PermissionChecker permissionChecker;
+
+    @Before("@annotation(com.example.sales.security.RequireBranchRole)")
+    public void checkBranchPermission(JoinPoint joinPoint) {
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+        RequireBranchRole annotation = method.getAnnotation(RequireBranchRole.class);
+        ShopRole[] roles = annotation.value();
+
+        User user = null;
+        String branchId = null;
+
+        Object[] args = joinPoint.getArgs();
+        Annotation[][] paramAnnotations = method.getParameterAnnotations();
+
+        for (int i = 0; i < args.length; i++) {
+            if (user == null && Arrays.stream(paramAnnotations[i])
+                    .anyMatch(a -> a.annotationType() == AuthenticationPrincipal.class)) {
+                user = (User) args[i];
+            }
+            if (branchId == null && args[i] instanceof String str && str.startsWith("branch_")) {
+                branchId = str;
+            }
+        }
+
+        if (user == null || branchId == null) {
+            log.warn("Thiếu user hoặc branchId khi kiểm tra quyền cho method: {}", method.getName());
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        boolean allowed = permissionChecker.hasBranchRole(branchId, user.getId(), roles);
+        if (!allowed) {
+            log.warn("Người dùng {} bị từ chối truy cập branch {} với vai trò yêu cầu: {}",
+                    user.getId(), branchId, Arrays.toString(roles));
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+    }
+}
+
+// File: src/main/java/com/example/sales/security/RequirePermission.java
+package com.example.sales.security;
+
+import java.lang.annotation.*;
+
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface RequirePermission {
+    String value();
+}
+
+// File: src/main/java/com/example/sales/security/RequireRole.java
+package com.example.sales.security;
+
+import com.example.sales.constant.ShopRole;
+
+import java.lang.annotation.*;
+
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface RequireRole {
+    ShopRole[] value();
+}
+
+// File: src/main/java/com/example/sales/security/RequireRoleAspect.java
+package com.example.sales.security;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.User;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.stereotype.Component;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+
+@Aspect
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class RequireRoleAspect {
+
+    private final PermissionChecker permissionChecker;
+
+    @Before("@annotation(com.example.sales.security.RequireRole)")
+    public void checkPermission(JoinPoint joinPoint) {
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+        RequireRole requireRole = method.getAnnotation(RequireRole.class);
+        ShopRole[] roles = requireRole.value();
+
+        User user = null;
+        String shopId = null;
+
+        Object[] args = joinPoint.getArgs();
+        Annotation[][] paramAnnotations = method.getParameterAnnotations();
+
+        for (int i = 0; i < args.length; i++) {
+            if (user == null && Arrays.stream(paramAnnotations[i])
+                    .anyMatch(a -> a.annotationType() == AuthenticationPrincipal.class)) {
+                user = (User) args[i];
+            }
+            if (shopId == null && args[i] instanceof String str && str.startsWith("shop_")) {
+                shopId = str;
+            }
+        }
+
+        if (user == null || shopId == null) {
+            log.warn("Thiếu user hoặc shopId khi kiểm tra quyền cho method: {}", method.getName());
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        boolean allowed = permissionChecker.hasRole(shopId, user.getId(), roles);
+        if (!allowed) {
+            log.warn("Người dùng {} bị từ chối truy cập shop {} với vai trò yêu cầu: {}",
+                    user.getId(), shopId, Arrays.toString(roles));
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+    }
 }
 
 [END]

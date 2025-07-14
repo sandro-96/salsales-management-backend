@@ -3,12 +3,15 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.ShopType;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.model.Product;
 import com.example.sales.model.User;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ProductImportService;
@@ -38,40 +41,48 @@ public class ProductController {
     private final FileUploadService fileUploadService;
 
     @GetMapping
-    public ApiResponse<List<ProductResponse>> getAllByUser(@AuthenticationPrincipal User user) {
-        return ApiResponse.success(ApiCode.SUCCESS, productService.getAllByUser(user));
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<ProductResponse>> getAllByUser(@RequestParam String shopId) {
+        return ApiResponse.success(ApiCode.SUCCESS, productService.getAllByShop(shopId));
     }
 
     @PostMapping
-    public ApiResponse<ProductResponse> createProduct(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<ProductResponse> createProduct(@RequestParam String shopId,
                                                       @RequestBody @Valid ProductRequest request) {
-        return ApiResponse.success(ApiCode.PRODUCT_CREATED, productService.createProduct(user, request));
+        return ApiResponse.success(ApiCode.PRODUCT_CREATED, productService.createProduct(shopId, request));
     }
 
     @PutMapping("/{id}")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<ProductResponse> updateProduct(@AuthenticationPrincipal User user,
+                                                      @RequestParam String shopId,
+                                                      @RequestParam ShopType shopType,
                                                       @PathVariable String id,
                                                       @RequestBody @Valid ProductRequest request) {
-        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.updateProduct(user, id, request));
+        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.updateProduct(user, shopId, shopType, id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> deleteProduct(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<?> deleteProduct(@RequestParam String shopId,
                                         @PathVariable String id) {
-        productService.deleteProduct(user, id);
+        productService.deleteProduct(shopId, id);
         return ApiResponse.success(ApiCode.SUCCESS);
     }
 
     @PostMapping("/search")
-    public ApiResponse<Page<ProductResponse>> searchProducts(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<Page<ProductResponse>> searchProducts(@RequestParam String shopId,
                                                              @RequestBody ProductSearchRequest req) {
-        return ApiResponse.success(ApiCode.SUCCESS, productService.search(user, req));
+        return ApiResponse.success(ApiCode.SUCCESS, productService.search(shopId, req));
     }
 
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportProducts(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ResponseEntity<byte[]> exportProducts(@RequestParam String shopId,
                                                  @ModelAttribute ProductSearchRequest req) {
-        List<Product> products = productService.searchAllForExport(user, req);
+        List<Product> products = productService.searchAllForExport(shopId, req);
 
         List<String> headers = List.of("Tên", "Danh mục", "Số lượng", "Đơn giá", "Đơn vị", "Trạng thái");
 
@@ -94,24 +105,28 @@ public class ProductController {
     }
 
     @PutMapping("/{id}/toggle-active")
-    public ApiResponse<ProductResponse> toggleActive(@AuthenticationPrincipal User user,
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<ProductResponse> toggleActive(@RequestParam String shopId,
                                                      @PathVariable String id) {
-        ProductResponse result = productService.toggleActive(user, id);
-        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, result);
+        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.toggleActive(shopId, id));
     }
 
     @GetMapping("/low-stock")
-    public ApiResponse<List<ProductResponse>> getLowStock(@AuthenticationPrincipal User user,
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<ProductResponse>> getLowStock(@RequestParam String shopId,
+                                                          @RequestParam ShopType shopType,
                                                           @RequestParam(defaultValue = "5") int threshold) {
-        List<ProductResponse> results = productService.getLowStock(user, threshold);
+        List<ProductResponse> results = productService.getLowStock(shopId, threshold, shopType);
         return ApiResponse.success(ApiCode.SUCCESS, results);
     }
 
     @PostMapping("/import")
+    @RequireRole(ShopRole.OWNER)
     public ApiResponse<Map<String, Object>> importExcel(@AuthenticationPrincipal User user,
                                                         @RequestParam("file") MultipartFile file,
+                                                        @RequestParam String shopId,
                                                         @RequestParam(required = false) String branchId) {
-        Map<String, Object> result = productImportService.importExcel(user, branchId, file);
+        Map<String, Object> result = productImportService.importExcel(shopId, branchId, file);
         return ApiResponse.success(ApiCode.SUCCESS, result);
     }
 

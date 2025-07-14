@@ -7,10 +7,8 @@ import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Customer;
-import com.example.sales.model.Shop;
 import com.example.sales.model.User;
 import com.example.sales.repository.CustomerRepository;
-import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,23 +19,17 @@ import java.util.List;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final ShopRepository shopRepository;
 
-    // Lấy danh sách khách hàng thuộc shop của user
-    public List<CustomerResponse> getCustomers(User user, String branchId) {
-        Shop shop = getShopOfUser(user);
-        return customerRepository.findByShopIdAndBranchId(shop.getId(), branchId)
+    public List<CustomerResponse> getCustomers(String shopId, String branchId) {
+        return customerRepository.findByShopIdAndBranchId(shopId, branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    // Tạo khách hàng mới, gắn shopId
-    public CustomerResponse createCustomer(User user, CustomerRequest request) {
-        Shop shop = getShopOfUser(user);
-
+    public CustomerResponse createCustomer(String shopId, User user, CustomerRequest request) {
         Customer customer = new Customer();
-        customer.setShopId(shop.getId());
+        customer.setShopId(shopId);
         customer.setUserId(user.getId());
         customer.setName(request.getName());
         customer.setPhone(request.getPhone());
@@ -49,16 +41,15 @@ public class CustomerService {
         return toResponse(customerRepository.save(customer));
     }
 
-    // Cập nhật khách hàng
-    public CustomerResponse updateCustomer(User user, String id, CustomerRequest request) {
-        Shop shop = getShopOfUser(user);
-
+    public CustomerResponse updateCustomer(String shopId, String id, CustomerRequest request) {
         Customer existing = customerRepository.findById(id)
-                .filter(c -> c.getShopId().equals(shop.getId()))
+                .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+
         if (!existing.getBranchId().equals(request.getBranchId())) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
+
         existing.setName(request.getName());
         existing.setPhone(request.getPhone());
         existing.setEmail(request.getEmail());
@@ -66,6 +57,18 @@ public class CustomerService {
         existing.setNote(request.getNote());
 
         return toResponse(customerRepository.save(existing));
+    }
+
+    public void deleteCustomer(String shopId, String branchId, String id) {
+        Customer customer = customerRepository.findById(id)
+                .filter(c -> c.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+
+        if (!customer.getBranchId().equals(branchId)) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        customerRepository.delete(customer);
     }
 
     private CustomerResponse toResponse(Customer c) {
@@ -77,24 +80,5 @@ public class CustomerService {
                 .address(c.getAddress())
                 .note(c.getNote())
                 .build();
-    }
-
-    // Xoá khách hàng
-    public void deleteCustomer(User user, String branchId, String id) {
-        Shop shop = getShopOfUser(user);
-
-        Customer customer = customerRepository.findById(id)
-                .filter(c -> c.getShopId().equals(shop.getId()))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
-        if (!customer.getBranchId().equals(branchId)) {
-            throw new BusinessException(ApiCode.UNAUTHORIZED);
-        }
-        customerRepository.delete(customer);
-    }
-
-    // Helper: lấy shop của user hiện tại
-    private Shop getShopOfUser(User user) {
-        return shopRepository.findByOwnerId(user.getId())
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 }
