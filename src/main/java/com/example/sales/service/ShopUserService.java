@@ -19,25 +19,25 @@ public class ShopUserService {
     private final ShopUserRepository shopUserRepository;
 
     public ShopRole getUserRoleInShop(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(ShopUser::getRole)
                 .orElseThrow(() -> new BusinessException(ApiCode.UNAUTHORIZED));
     }
 
     public boolean isOwner(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(shopUser -> shopUser.getRole() == ShopRole.OWNER)
                 .orElse(false);
     }
 
     public boolean isStaff(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(shopUser -> shopUser.getRole() == ShopRole.STAFF)
                 .orElse(false);
     }
 
     public boolean isOwnerOrStaff(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(shopUser -> {
                     ShopRole role = shopUser.getRole();
                     return role == ShopRole.OWNER || role == ShopRole.STAFF;
@@ -59,7 +59,7 @@ public class ShopUserService {
     }
 
     public void addUser(String shopId, String userId, ShopRole role) {
-        Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserId(shopId, userId);
+        Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId);
         if (existing.isPresent()) {
             throw new BusinessException(ApiCode.DUPLICATE_DATA);
         }
@@ -74,7 +74,7 @@ public class ShopUserService {
     }
 
     public void removeUser(String shopId, String userId) {
-        ShopUser user = shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        ShopUser user = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUserRepository.delete(user);
     }

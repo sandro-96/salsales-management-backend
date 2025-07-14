@@ -35,7 +35,7 @@ public class AuthService {
     private String verifyUrl;
 
     public void register(RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (userRepository.findByEmailAndDeletedFalse(request.getEmail()).isPresent()) {
             throw new BusinessException(ApiCode.EMAIL_EXISTS);
         }
 
@@ -67,7 +67,7 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
         // 2. Lấy user từ DB
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
         // 3. Kiểm tra đã xác thực chưa
         if (!user.isVerified()) {
@@ -79,7 +79,7 @@ public class AuthService {
     }
 
     public void forgotPassword(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
         String token = UUID.randomUUID().toString();
@@ -91,7 +91,7 @@ public class AuthService {
     }
 
     public void resendVerification(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
         if (user.isVerified()) {
@@ -117,7 +117,7 @@ public class AuthService {
     }
 
     public void verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
+        User user = userRepository.findByVerificationTokenAndDeletedFalse(token)
                 .orElseThrow(() -> new BusinessException(ApiCode.INVALID_TOKEN));
 
         if (user.isVerified()) {

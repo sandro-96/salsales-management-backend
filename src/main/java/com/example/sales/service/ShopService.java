@@ -15,9 +15,10 @@ import org.springframework.stereotype.Service;
 public class ShopService {
 
     private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
 
     public Shop createShop(User owner, ShopRequest request) {
-        if (shopRepository.findByOwnerId(owner.getId()).isPresent()) {
+        if (shopRepository.findByOwnerIdAndDeletedFalse(owner.getId()).isPresent()) {
             throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
 
@@ -29,11 +30,14 @@ public class ShopService {
         shop.setLogoUrl(request.getLogoUrl());
         shop.setOwnerId(owner.getId());
 
-        return shopRepository.save(shop);
+        Shop saved = shopRepository.save(shop);
+        auditLogService.log(owner, saved.getId(), saved.getId(), "SHOP", "CREATED",
+                String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+        return saved;
     }
 
     public Shop getShopByOwner(String ownerId) {
-        return shopRepository.findByOwnerId(ownerId)
+        return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
@@ -46,12 +50,24 @@ public class ShopService {
         shop.setPhone(request.getPhone());
         shop.setLogoUrl(request.getLogoUrl());
 
-        return shopRepository.save(shop);
+        Shop saved = shopRepository.save(shop);
+        auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",
+                String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+        return saved;
     }
 
     public String getShopIdByOwner(String ownerId) {
-        return shopRepository.findByOwnerId(ownerId)
+        return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
                 .getId();
     }
+
+    public void deleteShop(String ownerId) {
+        Shop shop = getShopByOwner(ownerId);
+        shop.setDeleted(true);
+        shopRepository.save(shop);
+        auditLogService.log(null, shop.getId(), shop.getId(), "SHOP", "DELETED",
+                String.format("Xoá mềm cửa hàng: %s", shop.getName()));
+    }
+
 }

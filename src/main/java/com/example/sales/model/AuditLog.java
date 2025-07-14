@@ -7,10 +7,11 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document("audit_logs")
-@Data
 @Builder
-@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class AuditLog extends BaseEntity {
 
     @Id

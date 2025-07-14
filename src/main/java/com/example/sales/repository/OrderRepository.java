@@ -4,20 +4,16 @@ package com.example.sales.repository;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.model.Order;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends MongoRepository<Order, String> {
-    @Query("{ 'userId': ?0, 'deleted': false }")
-    List<Order> findByUserId(String userId);
 
-    @Query("{ 'status': ?0, 'deleted': false }")
-    List<Order> findAllByStatus(OrderStatus status);
+    Optional<Order> findByIdAndDeletedFalse(String id);
 
-    @Query("{ 'shopId': ?0, 'deleted': false }")
-    List<Order> findByShopId(String shopId);
+    List<Order> findByShopIdAndDeletedFalse(String shopId);
 
-    @Query("{ 'shopId': ?0, 'branchId': ?1, 'status': ?2, 'deleted': false }")
-    List<Order> findByShopIdAndBranchIdAndStatus(String shopId, String branchId, OrderStatus status);
+    List<Order> findByShopIdAndBranchIdAndStatusAndDeletedFalse(String shopId, String branchId, OrderStatus status);
+
 }

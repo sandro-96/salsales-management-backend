@@ -34,7 +34,7 @@ public class ProductService {
     private final ShopRepository shopRepository;
 
     public List<ProductResponse> getAllByShop(String shopId) {
-        return productRepository.findByShopId(shopId)
+        return productRepository.findByShopIdAndDeletedFalse(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -43,7 +43,7 @@ public class ProductService {
         if (productCode == null || productCode.isBlank()) {
             productCode = UUID.randomUUID().toString();
         }
-        Shop shop = shopRepository.findById(shopId)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
         String finalImageUrl = fileUploadService.moveToProduct(request.getImageUrl());
         Product product = Product.builder()
@@ -61,11 +61,14 @@ public class ProductService {
 
         product.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
 
-        return toResponse(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        auditLogService.log(null, shopId, saved.getId(), "PRODUCT", "CREATED",
+                String.format("Tạo sản phẩm: %s (Mã: %s)", saved.getName(), saved.getProductCode()));
+        return toResponse(saved);
     }
 
     public ProductResponse updateProduct(User user, String shopId, ShopType shopType, String id, ProductRequest request) {
-        Product existing = productRepository.findById(id)
+        Product existing = productRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
@@ -99,11 +102,13 @@ public class ProductService {
     }
 
     public void deleteProduct(String shopId, String id) {
-        Product existing = productRepository.findById(id)
+        Product existing = productRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-        productRepository.delete(existing);
+        existing.setDeleted(true);
+        productRepository.save(existing);
+        auditLogService.log(null, shopId, existing.getId(), "PRODUCT", "DELETED",
+                String.format("Xoá sản phẩm: %s (Mã: %s)", existing.getName(), existing.getProductCode()));
     }
 
     public Page<ProductResponse> search(String shopId, ProductSearchRequest req) {
@@ -123,12 +128,17 @@ public class ProductService {
     }
 
     public ProductResponse toggleActive(String shopId, String id) {
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         product.setActive(!product.isActive());
-        return toResponse(productRepository.save(product));
+        Product updated = productRepository.save(product);
+        String action = product.isActive() ? "ACTIVATED" : "DEACTIVATED";
+        auditLogService.log(null, shopId, product.getId(), "PRODUCT", action,
+                String.format("%s sản phẩm: %s (Mã: %s)", product.isActive() ? "Kích hoạt" : "Ngưng bán",
+                        product.getName(), product.getProductCode()));
+        return toResponse(updated);
     }
 
     public List<ProductResponse> getLowStock(String shopId, int threshold, ShopType shopType) {
@@ -136,7 +146,7 @@ public class ProductService {
             return List.of();
         }
 
-        return productRepository.findByShopId(shopId).stream()
+        return productRepository.findByShopIdAndDeletedFalse(shopId).stream()
                 .filter(p -> p.getQuantity() < threshold)
                 .map(this::toResponse)
                 .toList();

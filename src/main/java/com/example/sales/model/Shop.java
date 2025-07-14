@@ -3,14 +3,16 @@ package com.example.sales.model;
 
 import com.example.sales.constant.ShopType;
 import com.example.sales.model.base.BaseEntity;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Getter
-@Setter
 @Document(collection = "shops")
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class Shop extends BaseEntity {
 
     @Id
@@ -29,4 +31,5 @@ public class Shop extends BaseEntity {
     private String currency = "VND";       // Đơn vị tiền tệ mặc định
     private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
     private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
+
 }

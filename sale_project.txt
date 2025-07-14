@@ -923,8 +923,12 @@ public class ShopController {
                                     @RequestBody @Valid ShopRequest request) {
         return ApiResponse.success(ApiCode.SUCCESS, shopService.updateShop(user.getId(), request));
     }
+    @DeleteMapping
+    public ApiResponse<?> deleteShop(@AuthenticationPrincipal User user) {
+        shopService.deleteShop(user.getId());
+        return ApiResponse.success(ApiCode.SUCCESS);
+    }
 }
-
 
 // File: src/main/java/com/example/sales/controller/ShopUserController.java
 package com.example.sales.controller;
@@ -1951,20 +1955,26 @@ public class ImageCleanupJob {
         }
     }
 }
+
 // File: src/main/java/com/example/sales/model/base/BaseEntity.java
 package com.example.sales.model.base;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
 public abstract class BaseEntity {
 
     @CreatedDate
@@ -1979,10 +1989,13 @@ public abstract class BaseEntity {
     @LastModifiedBy
     private String updatedBy;
 
+    @Field("deleted")
+    @Builder.Default
     private boolean deleted = false;
 
     private LocalDateTime deletedAt;
 }
+
 // File: src/main/java/com/example/sales/model/AuditLog.java
 package com.example.sales.model;
 
@@ -1992,10 +2005,11 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document("audit_logs")
-@Data
 @Builder
-@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class AuditLog extends BaseEntity {
 
     @Id
@@ -2010,19 +2024,13 @@ public class AuditLog extends BaseEntity {
     private String action;       // Hành động: PRICE_CHANGED, STATUS_UPDATED...
     private String description;  // Mô tả cụ thể
 }
-// File: src/main/java/com/example/sales/model/Branch.java
-package com.example.sales.model;
-
-import com.example.sales.model.base.BaseEntity;
-import lombok.*;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document("branches")
-@Data
 @Builder
-@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class Branch extends BaseEntity {
 
     @Id
@@ -2037,17 +2045,20 @@ public class Branch extends BaseEntity {
     @Builder.Default
     private boolean active = true;
 }
+
 // File: src/main/java/com/example/sales/model/Customer.java
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
-import lombok.Data;
-import org.springframework.data.annotation.*;
+import lombok.*;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
-
+@EqualsAndHashCode(callSuper = true)
 @Document("customers")
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Data
 public class Customer extends BaseEntity {
     @Id
@@ -2061,13 +2072,15 @@ public class Customer extends BaseEntity {
     private String note;
     private String shopId;
     private String branchId; // Có thể null nếu không phân biệt chi nhánh
+
 }
+
 // File: src/main/java/com/example/sales/model/Order.java
 package com.example.sales.model;
 
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.model.base.BaseEntity;
-import lombok.Data;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -2075,6 +2088,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Document("orders")
+@Builder
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+@NoArgsConstructor
 @Data
 public class Order extends BaseEntity {
     @Id
@@ -2100,6 +2117,7 @@ public class Order extends BaseEntity {
 
     private String note;
 }
+
 // File: src/main/java/com/example/sales/model/OrderItem.java
 package com.example.sales.model;
 
@@ -2119,16 +2137,19 @@ public class OrderItem {
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document("products")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class Product extends BaseEntity {
 
     @Id
@@ -2159,6 +2180,8 @@ public class Product extends BaseEntity {
     private boolean active = true; // Có đang bán hay tạm ngưng
     private String productCode; // mã sản phẩm duy nhất
 }
+
+
 // File: src/main/java/com/example/sales/model/Promotion.java
 package com.example.sales.model;
 
@@ -2172,10 +2195,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Document(collection = "promotions")
-@Data
 @Builder
-@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class Promotion extends BaseEntity {
 
     @Id
@@ -2197,10 +2221,13 @@ public class Promotion extends BaseEntity {
 
     private boolean active;
 }
+
 // File: src/main/java/com/example/sales/model/RefreshToken.java
 package com.example.sales.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -2208,6 +2235,8 @@ import java.util.Date;
 
 @Data
 @Document(collection = "refresh_tokens")
+@AllArgsConstructor
+@NoArgsConstructor
 public class RefreshToken {
     @Id
     private String id;
@@ -2215,19 +2244,22 @@ public class RefreshToken {
     private String userId;
     private Date expiryDate;
 }
+
 // File: src/main/java/com/example/sales/model/Shop.java
 package com.example.sales.model;
 
 import com.example.sales.constant.ShopType;
 import com.example.sales.model.base.BaseEntity;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Getter
-@Setter
 @Document(collection = "shops")
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class Shop extends BaseEntity {
 
     @Id
@@ -2246,7 +2278,9 @@ public class Shop extends BaseEntity {
     private String currency = "VND";       // Đơn vị tiền tệ mặc định
     private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
     private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
+
 }
+
 // File: src/main/java/com/example/sales/model/ShopUser.java
 package com.example.sales.model;
 
@@ -2257,10 +2291,11 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "shop_users")
-@Data
 @Builder
-@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class ShopUser extends BaseEntity {
 
     @Id
@@ -2272,6 +2307,7 @@ public class ShopUser extends BaseEntity {
 
     private ShopRole role;
 }
+
 // File: src/main/java/com/example/sales/model/Table.java
 package com.example.sales.model;
 
@@ -2282,11 +2318,11 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "tables")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class Table extends BaseEntity {
     @Id
     private String id;
@@ -2300,6 +2336,7 @@ public class Table extends BaseEntity {
     private String note;                // Ghi chú (optional)
     private String currentOrderId;      // Đơn đang sử dụng bàn (nếu có)
 }
+
 // File: src/main/java/com/example/sales/model/User.java
 package com.example.sales.model;
 
@@ -2307,21 +2344,18 @@ import com.example.sales.constant.UserRole;
 import com.example.sales.model.base.BaseEntity;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.*;
+import lombok.*;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
 import java.util.Date;
 
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @Document(collection = "users")
-@Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class User extends BaseEntity {
     @Id
     private String id;
@@ -2346,6 +2380,7 @@ public class User extends BaseEntity {
     private String phone;
     private String avatarUrl; // (nếu có ảnh đại diện)
 }
+
 // File: src/main/java/com/example/sales/repository/AuditLogRepository.java
 package com.example.sales.repository;
 
@@ -2365,13 +2400,14 @@ package com.example.sales.repository;
 
 import com.example.sales.model.Branch;
 import com.example.sales.repository.base.SoftDeleteRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface BranchRepository extends SoftDeleteRepository<Branch, String> {
-    @Query("{ 'shopId': ?0, 'deleted': false }")
-    List<Branch> findByShopId(String shopId);
+    List<Branch> findByShopIdAndDeletedFalse(String shopId);
+    Optional<Branch> findByIdAndDeletedFalse(String id);
+
 }
 
 // File: src/main/java/com/example/sales/repository/CustomerRepository.java
@@ -2379,22 +2415,15 @@ package com.example.sales.repository;
 
 import com.example.sales.model.Customer;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CustomerRepository extends MongoRepository<Customer, String> {
-    @Query("{ 'userId': ?0, 'deleted': false }")
-    List<Customer> findByUserId(String userId);
 
-    @Query("{ 'userId': ?0, 'deleted': false }")
-    List<Customer> findByUserIdAndDeletedFalse(String userId);
+    List<Customer> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
 
-    @Query("{ 'shopId': ?0, 'deleted': false }")
-    List<Customer> findByShopId(String shopId);
-
-    @Query("{ 'shopId': ?0, 'branchId': ?1, 'deleted': false }")
-    List<Customer> findByShopIdAndBranchId(String shopId, String branchId);
+    Optional<Customer> findByIdAndDeletedFalse(String id);
 }
 
 // File: src/main/java/com/example/sales/repository/OrderRepository.java
@@ -2403,22 +2432,18 @@ package com.example.sales.repository;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.model.Order;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends MongoRepository<Order, String> {
-    @Query("{ 'userId': ?0, 'deleted': false }")
-    List<Order> findByUserId(String userId);
 
-    @Query("{ 'status': ?0, 'deleted': false }")
-    List<Order> findAllByStatus(OrderStatus status);
+    Optional<Order> findByIdAndDeletedFalse(String id);
 
-    @Query("{ 'shopId': ?0, 'deleted': false }")
-    List<Order> findByShopId(String shopId);
+    List<Order> findByShopIdAndDeletedFalse(String shopId);
 
-    @Query("{ 'shopId': ?0, 'branchId': ?1, 'status': ?2, 'deleted': false }")
-    List<Order> findByShopIdAndBranchIdAndStatus(String shopId, String branchId, OrderStatus status);
+    List<Order> findByShopIdAndBranchIdAndStatusAndDeletedFalse(String shopId, String branchId, OrderStatus status);
+
 }
 
 // File: src/main/java/com/example/sales/repository/ProductRepository.java
@@ -2429,10 +2454,15 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository extends MongoRepository<Product, String> {
     @Query("{ 'shopId': ?0, 'deleted': false }")
     List<Product> findByShopId(String shopId);
+
+    List<Product> findByShopIdAndDeletedFalse(String shopId);
+    Optional<Product> findByIdAndDeletedFalse(String id);
+
 }
 
 // File: src/main/java/com/example/sales/repository/PromotionRepository.java
@@ -2440,16 +2470,17 @@ package com.example.sales.repository;
 
 import com.example.sales.model.Promotion;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface PromotionRepository extends MongoRepository<Promotion, String> {
-    @Query("{ 'shopId': ?0, 'deleted': false }")
-    List<Promotion> findByShopId(String shopId);
+    List<Promotion> findByShopIdAndDeletedFalse(String shopId);
 
-    @Query("{ 'shopId': ?0, 'branchId': ?1, 'deleted': false }")
-    List<Promotion> findByShopIdAndBranchId(String shopId, String branchId);
+    Optional<Promotion> findByIdAndDeletedFalse(String id);
+
+    List<Promotion> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
+
 }
 
 // File: src/main/java/com/example/sales/repository/RefreshTokenRepository.java
@@ -2469,13 +2500,12 @@ package com.example.sales.repository;
 
 import com.example.sales.model.Shop;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.Optional;
 
 public interface ShopRepository extends MongoRepository<Shop, String> {
-    @Query("{ 'ownerId': ?0, 'deleted': false }")
-    Optional<Shop> findByOwnerId(String ownerId);
+    Optional<Shop> findByOwnerIdAndDeletedFalse(String ownerId);
+    Optional<Shop> findByIdAndDeletedFalse(String id);
 }
 
 // File: src/main/java/com/example/sales/repository/ShopUserRepository.java
@@ -2483,13 +2513,13 @@ package com.example.sales.repository;
 
 import com.example.sales.model.ShopUser;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.Optional;
 
 public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
-    @Query("{ 'shopId': ?0, 'userId': ?1, 'deleted': false }")
-    Optional<ShopUser> findByShopIdAndUserId(String shopId, String userId);
+    Optional<ShopUser> findByIdAndDeletedFalse(String id);
+
+    Optional<ShopUser> findByShopIdAndUserIdAndDeletedFalse(String shopId, String userId);
 }
 
 // File: src/main/java/com/example/sales/repository/TableRepository.java
@@ -2497,20 +2527,15 @@ package com.example.sales.repository;
 
 import com.example.sales.model.Table;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface TableRepository extends MongoRepository<Table, String> {
-    @Query("{ 'shopId': ?0, 'branchId': ?1, 'deleted': false }")
-    List<Table> findByShopIdAndBranchId(String shopId, String branchId);
 
-    @Query("{ 'shopId': ?0, 'deleted': false }")
-    List<Table> findByShopId(String shopId);
+    List<Table> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
 
-    @Query("{ 'shopId': ?0, 'name': ?1, 'deleted': false }")
-    Optional<Table> findByShopIdAndName(String shopId, String name);
+    Optional<Table> findByIdAndDeletedFalse(String id);
 }
 
 // File: src/main/java/com/example/sales/repository/UserRepository.java
@@ -2518,19 +2543,13 @@ package com.example.sales.repository;
 
 import com.example.sales.model.User;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.Optional;
 
 public interface UserRepository extends MongoRepository<User, String> {
-    @Query("{ 'email': ?0, 'deleted': false }")
-    Optional<User> findByEmail(String email);
-
-    @Query("{ 'verificationToken': ?0, 'deleted': false }")
-    Optional<User> findByVerificationToken(String token);
-
-    @Query("{ 'resetToken': ?0, 'deleted': false }")
-    Optional<User> findByResetToken(String token);
+    Optional<User> findByEmailAndDeletedFalse(String email);
+    Optional<User> findByIdAndDeletedFalse(String id);
+    Optional<User> findByVerificationTokenAndDeletedFalse(String token);
 }
 
 // File: src/main/java/com/example/sales/security/JwtAuthenticationFilter.java
@@ -2682,13 +2701,14 @@ import java.util.List;
 public class AdminUserService {
 
     private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
 
     public User getUserById(String id) {
-        return userRepository.findById(id)
+        return userRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
     }
 
@@ -2703,8 +2723,12 @@ public class AdminUserService {
         return userRepository.save(user);
     }
 
-    public void deleteUser(String id) {
-        userRepository.deleteById(id);
+    public void deleteUser(String userId) {
+        User user = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
+        user.setDeleted(true);
+        userRepository.save(user);
+        auditLogService.log(null, user.getId(), user.getId(), "USER", "DELETED", "Xoá mềm tài khoản người dùng");
     }
 }
 
@@ -2774,7 +2798,7 @@ public class AuthService {
     private String verifyUrl;
 
     public void register(RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (userRepository.findByEmailAndDeletedFalse(request.getEmail()).isPresent()) {
             throw new BusinessException(ApiCode.EMAIL_EXISTS);
         }
 
@@ -2806,7 +2830,7 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
         // 2. Lấy user từ DB
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
         // 3. Kiểm tra đã xác thực chưa
         if (!user.isVerified()) {
@@ -2818,7 +2842,7 @@ public class AuthService {
     }
 
     public void forgotPassword(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
         String token = UUID.randomUUID().toString();
@@ -2830,7 +2854,7 @@ public class AuthService {
     }
 
     public void resendVerification(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
         if (user.isVerified()) {
@@ -2856,7 +2880,7 @@ public class AuthService {
     }
 
     public void verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
+        User user = userRepository.findByVerificationTokenAndDeletedFalse(token)
                 .orElseThrow(() -> new BusinessException(ApiCode.INVALID_TOKEN));
 
         if (user.isVerified()) {
@@ -2894,9 +2918,10 @@ import java.util.List;
 public class BranchService {
 
     private final BranchRepository branchRepository;
+    private final AuditLogService auditLogService;
 
     public List<BranchResponse> getAll(String shopId) {
-        return branchRepository.findByShopId(shopId)
+        return branchRepository.findByShopIdAndDeletedFalse(shopId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -2911,11 +2936,14 @@ public class BranchService {
                 .active(req.isActive())
                 .build();
 
-        return toResponse(branchRepository.save(branch));
+        Branch saved = branchRepository.save(branch);
+        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "CREATED",
+                String.format("Tạo chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
+        return toResponse(saved);
     }
 
     public BranchResponse update(String shopId, String id, BranchRequest req) {
-        Branch branch = branchRepository.findById(id)
+        Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
@@ -2924,15 +2952,22 @@ public class BranchService {
         branch.setPhone(req.getPhone());
         branch.setActive(req.isActive());
 
-        return toResponse(branchRepository.save(branch));
+        Branch saved = branchRepository.save(branch);
+        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "UPDATED",
+                String.format("Cập nhật chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
+        return toResponse(saved);
     }
 
     public void delete(String shopId, String id) {
-        Branch branch = branchRepository.findById(id)
+        Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
-        branchRepository.delete(branch);
+        branch.setDeleted(true);
+        branchRepository.save(branch);
+        auditLogService.log(null, shopId, branch.getId(), "BRANCH", "DELETED",
+                String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
+
     }
 
     private BranchResponse toResponse(Branch branch) {
@@ -2968,9 +3003,10 @@ import java.util.List;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final AuditLogService auditLogService;
 
     public List<CustomerResponse> getCustomers(String shopId, String branchId) {
-        return customerRepository.findByShopIdAndBranchId(shopId, branchId)
+        return customerRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -2987,11 +3023,14 @@ public class CustomerService {
         customer.setNote(request.getNote());
         customer.setBranchId(request.getBranchId());
 
-        return toResponse(customerRepository.save(customer));
+        Customer saved = customerRepository.save(customer);
+        auditLogService.log(user, shopId, saved.getId(), "CUSTOMER", "CREATED",
+                String.format("Tạo khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
+        return toResponse(saved);
     }
 
     public CustomerResponse updateCustomer(String shopId, String id, CustomerRequest request) {
-        Customer existing = customerRepository.findById(id)
+        Customer existing = customerRepository.findByIdAndDeletedFalse(id)
                 .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
 
@@ -3005,11 +3044,14 @@ public class CustomerService {
         existing.setAddress(request.getAddress());
         existing.setNote(request.getNote());
 
-        return toResponse(customerRepository.save(existing));
+        Customer saved = customerRepository.save(existing);
+        auditLogService.log(null, shopId, saved.getId(), "CUSTOMER", "UPDATED",
+                String.format("Cập nhật khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
+        return toResponse(saved);
     }
 
     public void deleteCustomer(String shopId, String branchId, String id) {
-        Customer customer = customerRepository.findById(id)
+        Customer customer = customerRepository.findByIdAndDeletedFalse(id)
                 .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
 
@@ -3017,7 +3059,10 @@ public class CustomerService {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
-        customerRepository.delete(customer);
+        customer.setDeleted(true);
+        customerRepository.save(customer);
+        auditLogService.log(null, shopId, customer.getId(), "CUSTOMER", "DELETED",
+                String.format("Xoá mềm khách hàng: %s (%s)", customer.getName(), customer.getPhone()));
     }
 
     private CustomerResponse toResponse(Customer c) {
@@ -3249,7 +3294,7 @@ public class OrderService {
     private final AuditLogService auditLogService;
 
     public List<OrderResponse> getOrdersByUser(User user, String shopId) {
-        return orderRepository.findByShopId(shopId)
+        return orderRepository.findByShopIdAndDeletedFalse(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -3370,12 +3415,12 @@ public class OrderService {
     }
 
     public List<OrderResponse> getOrdersByStatus(User user, String shopId, OrderStatus status, String branchId) {
-        return orderRepository.findByShopIdAndBranchIdAndStatus(shopId, branchId, status)
+        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status)
                 .stream().map(this::toResponse).toList();
     }
 
     private Order getOrderByShop(String orderId, String shopId) {
-        return orderRepository.findById(orderId)
+        return orderRepository.findByIdAndDeletedFalse(orderId)
                 .filter(o -> o.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
     }
@@ -3392,7 +3437,7 @@ public class OrderService {
 
     private Promotion findApplicablePromotion(String shopId, String branchId, String productId) {
         LocalDateTime now = LocalDateTime.now();
-        return promotionRepository.findByShopId(shopId).stream()
+        return promotionRepository.findByShopIdAndDeletedFalse(shopId).stream()
                 .filter(Promotion::isActive)
                 .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
                 .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))
@@ -3441,15 +3486,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class ProductImportService {
 
     private final ProductService productService;
+    private final AuditLogService auditLogService;
 
     public Map<String, Object> importExcel(String shopId, String branchId, MultipartFile file) {
         int successCount = 0;
@@ -3467,7 +3511,9 @@ public class ProductImportService {
                 try {
                     ProductRequest req = parseRow(row);
                     req.setBranchId(branchId);
-                    productService.createProduct(shopId, req);
+                    var product = productService.createProduct(shopId, req);
+                    auditLogService.log(null, shopId, product.getId(), "PRODUCT", "IMPORTED",
+                            String.format("Nhập sản phẩm từ Excel: %s (Mã: %s)", product.getName(), product.getProductCode()));
                     successCount++;
                 } catch (Exception ex) {
                     failCount++;
@@ -3561,7 +3607,7 @@ public class ProductService {
     private final ShopRepository shopRepository;
 
     public List<ProductResponse> getAllByShop(String shopId) {
-        return productRepository.findByShopId(shopId)
+        return productRepository.findByShopIdAndDeletedFalse(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -3570,7 +3616,7 @@ public class ProductService {
         if (productCode == null || productCode.isBlank()) {
             productCode = UUID.randomUUID().toString();
         }
-        Shop shop = shopRepository.findById(shopId)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
         String finalImageUrl = fileUploadService.moveToProduct(request.getImageUrl());
         Product product = Product.builder()
@@ -3588,11 +3634,14 @@ public class ProductService {
 
         product.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
 
-        return toResponse(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        auditLogService.log(null, shopId, saved.getId(), "PRODUCT", "CREATED",
+                String.format("Tạo sản phẩm: %s (Mã: %s)", saved.getName(), saved.getProductCode()));
+        return toResponse(saved);
     }
 
     public ProductResponse updateProduct(User user, String shopId, ShopType shopType, String id, ProductRequest request) {
-        Product existing = productRepository.findById(id)
+        Product existing = productRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
@@ -3626,11 +3675,13 @@ public class ProductService {
     }
 
     public void deleteProduct(String shopId, String id) {
-        Product existing = productRepository.findById(id)
+        Product existing = productRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-        productRepository.delete(existing);
+        existing.setDeleted(true);
+        productRepository.save(existing);
+        auditLogService.log(null, shopId, existing.getId(), "PRODUCT", "DELETED",
+                String.format("Xoá sản phẩm: %s (Mã: %s)", existing.getName(), existing.getProductCode()));
     }
 
     public Page<ProductResponse> search(String shopId, ProductSearchRequest req) {
@@ -3650,12 +3701,17 @@ public class ProductService {
     }
 
     public ProductResponse toggleActive(String shopId, String id) {
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
         product.setActive(!product.isActive());
-        return toResponse(productRepository.save(product));
+        Product updated = productRepository.save(product);
+        String action = product.isActive() ? "ACTIVATED" : "DEACTIVATED";
+        auditLogService.log(null, shopId, product.getId(), "PRODUCT", action,
+                String.format("%s sản phẩm: %s (Mã: %s)", product.isActive() ? "Kích hoạt" : "Ngưng bán",
+                        product.getName(), product.getProductCode()));
+        return toResponse(updated);
     }
 
     public List<ProductResponse> getLowStock(String shopId, int threshold, ShopType shopType) {
@@ -3663,7 +3719,7 @@ public class ProductService {
             return List.of();
         }
 
-        return productRepository.findByShopId(shopId).stream()
+        return productRepository.findByShopIdAndDeletedFalse(shopId).stream()
                 .filter(p -> p.getQuantity() < threshold)
                 .map(this::toResponse)
                 .toList();
@@ -3714,9 +3770,10 @@ import java.util.List;
 public class PromotionService {
 
     private final PromotionRepository promotionRepository;
+    private final AuditLogService auditLogService;
 
     public List<PromotionResponse> getAll(String shopId, String branchId) {
-        return promotionRepository.findByShopIdAndBranchId(shopId, branchId)
+        return promotionRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -3735,11 +3792,17 @@ public class PromotionService {
                 .branchId(request.getBranchId())
                 .build();
 
-        return toResponse(promotionRepository.save(promotion));
+        Promotion saved = promotionRepository.save(promotion);
+        auditLogService.log(null, shopId, saved.getId(), "PROMOTION", "CREATED",
+                String.format("Tạo khuyến mãi: %s (%.2f %s)",
+                        saved.getName(),
+                        saved.getDiscountValue(),
+                        saved.getDiscountType()));
+        return toResponse(saved);
     }
 
     public PromotionResponse update(String shopId, String id, PromotionRequest request) {
-        Promotion promotion = promotionRepository.findById(id)
+        Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
 
@@ -3755,15 +3818,22 @@ public class PromotionService {
         promotion.setEndDate(request.getEndDate());
         promotion.setActive(request.isActive());
 
-        return toResponse(promotionRepository.save(promotion));
+        Promotion saved = promotionRepository.save(promotion);
+        auditLogService.log(null, shopId, saved.getId(), "PROMOTION", "UPDATED",
+                String.format("Cập nhật khuyến mãi: %s", saved.getName()));
+        return toResponse(saved);
     }
 
     public void delete(String shopId, String id) {
-        Promotion promotion = promotionRepository.findById(id)
+        Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
 
-        promotionRepository.delete(promotion);
+        promotion.setDeleted(true);
+        promotionRepository.save(promotion);
+        auditLogService.log(null, shopId, promotion.getId(), "PROMOTION", "DELETED",
+                String.format("Xoá mềm khuyến mãi: %s", promotion.getName()));
+
     }
 
     private PromotionResponse toResponse(Promotion p) {
@@ -3928,9 +3998,10 @@ import org.springframework.stereotype.Service;
 public class ShopService {
 
     private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
 
     public Shop createShop(User owner, ShopRequest request) {
-        if (shopRepository.findByOwnerId(owner.getId()).isPresent()) {
+        if (shopRepository.findByOwnerIdAndDeletedFalse(owner.getId()).isPresent()) {
             throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
 
@@ -3942,11 +4013,14 @@ public class ShopService {
         shop.setLogoUrl(request.getLogoUrl());
         shop.setOwnerId(owner.getId());
 
-        return shopRepository.save(shop);
+        Shop saved = shopRepository.save(shop);
+        auditLogService.log(owner, saved.getId(), saved.getId(), "SHOP", "CREATED",
+                String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+        return saved;
     }
 
     public Shop getShopByOwner(String ownerId) {
-        return shopRepository.findByOwnerId(ownerId)
+        return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
 
@@ -3959,14 +4033,26 @@ public class ShopService {
         shop.setPhone(request.getPhone());
         shop.setLogoUrl(request.getLogoUrl());
 
-        return shopRepository.save(shop);
+        Shop saved = shopRepository.save(shop);
+        auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",
+                String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+        return saved;
     }
 
     public String getShopIdByOwner(String ownerId) {
-        return shopRepository.findByOwnerId(ownerId)
+        return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
                 .getId();
     }
+
+    public void deleteShop(String ownerId) {
+        Shop shop = getShopByOwner(ownerId);
+        shop.setDeleted(true);
+        shopRepository.save(shop);
+        auditLogService.log(null, shop.getId(), shop.getId(), "SHOP", "DELETED",
+                String.format("Xoá mềm cửa hàng: %s", shop.getName()));
+    }
+
 }
 
 // File: src/main/java/com/example/sales/service/ShopUserService.java
@@ -3990,25 +4076,25 @@ public class ShopUserService {
     private final ShopUserRepository shopUserRepository;
 
     public ShopRole getUserRoleInShop(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(ShopUser::getRole)
                 .orElseThrow(() -> new BusinessException(ApiCode.UNAUTHORIZED));
     }
 
     public boolean isOwner(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(shopUser -> shopUser.getRole() == ShopRole.OWNER)
                 .orElse(false);
     }
 
     public boolean isStaff(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(shopUser -> shopUser.getRole() == ShopRole.STAFF)
                 .orElse(false);
     }
 
     public boolean isOwnerOrStaff(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(shopUser -> {
                     ShopRole role = shopUser.getRole();
                     return role == ShopRole.OWNER || role == ShopRole.STAFF;
@@ -4030,7 +4116,7 @@ public class ShopUserService {
     }
 
     public void addUser(String shopId, String userId, ShopRole role) {
-        Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserId(shopId, userId);
+        Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId);
         if (existing.isPresent()) {
             throw new BusinessException(ApiCode.DUPLICATE_DATA);
         }
@@ -4045,7 +4131,7 @@ public class ShopUserService {
     }
 
     public void removeUser(String shopId, String userId) {
-        ShopUser user = shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        ShopUser user = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUserRepository.delete(user);
     }
@@ -4075,12 +4161,13 @@ public class TableService {
 
     private final TableRepository tableRepository;
     private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
 
     public TableResponse create(TableRequest request) {
         String shopId = request.getShopId();
         String branchId = request.getBranchId();
 
-        Shop shop = shopRepository.findById(shopId)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
         Table table = Table.builder()
@@ -4092,29 +4179,35 @@ public class TableService {
                 .note(request.getNote())
                 .build();
 
-        return toResponse(tableRepository.save(table), shop);
+        Table saved = tableRepository.save(table);
+        auditLogService.log(null, shopId, saved.getId(), "TABLE", "CREATED",
+                String.format("Tạo bàn: %s (Chi nhánh: %s)", saved.getName(), saved.getBranchId()));
+        return toResponse(saved, shop);
     }
 
     public List<TableResponse> getByShop(String shopId, String branchId) {
-        Shop shop = shopRepository.findById(shopId)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
-        return tableRepository.findByShopIdAndBranchId(shopId, branchId)
+        return tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
                 .stream()
                 .map(table -> toResponse(table, shop))
                 .toList();
     }
 
     public TableResponse updateStatus(String tableId, TableStatus status) {
-        Table table = tableRepository.findById(tableId)
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new BusinessException(ApiCode.TABLE_NOT_FOUND));
 
         table.setStatus(status);
-        return toResponse(tableRepository.save(table));
+        Table saved = tableRepository.save(table);
+        auditLogService.log(null, table.getShopId(), saved.getId(), "TABLE", "STATUS_UPDATED",
+                String.format("Cập nhật trạng thái bàn: %s → %s", table.getName(), status));
+        return toResponse(saved);
     }
 
     private TableResponse toResponse(Table table) {
-        Shop shop = shopRepository.findById(table.getShopId()).orElse(null);
+        Shop shop = shopRepository.findByIdAndDeletedFalse(table.getShopId()).orElse(null);
 
         return TableResponse.builder()
                 .id(table.getId())
@@ -4186,7 +4279,7 @@ public class TokenService {
             throw new BusinessException(ApiCode.REFRESH_TOKEN_EXPIRED);
         }
 
-        User user = userRepository.findById(token.getUserId())
+        User user = userRepository.findByIdAndDeletedFalse(token.getUserId())
                 .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
 
         return jwtUtil.generateToken(user);
@@ -4434,17 +4527,16 @@ public class PermissionChecker {
 
     public boolean hasRole(String shopId, String userId, ShopRole... roles) {
         Set<ShopRole> allowed = Set.of(roles);
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(user -> allowed.contains(user.getRole()))
                 .orElse(false);
     }
     public boolean hasBranchRole(String branchId, String userId, ShopRole... roles) {
-        return branchRepository.findById(branchId)
+        return branchRepository.findByIdAndDeletedFalse(branchId)
                 .map(branch -> hasRole(branch.getShopId(), userId, roles))
                 .orElse(false);
     }
 }
-
 
 // File: src/main/java/com/example/sales/repository/base/SoftDeleteRepository.java
 package com.example.sales.repository.base;

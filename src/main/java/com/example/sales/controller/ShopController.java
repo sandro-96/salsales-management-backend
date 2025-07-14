@@ -38,4 +38,9 @@ public class ShopController {
                                     @RequestBody @Valid ShopRequest request) {
         return ApiResponse.success(ApiCode.SUCCESS, shopService.updateShop(user.getId(), request));
     }
+    @DeleteMapping
+    public ApiResponse<?> deleteShop(@AuthenticationPrincipal User user) {
+        shopService.deleteShop(user.getId());
+        return ApiResponse.success(ApiCode.SUCCESS);
+    }
 }

@@ -34,12 +34,12 @@ public class PermissionChecker {
 
     public boolean hasRole(String shopId, String userId, ShopRole... roles) {
         Set<ShopRole> allowed = Set.of(roles);
-        return shopUserRepository.findByShopIdAndUserId(shopId, userId)
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(user -> allowed.contains(user.getRole()))
                 .orElse(false);
     }
     public boolean hasBranchRole(String branchId, String userId, ShopRole... roles) {
-        return branchRepository.findById(branchId)
+        return branchRepository.findByIdAndDeletedFalse(branchId)
                 .map(branch -> hasRole(branch.getShopId(), userId, roles))
                 .orElse(false);
     }

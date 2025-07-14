@@ -40,7 +40,7 @@ public class TokenService {
             throw new BusinessException(ApiCode.REFRESH_TOKEN_EXPIRED);
         }
 
-        User user = userRepository.findById(token.getUserId())
+        User user = userRepository.findByIdAndDeletedFalse(token.getUserId())
                 .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
 
         return jwtUtil.generateToken(user);

@@ -19,9 +19,10 @@ import java.util.List;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final AuditLogService auditLogService;
 
     public List<CustomerResponse> getCustomers(String shopId, String branchId) {
-        return customerRepository.findByShopIdAndBranchId(shopId, branchId)
+        return customerRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -38,11 +39,14 @@ public class CustomerService {
         customer.setNote(request.getNote());
         customer.setBranchId(request.getBranchId());
 
-        return toResponse(customerRepository.save(customer));
+        Customer saved = customerRepository.save(customer);
+        auditLogService.log(user, shopId, saved.getId(), "CUSTOMER", "CREATED",
+                String.format("Tạo khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
+        return toResponse(saved);
     }
 
     public CustomerResponse updateCustomer(String shopId, String id, CustomerRequest request) {
-        Customer existing = customerRepository.findById(id)
+        Customer existing = customerRepository.findByIdAndDeletedFalse(id)
                 .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
 
@@ -56,11 +60,14 @@ public class CustomerService {
         existing.setAddress(request.getAddress());
         existing.setNote(request.getNote());
 
-        return toResponse(customerRepository.save(existing));
+        Customer saved = customerRepository.save(existing);
+        auditLogService.log(null, shopId, saved.getId(), "CUSTOMER", "UPDATED",
+                String.format("Cập nhật khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
+        return toResponse(saved);
     }
 
     public void deleteCustomer(String shopId, String branchId, String id) {
-        Customer customer = customerRepository.findById(id)
+        Customer customer = customerRepository.findByIdAndDeletedFalse(id)
                 .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
 
@@ -68,7 +75,10 @@ public class CustomerService {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
-        customerRepository.delete(customer);
+        customer.setDeleted(true);
+        customerRepository.save(customer);
+        auditLogService.log(null, shopId, customer.getId(), "CUSTOMER", "DELETED",
+                String.format("Xoá mềm khách hàng: %s (%s)", customer.getName(), customer.getPhone()));
     }
 
     private CustomerResponse toResponse(Customer c) {

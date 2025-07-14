@@ -22,12 +22,13 @@ public class TableService {
 
     private final TableRepository tableRepository;
     private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
 
     public TableResponse create(TableRequest request) {
         String shopId = request.getShopId();
         String branchId = request.getBranchId();
 
-        Shop shop = shopRepository.findById(shopId)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
         Table table = Table.builder()
@@ -39,29 +40,35 @@ public class TableService {
                 .note(request.getNote())
                 .build();
 
-        return toResponse(tableRepository.save(table), shop);
+        Table saved = tableRepository.save(table);
+        auditLogService.log(null, shopId, saved.getId(), "TABLE", "CREATED",
+                String.format("Tạo bàn: %s (Chi nhánh: %s)", saved.getName(), saved.getBranchId()));
+        return toResponse(saved, shop);
     }
 
     public List<TableResponse> getByShop(String shopId, String branchId) {
-        Shop shop = shopRepository.findById(shopId)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
-        return tableRepository.findByShopIdAndBranchId(shopId, branchId)
+        return tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
                 .stream()
                 .map(table -> toResponse(table, shop))
                 .toList();
     }
 
     public TableResponse updateStatus(String tableId, TableStatus status) {
-        Table table = tableRepository.findById(tableId)
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new BusinessException(ApiCode.TABLE_NOT_FOUND));
 
         table.setStatus(status);
-        return toResponse(tableRepository.save(table));
+        Table saved = tableRepository.save(table);
+        auditLogService.log(null, table.getShopId(), saved.getId(), "TABLE", "STATUS_UPDATED",
+                String.format("Cập nhật trạng thái bàn: %s → %s", table.getName(), status));
+        return toResponse(saved);
     }
 
     private TableResponse toResponse(Table table) {
-        Shop shop = shopRepository.findById(table.getShopId()).orElse(null);
+        Shop shop = shopRepository.findByIdAndDeletedFalse(table.getShopId()).orElse(null);
 
         return TableResponse.builder()
                 .id(table.getId())

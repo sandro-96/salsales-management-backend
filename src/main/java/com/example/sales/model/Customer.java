@@ -2,13 +2,15 @@
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
-import lombok.Data;
-import org.springframework.data.annotation.*;
+import lombok.*;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.LocalDateTime;
-
+@EqualsAndHashCode(callSuper = true)
 @Document("customers")
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Data
 public class Customer extends BaseEntity {
     @Id
@@ -22,4 +24,5 @@ public class Customer extends BaseEntity {
     private String note;
     private String shopId;
     private String branchId; // Có thể null nếu không phân biệt chi nhánh
+
 }

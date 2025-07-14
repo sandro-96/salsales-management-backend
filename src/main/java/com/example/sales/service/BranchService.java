@@ -17,9 +17,10 @@ import java.util.List;
 public class BranchService {
 
     private final BranchRepository branchRepository;
+    private final AuditLogService auditLogService;
 
     public List<BranchResponse> getAll(String shopId) {
-        return branchRepository.findByShopId(shopId)
+        return branchRepository.findByShopIdAndDeletedFalse(shopId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -34,11 +35,14 @@ public class BranchService {
                 .active(req.isActive())
                 .build();
 
-        return toResponse(branchRepository.save(branch));
+        Branch saved = branchRepository.save(branch);
+        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "CREATED",
+                String.format("Tạo chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
+        return toResponse(saved);
     }
 
     public BranchResponse update(String shopId, String id, BranchRequest req) {
-        Branch branch = branchRepository.findById(id)
+        Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
@@ -47,15 +51,22 @@ public class BranchService {
         branch.setPhone(req.getPhone());
         branch.setActive(req.isActive());
 
-        return toResponse(branchRepository.save(branch));
+        Branch saved = branchRepository.save(branch);
+        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "UPDATED",
+                String.format("Cập nhật chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
+        return toResponse(saved);
     }
 
     public void delete(String shopId, String id) {
-        Branch branch = branchRepository.findById(id)
+        Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
-        branchRepository.delete(branch);
+        branch.setDeleted(true);
+        branchRepository.save(branch);
+        auditLogService.log(null, shopId, branch.getId(), "BRANCH", "DELETED",
+                String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
+
     }
 
     private BranchResponse toResponse(Branch branch) {

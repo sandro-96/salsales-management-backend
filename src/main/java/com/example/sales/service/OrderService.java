@@ -27,7 +27,7 @@ public class OrderService {
     private final AuditLogService auditLogService;
 
     public List<OrderResponse> getOrdersByUser(User user, String shopId) {
-        return orderRepository.findByShopId(shopId)
+        return orderRepository.findByShopIdAndDeletedFalse(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -148,12 +148,12 @@ public class OrderService {
     }
 
     public List<OrderResponse> getOrdersByStatus(User user, String shopId, OrderStatus status, String branchId) {
-        return orderRepository.findByShopIdAndBranchIdAndStatus(shopId, branchId, status)
+        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status)
                 .stream().map(this::toResponse).toList();
     }
 
     private Order getOrderByShop(String orderId, String shopId) {
-        return orderRepository.findById(orderId)
+        return orderRepository.findByIdAndDeletedFalse(orderId)
                 .filter(o -> o.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
     }
@@ -170,7 +170,7 @@ public class OrderService {
 
     private Promotion findApplicablePromotion(String shopId, String branchId, String productId) {
         LocalDateTime now = LocalDateTime.now();
-        return promotionRepository.findByShopId(shopId).stream()
+        return promotionRepository.findByShopIdAndDeletedFalse(shopId).stream()
                 .filter(Promotion::isActive)
                 .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
                 .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))

@@ -11,10 +11,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Document(collection = "promotions")
-@Data
 @Builder
-@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class Promotion extends BaseEntity {
 
     @Id

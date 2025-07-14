@@ -2,16 +2,19 @@
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document("products")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
 public class Product extends BaseEntity {
 
     @Id

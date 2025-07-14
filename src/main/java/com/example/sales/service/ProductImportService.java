@@ -8,15 +8,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class ProductImportService {
 
     private final ProductService productService;
+    private final AuditLogService auditLogService;
 
     public Map<String, Object> importExcel(String shopId, String branchId, MultipartFile file) {
         int successCount = 0;
@@ -34,7 +33,9 @@ public class ProductImportService {
                 try {
                     ProductRequest req = parseRow(row);
                     req.setBranchId(branchId);
-                    productService.createProduct(shopId, req);
+                    var product = productService.createProduct(shopId, req);
+                    auditLogService.log(null, shopId, product.getId(), "PRODUCT", "IMPORTED",
+                            String.format("Nhập sản phẩm từ Excel: %s (Mã: %s)", product.getName(), product.getProductCode()));
                     successCount++;
                 } catch (Exception ex) {
                     failCount++;
