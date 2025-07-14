@@ -3,7 +3,7 @@
 
 package com.example.sales.config;
 
-import com.example.sales.model.User;
+import com.example.sales.security.CustomUserDetails;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,16 +17,16 @@ public class AuditorAwareImpl implements AuditorAware<String> {
     @Override
     public Optional<String> getCurrentAuditor() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) return Optional.empty();
 
-        Object principal = auth.getPrincipal();
-        if (principal instanceof User user) {
+        if (auth != null && auth.isAuthenticated()
+                && auth.getPrincipal() instanceof CustomUserDetails user) {
             return Optional.of(user.getId());
         }
 
         return Optional.empty();
     }
 }
+
 // File: SecurityConfig.java
 
 package com.example.sales.config;
@@ -248,15 +248,25 @@ public enum ShopRole {
 
 package com.example.sales.constant;
 
+import lombok.Getter;
+
+@Getter
 public enum ShopType {
-    RESTAURANT,     // Nhà hàng ăn uống
-    CAFE,           // Quán cà phê
-    BAR,            // Quán nhậu / bar
-    GROCERY,        // Tạp hóa
-    CONVENIENCE,    // Cửa hàng tiện lợi
-    PHARMACY,       // Nhà thuốc
-    RETAIL,         // Cửa hàng bán lẻ (quần áo, điện máy...)
-    OTHER           // Khác
+    RESTAURANT(false),
+    CAFE(false),
+    BAR(false),
+    GROCERY(true),
+    CONVENIENCE(true),
+    PHARMACY(true),
+    RETAIL(true),
+    OTHER(false);
+
+    private final boolean trackInventory;
+
+    ShopType(boolean trackInventory) {
+        this.trackInventory = trackInventory;
+    }
+
 }
 
 // File: TableStatus.java
@@ -3292,6 +3302,8 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
+    private final ShopRepository shopRepository;
+    private final InventoryTransactionRepository inventoryTransactionRepository;
 
     public List<OrderResponse> getOrdersByUser(User user, String shopId) {
         return orderRepository.findByShopIdAndDeletedFalse(shopId)
@@ -3353,6 +3365,18 @@ public class OrderService {
         order.setTotalPrice(totals[1]);
 
         Order created = orderRepository.save(order);
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        if (shop.getType().isTrackInventory()) {
+            for (OrderItem item : created.getItems()) {
+                Product product = productRepository.findByIdAndDeletedFalse(item.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                adjustInventory(product, shopId, created.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
+                        "Xuất kho theo đơn hàng " + created.getId(), created.getId());
+            }
+        }
         releaseTable(created);
         return toResponse(created);
     }
@@ -3446,6 +3470,35 @@ public class OrderService {
                         || p.getApplicableProductIds().contains(productId))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void adjustInventory(Product product, String shopId, String branchId, InventoryType type, int qty,
+                                 String note, String referenceId) {
+
+        int change = switch (type) {
+            case EXPORT -> -qty;
+            case IMPORT, ADJUSTMENT -> qty;
+        };
+
+        int newQty = product.getQuantity() + change;
+        if (newQty < 0) {
+            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
+        }
+
+        product.setQuantity(newQty);
+        productRepository.save(product);
+
+        InventoryTransaction tx = InventoryTransaction.builder()
+                .shopId(shopId)
+                .branchId(branchId)
+                .productId(product.getId())
+                .type(type)
+                .quantity(change)
+                .note(note)
+                .referenceId(referenceId)
+                .build();
+
+        inventoryTransactionRepository.save(tx);
     }
 
     private OrderResponse toResponse(Order order) {
@@ -4404,6 +4457,7 @@ public class CustomUserDetails implements UserDetails {
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
     @Override public boolean isEnabled() { return true; }
+
 }
 
 // File: src/main/java/com/example/sales/validation/DateRangeValidator.java
@@ -4770,6 +4824,182 @@ public class RequireRoleAspect {
                     user.getId(), shopId, Arrays.toString(roles));
             throw new BusinessException(ApiCode.ACCESS_DENIED);
         }
+    }
+}
+
+// File: src/main/java/com/example/sales/dto/inventory/InventoryRequest.java
+
+package com.example.sales.dto.inventory;
+
+import com.example.sales.constant.InventoryType;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class InventoryRequest {
+
+    @NotBlank
+    private String productId;
+
+    private String branchId; // optional
+
+    @NotNull
+    private InventoryType type;
+
+    @Min(1)
+    private int quantity;
+
+    private String note;
+}
+
+// File: src/main/java/com/example/sales/model/InventoryTransaction.java
+
+package com.example.sales.model;
+
+import com.example.sales.constant.InventoryType;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("inventory_transactions")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+public class InventoryTransaction extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+    private String branchId;      // Có thể null nếu không phân biệt chi nhánh
+    private String productId;
+
+    private InventoryType type;   // IMPORT, EXPORT, ADJUSTMENT
+
+    private int quantity;         // Dương nếu nhập, âm nếu xuất
+
+    private String note;          // Ghi chú lý do nhập, xuất, điều chỉnh
+
+    private String referenceId;   // ID liên quan (vd: orderId nếu export theo đơn)
+}
+
+// File: src/main/java/com/example/sales/repository/InventoryTransactionRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.InventoryTransaction;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+
+public interface InventoryTransactionRepository extends MongoRepository<InventoryTransaction, String> {
+    List<InventoryTransaction> findByProductIdOrderByCreatedAtDesc(String productId);
+}
+
+// File: src/main/java/com/example/sales/constant/InventoryType.java
+
+package com.example.sales.constant;
+
+public enum InventoryType {
+    IMPORT,
+    EXPORT,
+    ADJUSTMENT
+}
+
+// File: com/example/sales/controller/InventoryController.java
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.inventory.InventoryRequest;
+import com.example.sales.model.InventoryTransaction;
+import com.example.sales.security.RequireRole;
+import com.example.sales.service.InventoryService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/inventory")
+@RequiredArgsConstructor
+public class InventoryController {
+
+    private final InventoryService inventoryService;
+
+    @PostMapping
+    @RequireRole(ShopRole.OWNER)
+    public ApiResponse<InventoryTransaction> create(@RequestParam String shopId,
+                                                    @RequestBody @Valid InventoryRequest request) {
+        return ApiResponse.success(ApiCode.SUCCESS, inventoryService.createTransaction(shopId, request));
+    }
+
+    @GetMapping("/history")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ApiResponse<List<InventoryTransaction>> getHistory(@RequestParam String productId) {
+        return ApiResponse.success(ApiCode.SUCCESS, inventoryService.getHistory(productId));
+    }
+}
+
+// File: com/example/sales/service/InventoryService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.inventory.InventoryRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.InventoryTransaction;
+import com.example.sales.model.Product;
+import com.example.sales.repository.InventoryTransactionRepository;
+import com.example.sales.repository.ProductRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class InventoryService {
+
+    private final ProductRepository productRepository;
+    private final InventoryTransactionRepository inventoryTransactionRepository;
+
+    public InventoryTransaction createTransaction(String shopId, InventoryRequest request) {
+        Product product = productRepository.findByIdAndDeletedFalse(request.getProductId())
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        int change = switch (request.getType()) {
+            case IMPORT, ADJUSTMENT -> request.getQuantity();
+            case EXPORT -> -request.getQuantity();
+        };
+
+        int newQty = product.getQuantity() + change;
+        if (newQty < 0) {
+            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
+        }
+
+        product.setQuantity(newQty);
+        productRepository.save(product);
+
+        InventoryTransaction tx = InventoryTransaction.builder()
+                .shopId(shopId)
+                .branchId(request.getBranchId())
+                .productId(product.getId())
+                .type(request.getType())
+                .quantity(change)
+                .note(request.getNote())
+                .build();
+
+        return inventoryTransactionRepository.save(tx);
+    }
+
+    public List<InventoryTransaction> getHistory(String productId) {
+        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId);
     }
 }
 

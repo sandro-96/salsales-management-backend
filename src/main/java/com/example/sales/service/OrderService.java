@@ -25,6 +25,8 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
+    private final ShopRepository shopRepository;
+    private final InventoryTransactionRepository inventoryTransactionRepository;
 
     public List<OrderResponse> getOrdersByUser(User user, String shopId) {
         return orderRepository.findByShopIdAndDeletedFalse(shopId)
@@ -86,6 +88,18 @@ public class OrderService {
         order.setTotalPrice(totals[1]);
 
         Order created = orderRepository.save(order);
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        if (shop.getType().isTrackInventory()) {
+            for (OrderItem item : created.getItems()) {
+                Product product = productRepository.findByIdAndDeletedFalse(item.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                adjustInventory(product, shopId, created.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
+                        "Xuất kho theo đơn hàng " + created.getId(), created.getId());
+            }
+        }
         releaseTable(created);
         return toResponse(created);
     }
@@ -179,6 +193,35 @@ public class OrderService {
                         || p.getApplicableProductIds().contains(productId))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void adjustInventory(Product product, String shopId, String branchId, InventoryType type, int qty,
+                                 String note, String referenceId) {
+
+        int change = switch (type) {
+            case EXPORT -> -qty;
+            case IMPORT, ADJUSTMENT -> qty;
+        };
+
+        int newQty = product.getQuantity() + change;
+        if (newQty < 0) {
+            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
+        }
+
+        product.setQuantity(newQty);
+        productRepository.save(product);
+
+        InventoryTransaction tx = InventoryTransaction.builder()
+                .shopId(shopId)
+                .branchId(branchId)
+                .productId(product.getId())
+                .type(type)
+                .quantity(change)
+                .note(note)
+                .referenceId(referenceId)
+                .build();
+
+        inventoryTransactionRepository.save(tx);
     }
 
     private OrderResponse toResponse(Order order) {
