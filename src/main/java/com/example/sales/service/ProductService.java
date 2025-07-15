@@ -166,6 +166,7 @@ public class ProductService {
                 .productCode(product.getProductCode())
                 .createdAt(product.getCreatedAt() != null ? product.getCreatedAt().toString() : null)
                 .updatedAt(product.getUpdatedAt() != null ? product.getUpdatedAt().toString() : null)
+                .shopId(product.getShopId())
                 .build();
     }
 

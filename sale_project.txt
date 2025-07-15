@@ -1313,9 +1313,11 @@ public class ProductResponse {
     private String description;
     private boolean active;
     private String productCode;
+    private String shopId;
     private String createdAt;
     private String updatedAt;
 }
+
 // File: src/main/java/com/example/sales/dto/product/ProductSearchRequest.java
 package com.example.sales.dto.product;
 
@@ -3806,6 +3808,7 @@ public class ProductService {
                 .productCode(product.getProductCode())
                 .createdAt(product.getCreatedAt() != null ? product.getCreatedAt().toString() : null)
                 .updatedAt(product.getUpdatedAt() != null ? product.getUpdatedAt().toString() : null)
+                .shopId(product.getShopId())
                 .build();
     }
 
@@ -4994,13 +4997,9 @@ public class SwaggerConfig {
 // File: test/java/com/example/sales/SalesManagementBackendApplicationTests.java
 package com.example.sales;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-@Disabled
-class SalesManagementBackendApplicationTests {
+class SalesManagementBackendApplicationTests extends BaseSpringTest {
 
 	@Test
 	void contextLoads() {
@@ -5008,4 +5007,333 @@ class SalesManagementBackendApplicationTests {
 
 }
 
+// File: src/test/java/com/example/sales/BaseSpringTest.java
+package com.example.sales;
+
+import com.example.sales.config.TestMailConfig;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.context.annotation.Import;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Import(TestMailConfig.class)
+public abstract class BaseSpringTest {
+}
+
+// File: test/java/com/example/sales/service/UserServiceTest.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @InjectMocks
+    private UserService userService;
+
+    @Mock private UserRepository userRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+
+    @Test
+    void testGetCurrentUser_shouldReturnSameUser() {
+        User mockUser = new User();
+        mockUser.setId("user1");
+
+        User result = userService.getCurrentUser(mockUser);
+
+        assertEquals("user1", result.getId());
+    }
+
+    @Test
+    void testUpdateProfile_shouldUpdateAndSave() {
+        User user = new User();
+        user.setId("u1");
+
+        when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User updated = userService.updateProfile(user, "Nguyễn Văn A", "0123456789", "Cửa hàng tiện lợi");
+
+        assertEquals("Nguyễn Văn A", updated.getFullName());
+        assertEquals("0123456789", updated.getPhone());
+        assertEquals("Cửa hàng tiện lợi", updated.getBusinessType());
+
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void testChangePassword_shouldThrowExceptionIfCurrentPasswordWrong() {
+        User user = new User();
+        user.setPassword("encoded-old");
+
+        when(passwordEncoder.matches("wrong-pass", "encoded-old")).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                userService.changePassword(user, "wrong-pass", "new-pass")
+        );
+
+        assertEquals(ApiCode.INCORRECT_PASSWORD, ex.getError());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testChangePassword_shouldEncodeAndSaveNewPassword() {
+        User user = new User();
+        user.setPassword("encoded-old");
+
+        when(passwordEncoder.matches("old-pass", "encoded-old")).thenReturn(true);
+        when(passwordEncoder.encode("new-pass")).thenReturn("encoded-new");
+        when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        userService.changePassword(user, "old-pass", "new-pass");
+
+        assertEquals("encoded-new", user.getPassword());
+        verify(userRepository).save(user);
+    }
+}
+
+// File: test/java/com/example/sales/service/ShopServiceTest.java
+package com.example.sales.service;
+
+import com.example.sales.dto.ShopRequest;
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.repository.ShopRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class ShopServiceTest {
+
+    @InjectMocks
+    private ShopService shopService;
+
+    @Mock
+    private ShopRepository shopRepository;
+
+    @Mock
+    private AuditLogService auditLogService; // ✅ Thêm dòng này
+
+    @Test
+    void testCreateShop() {
+        ShopRequest request = new ShopRequest();
+        request.setName("Shop ABC");
+
+        User owner = new User();
+        owner.setId("u1");
+
+        when(shopRepository.save(any())).thenAnswer(invocation -> {
+            Shop shop = invocation.getArgument(0);
+            shop.setId("s1");
+            return shop;
+        });
+
+        Shop result = shopService.createShop(owner, request);
+
+        assertEquals("Shop ABC", result.getName());
+        verify(shopRepository).save(any(Shop.class));
+
+        // ✅ Optional: kiểm tra ghi log
+        verify(auditLogService).log(eq(owner), eq("s1"), any(), eq("SHOP"), eq("CREATED"), contains("Shop ABC"));
+    }
+}
+
+
+// File: test/java/com/example/sales/service/ProductServiceTest.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ShopType;
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.model.Product;
+import com.example.sales.model.Shop;
+import com.example.sales.repository.ProductRepository;
+import com.example.sales.repository.ShopRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class ProductServiceTest {
+
+    @InjectMocks
+    private ProductService productService;
+
+    @Mock private ProductRepository productRepository;
+    @Mock private ShopRepository shopRepository;
+    @Mock private AuditLogService auditLogService;
+    @Mock private FileUploadService fileUploadService;
+
+    @Test
+    void testCreateProduct() {
+        // Arrange
+        ProductRequest req = new ProductRequest();
+        req.setName("Cà phê");
+        req.setPrice(25000);
+        req.setQuantity(10);
+        req.setCategory("Đồ uống");
+        req.setUnit("Cốc");
+        req.setImageUrl("http://example.com/image.jpg");
+
+        Shop mockShop = Shop.builder()
+                .id("shop1")
+                .name("Quán A")
+                .type(ShopType.CAFE)
+                .build();
+
+        when(shopRepository.findByIdAndDeletedFalse("shop1"))
+                .thenReturn(Optional.of(mockShop));
+
+        when(productRepository.save(any(Product.class)))
+                .thenAnswer(invocation -> {
+                    Product product = invocation.getArgument(0);
+                    product.setId("p1");
+                    return product;
+                });
+
+        // Act
+        ProductResponse response = productService.createProduct("shop1", req);
+
+        // Assert
+        assertEquals("Cà phê", response.getName());
+        assertEquals("shop1", response.getShopId());
+
+        verify(productRepository).save(any(Product.class));
+        verify(fileUploadService).moveToProduct(eq("http://example.com/image.jpg"));
+        verify(auditLogService).log(
+                eq(null),
+                eq("shop1"),
+                eq("p1"),
+                eq("PRODUCT"),
+                eq("CREATED"),
+                contains("Cà phê")
+        );
+    }
+}
+
+// File: test/java/com/example/sales/service/OrderServiceTest.java
+package com.example.sales.service;
+
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.model.Order;
+import com.example.sales.model.User;
+import com.example.sales.repository.OrderRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    @InjectMocks
+    private OrderService orderService;
+
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private AuditLogService auditLogService; // 🟢 THÊM MOCK NÀY
+
+    @Test
+    void testCancelOrder() {
+        Order mockOrder = Order.builder()
+                .id("ord1")
+                .shopId("shop1")
+                .userId("user1")
+                .status(OrderStatus.PENDING)
+                .build();
+
+        when(orderRepository.findByIdAndDeletedFalse("ord1"))
+                .thenReturn(Optional.of(mockOrder));
+
+        User user = new User();
+        user.setId("user1");
+
+        orderService.cancelOrder(user, "shop1", "ord1");
+
+        assertEquals(OrderStatus.CANCELLED, mockOrder.getStatus());
+        verify(orderRepository).save(mockOrder);
+
+        // 🟢 Optional: kiểm tra audit log được gọi
+        verify(auditLogService).log(eq(user), eq("shop1"), eq("ord1"), eq("ORDER"), eq("CANCELLED"), anyString());
+    }
+}
+
+// File: test/java/com/example/sales/service/CustomerServiceTest.java
+package com.example.sales.service;
+
+import com.example.sales.dto.customer.CustomerRequest;
+import com.example.sales.dto.customer.CustomerResponse;
+import com.example.sales.model.Customer;
+import com.example.sales.model.User;
+import com.example.sales.repository.CustomerRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class CustomerServiceTest {
+
+    @InjectMocks
+    private CustomerService customerService;
+
+    @Mock
+    private CustomerRepository customerRepository;
+
+    @Mock
+    private AuditLogService auditLogService;
+
+    @Test
+    void testCreateCustomer() {
+        CustomerRequest request = new CustomerRequest();
+        request.setName("Nguyễn Văn A");
+
+        User user = new User();
+        user.setId("user1");
+
+        when(customerRepository.save(any())).thenAnswer(invocation -> {
+            Customer customer = invocation.getArgument(0);
+            customer.setId("c1");
+            return customer;
+        });
+
+        CustomerResponse response = customerService.createCustomer("shop1", user, request);
+
+        assertEquals("Nguyễn Văn A", response.getName());
+        verify(customerRepository).save(any(Customer.class));
+        verify(auditLogService).log(any(), any(), any(), any(), any(), any());
+    }
+}
 [END]

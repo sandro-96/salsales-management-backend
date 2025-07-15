@@ -17,6 +17,7 @@ public class ProductResponse {
     private String description;
     private boolean active;
     private String productCode;
+    private String shopId;
     private String createdAt;
     private String updatedAt;
 }
