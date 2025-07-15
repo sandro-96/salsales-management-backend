@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Nhắc nhở gói sắp hết hạn</title>
+</head>
+<body style="font-family: Arial, sans-serif;">
+<div style="max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px;">
+    <h2 style="color: #f0ad4e;">⏰ Gói dịch vụ sắp hết hạn</h2>
+    <p>Chào <strong th:text="${fullName}">Tên người dùng</strong>,</p>
+    <p>Gói <strong th:text="${currentPlan}">PRO</strong> của cửa hàng <strong th:text="${shopName}">Tên cửa hàng</strong> sẽ hết hạn vào ngày <strong th:text="${expiryDate}">15/07/2025</strong>.</p>
+    <p>Hãy <a href="https://your-domain.com/pricing">nâng cấp lại gói</a> để không bị gián đoạn sử dụng tính năng nâng cao.</p>
+    <hr>
+    <p style="font-size: 12px; color: #999;">Đây là email tự động từ SalesApp.</p>
+</div>
+</body>
+</html>

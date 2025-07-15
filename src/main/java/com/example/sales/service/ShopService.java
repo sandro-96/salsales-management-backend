@@ -70,4 +70,12 @@ public class ShopService {
                 String.format("Xoá mềm cửa hàng: %s", shop.getName()));
     }
 
+    public Shop getShopById(String shopId) {
+        return shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
+
+    public Shop save(Shop shop) {
+        return shopRepository.save(shop);
+    }
 }

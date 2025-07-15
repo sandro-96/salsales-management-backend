@@ -29,11 +29,12 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/v3/api-docs/**",    // ✅ Cho phép swagger
+                                "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/webhook/**").permitAll() // 👈 THÊM DÒNG NÀY
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

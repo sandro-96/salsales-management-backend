@@ -2,10 +2,13 @@
 package com.example.sales.model;
 
 import com.example.sales.constant.ShopType;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.model.base.BaseEntity;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
 
 @Document(collection = "shops")
 @Builder
@@ -36,5 +39,7 @@ public class Shop extends BaseEntity {
     private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
     @Builder.Default
     private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
-
+    @Builder.Default
+    private SubscriptionPlan plan = SubscriptionPlan.FREE;
+    private LocalDateTime planExpiry; // optional nếu bạn muốn gói hết hạn
 }

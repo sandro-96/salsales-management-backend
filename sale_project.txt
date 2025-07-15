@@ -58,11 +58,12 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/v3/api-docs/**",    // ✅ Cho phép swagger
+                                "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/webhook/**").permitAll() // 👈 THÊM DÒNG NÀY
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
@@ -82,20 +83,26 @@ public class SecurityConfig {
     }
 }
 
-// File: WebConfig.java
-
+// File: com/example/sales/config/WebConfig.java
 package com.example.sales.config;
 
+import com.example.sales.security.PlanInterceptor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.ReloadableResourceBundleMessageSource;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
 
 import java.util.Locale;
 
 @Configuration
-public class WebConfig {
+public class WebConfig implements WebMvcConfigurer {
+
+    @Autowired
+    private PlanInterceptor planInterceptor;
 
     @Bean
     public AcceptHeaderLocaleResolver localeResolver() {
@@ -111,7 +118,14 @@ public class WebConfig {
         ms.setDefaultEncoding("UTF-8");
         return ms;
     }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(planInterceptor)
+                .addPathPatterns("/api/**"); // áp dụng cho mọi API
+    }
 }
+
 // File: ApiErrorCode.java
 
 package com.example.sales.constant;
@@ -351,9 +365,11 @@ public class AdminUserController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.model.AuditLog;
 import com.example.sales.repository.AuditLogRepository;
+import com.example.sales.security.RequirePlan;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -368,6 +384,7 @@ public class AuditLogController {
 
     private final AuditLogRepository auditLogRepository;
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/{targetId}")
     public ApiResponse<List<AuditLog>> getLogs(@PathVariable String targetId) {
         List<AuditLog> logs = auditLogRepository.findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(targetId);
@@ -447,9 +464,11 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
+import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.BranchService;
 import jakarta.validation.Valid;
@@ -473,6 +492,7 @@ public class BranchController {
         return ApiResponse.success(ApiCode.SUCCESS, branchService.getAll(shopId));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<BranchResponse> create(@RequestParam String shopId,
@@ -480,6 +500,7 @@ public class BranchController {
         return ApiResponse.success(ApiCode.SUCCESS, branchService.create(shopId, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<BranchResponse> update(@RequestParam String shopId,
@@ -488,6 +509,7 @@ public class BranchController {
         return ApiResponse.success(ApiCode.SUCCESS, branchService.update(shopId, id, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<?> delete(@RequestParam String shopId,
@@ -654,12 +676,14 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.ShopType;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.model.Product;
 import com.example.sales.model.User;
+import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.FileUploadService;
@@ -760,6 +784,7 @@ public class ProductController {
         return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.toggleActive(shopId, id));
     }
 
+    @RequirePlan({SubscriptionPlan.ENTERPRISE})
     @GetMapping("/low-stock")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<List<ProductResponse>> getLowStock(@RequestParam String shopId,
@@ -786,16 +811,17 @@ public class ProductController {
     }
 }
 
-
 // File: src/main/java/com/example/sales/controller/PromotionController.java
 
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
+import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.PromotionService;
 import jakarta.validation.Valid;
@@ -813,6 +839,7 @@ public class PromotionController {
 
     private final PromotionService promotionService;
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<List<PromotionResponse>> getAll(@RequestParam String shopId,
@@ -820,6 +847,7 @@ public class PromotionController {
         return ApiResponse.success(ApiCode.SUCCESS, promotionService.getAll(shopId, branchId));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<PromotionResponse> create(@RequestParam String shopId,
@@ -827,6 +855,7 @@ public class PromotionController {
         return ApiResponse.success(ApiCode.SUCCESS, promotionService.create(shopId, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<PromotionResponse> update(@RequestParam String shopId,
@@ -835,6 +864,7 @@ public class PromotionController {
         return ApiResponse.success(ApiCode.SUCCESS, promotionService.update(shopId, id, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<?> delete(@RequestParam String shopId,
@@ -844,17 +874,18 @@ public class PromotionController {
     }
 }
 
-
 // File: src/main/java/com/example/sales/controller/ReportController.java
 
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
+import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ReportService;
 import lombok.RequiredArgsConstructor;
@@ -874,6 +905,7 @@ public class ReportController {
 
     private final ReportService reportService;
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/summary")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<ReportResponse> getReport(@RequestParam String shopId,
@@ -881,6 +913,7 @@ public class ReportController {
         return ApiResponse.success(ApiCode.SUCCESS, reportService.getReport(shopId, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/daily")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<List<DailyReportResponse>> getDaily(@RequestParam String shopId,
@@ -888,6 +921,7 @@ public class ReportController {
         return ApiResponse.success(ApiCode.SUCCESS, reportService.getDailyReport(shopId, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/daily/export")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<byte[]> exportDaily(@RequestParam String shopId,
@@ -2262,10 +2296,13 @@ public class RefreshToken {
 package com.example.sales.model;
 
 import com.example.sales.constant.ShopType;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.model.base.BaseEntity;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
 
 @Document(collection = "shops")
 @Builder
@@ -2296,7 +2333,9 @@ public class Shop extends BaseEntity {
     private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
     @Builder.Default
     private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
-
+    @Builder.Default
+    private SubscriptionPlan plan = SubscriptionPlan.FREE;
+    private LocalDateTime planExpiry; // optional nếu bạn muốn gói hết hạn
 }
 
 // File: src/main/java/com/example/sales/model/ShopUser.java
@@ -2516,14 +2555,19 @@ public interface RefreshTokenRepository extends MongoRepository<RefreshToken, St
 // File: src/main/java/com/example/sales/repository/ShopRepository.java
 package com.example.sales.repository;
 
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.model.Shop;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface ShopRepository extends MongoRepository<Shop, String> {
     Optional<Shop> findByOwnerIdAndDeletedFalse(String ownerId);
     Optional<Shop> findByIdAndDeletedFalse(String id);
+    List<Shop> findByPlanExpiryBeforeAndPlanNot(LocalDateTime date, SubscriptionPlan plan);
+    List<Shop> findByPlanExpiryBetween(LocalDateTime start, LocalDateTime end);
 }
 
 // File: src/main/java/com/example/sales/repository/ShopUserRepository.java
@@ -3264,12 +3308,17 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class MailService {
 
     private final JavaMailSender mailSender;
+    private final TemplateEngine templateEngine;
 
     @Value("${spring.mail.username}")
     private String from;
@@ -3283,6 +3332,27 @@ public class MailService {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setFrom(from);
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("Không gửi được email", e);
+        }
+    }
+
+    public void sendHtmlTemplate(String to, String subject, String templateName, Map<String, Object> model) {
+        try {
+            Context context = new Context();
+            context.setVariables(model);
+
+            String htmlContent = templateEngine.process(templateName, context);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, "utf-8");
+
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setFrom(from);
+            helper.setText(htmlContent, true);
 
             mailSender.send(message);
         } catch (MessagingException e) {
@@ -4123,6 +4193,14 @@ public class ShopService {
                 String.format("Xoá mềm cửa hàng: %s", shop.getName()));
     }
 
+    public Shop getShopById(String shopId) {
+        return shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
+
+    public Shop save(Shop shop) {
+        return shopRepository.save(shop);
+    }
 }
 
 // File: src/main/java/com/example/sales/service/ShopUserService.java
@@ -4559,7 +4637,8 @@ public enum ApiCode {
     CUSTOMER_CREATED,
     CUSTOMER_UPDATED,
     CUSTOMER_DELETED,
-    CUSTOMER_LIST
+    CUSTOMER_LIST,
+    PLAN_UPGRADE_REQUIRED
 }
 
 // File: src/main/java/com/example/sales/security/PermissionChecker.java
@@ -5336,4 +5415,492 @@ class CustomerServiceTest {
         verify(auditLogService).log(any(), any(), any(), any(), any(), any());
     }
 }
+
+// File: com/example/sales/service/PaymentService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.SubscriptionActionType;
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.Shop;
+import com.example.sales.model.SubscriptionHistory;
+import com.example.sales.model.User;
+import com.example.sales.repository.SubscriptionHistoryRepository;
+import com.example.sales.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+public class PaymentService {
+
+    private final SubscriptionHistoryRepository historyRepository;
+    private final UserRepository userRepository; // Giả sử bạn có repository để lấy thông tin người dùng
+    private final MailService mailService; // Giả sử bạn có service gửi email
+
+    public void upgradeShopPlan(Shop shop, SubscriptionPlan newPlan, int months) {
+        SubscriptionPlan oldPlan = shop.getPlan();
+
+        shop.setPlan(newPlan);
+        shop.setPlanExpiry(LocalDateTime.now().plusMonths(months));
+
+        // Lưu lịch sử nâng cấp
+        SubscriptionHistory history = SubscriptionHistory.builder()
+                .shopId(shop.getId())
+                .userId(shop.getOwnerId())
+                .oldPlan(oldPlan)
+                .newPlan(newPlan)
+                .durationMonths(months)
+                .paymentMethod("MANUAL") // hoặc "WEBHOOK", "STRIPE", "VNPAY", ...
+                .transactionId(null) // có thể set từ webhook
+                .actionType(SubscriptionActionType.UPGRADE)
+                .build();
+
+        historyRepository.save(history);
+
+        // Gửi mail thông báo nâng cấp
+        User owner = userRepository.findById(shop.getOwnerId()).orElse(null);
+        if (owner != null && owner.getEmail() != null) {
+            Map<String, Object> model = Map.of(
+                    "fullName", owner.getFullName(),
+                    "newPlan", newPlan.name(),
+                    "shopName", shop.getName(),
+                    "duration", months + " tháng"
+            );
+
+            mailService.sendHtmlTemplate(
+                    owner.getEmail(),
+                    "🎉 Gói " + newPlan.name() + " đã được kích hoạt",
+                    "emails/plan-upgraded",
+                    model
+            );
+        }
+    }
+}
+
+// File: com/example/sales/scheduler/PlanExpiryScheduler.java
+package com.example.sales.scheduler;
+
+import com.example.sales.constant.SubscriptionActionType;
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.Shop;
+import com.example.sales.model.SubscriptionHistory;
+import com.example.sales.model.User;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.SubscriptionHistoryRepository;
+import com.example.sales.repository.UserRepository;
+import com.example.sales.service.MailService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class PlanExpiryScheduler {
+
+    private final ShopRepository shopRepository;
+    private final SubscriptionHistoryRepository historyRepository;
+    private final MailService emailService; // Giả sử bạn có một service gửi email
+    private final UserRepository userRepository; // Giả sử bạn có repository để lấy thông tin người dùng
+
+    // Chạy mỗi ngày lúc 01:00 sáng
+    @Scheduled(cron = "0 0 1 * * *")
+    public void downgradeExpiredPlans() {
+        log.info("🔄 Kiểm tra gói đã hết hạn...");
+
+        List<Shop> expiredShops = shopRepository.findByPlanExpiryBeforeAndPlanNot(LocalDateTime.now(), SubscriptionPlan.FREE);
+
+        for (Shop shop : expiredShops) {
+            SubscriptionPlan oldPlan = shop.getPlan();
+            log.info("⚠️ Shop {} đã hết hạn gói {} → hạ về FREE", shop.getId(), shop.getPlan());
+            shop.setPlan(SubscriptionPlan.FREE);
+            shop.setPlanExpiry(null); // hoặc giữ nguyên nếu muốn log
+
+            // Ghi lịch sử
+            SubscriptionHistory history = SubscriptionHistory.builder()
+                    .shopId(shop.getId())
+                    .userId(shop.getOwnerId())
+                    .oldPlan(oldPlan)
+                    .newPlan(SubscriptionPlan.FREE)
+                    .durationMonths(0)
+                    .paymentMethod("AUTO")
+                    .actionType(SubscriptionActionType.AUTO_DOWNGRADE)
+                    .build();
+
+            historyRepository.save(history);
+
+            User owner = userRepository.findById(shop.getOwnerId()).orElse(null);
+            if (owner != null && owner.getEmail() != null) {
+                Map<String, Object> model = Map.of(
+                        "fullName", owner.getFullName(),
+                        "oldPlan", oldPlan.name(),
+                        "shopName", shop.getName()
+                );
+
+                emailService.sendHtmlTemplate(
+                        owner.getEmail(),
+                        "Gói dịch vụ của bạn đã hết hạn",
+                        "emails/plan-downgraded",
+                        model
+                );
+            }
+        }
+
+        shopRepository.saveAll(expiredShops);
+    }
+}
+
+// File: com/example/sales/security/PlanInterceptor.java
+package com.example.sales.security;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
+import com.example.sales.service.ShopService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.Arrays;
+
+@Component
+@RequiredArgsConstructor
+public class PlanInterceptor implements HandlerInterceptor {
+
+    private final ShopService shopService;
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (!(handler instanceof HandlerMethod method)) return true;
+
+        RequirePlan annotation = method.getMethodAnnotation(RequirePlan.class);
+        if (annotation == null) return true;
+
+        String shopId = request.getParameter("shopId");
+        if (shopId == null || shopId.isBlank()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR); // hoặc custom lỗi
+        }
+
+        Shop shop = shopService.getShopById(shopId); // bạn cần viết hàm này
+        SubscriptionPlan currentPlan = shop.getPlan();
+
+        boolean allowed = Arrays.stream(annotation.value())
+                .anyMatch(p -> currentPlan.ordinal() >= p.ordinal());
+
+        if (!allowed) {
+            throw new BusinessException(ApiCode.PLAN_UPGRADE_REQUIRED); // hoặc tạo code riêng như `PLAN_UPGRADE_REQUIRED`
+        }
+
+        return true;
+    }
+}
+
+// File: com/example/sales/scheduler/PlanReminderScheduler.java
+package com.example.sales.scheduler;
+
+import com.example.sales.model.Shop;
+import com.example.sales.model.User;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.UserRepository;
+import com.example.sales.service.MailService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class PlanReminderScheduler {
+
+    private final ShopRepository shopRepository;
+    private final UserRepository userRepository;
+    private final MailService mailService;
+
+    // Chạy mỗi ngày lúc 7h sáng
+    @Scheduled(cron = "0 0 7 * * *")
+    public void remindExpiringPlans() {
+        LocalDateTime targetDate = LocalDateTime.now().plusDays(3).truncatedTo(ChronoUnit.DAYS);
+
+        List<Shop> shops = shopRepository.findByPlanExpiryBetween(
+                targetDate,
+                targetDate.plusDays(1)
+        );
+
+        for (Shop shop : shops) {
+            User owner = userRepository.findById(shop.getOwnerId()).orElse(null);
+            if (owner == null || owner.getEmail() == null) continue;
+
+            Map<String, Object> model = Map.of(
+                    "fullName", owner.getFullName(),
+                    "shopName", shop.getName(),
+                    "expiryDate", shop.getPlanExpiry().toLocalDate(),
+                    "currentPlan", shop.getPlan().name()
+            );
+
+            mailService.sendHtmlTemplate(
+                    owner.getEmail(),
+                    "⏳ Gói " + shop.getPlan() + " sắp hết hạn",
+                    "emails/plan-expiry-reminder",
+                    model
+            );
+
+            log.info("📧 Đã gửi email nhắc hạn cho shop {}", shop.getName());
+        }
+    }
+}
+
+// File: com/example/sales/security/RequirePlan.java
+package com.example.sales.security;
+
+import com.example.sales.constant.SubscriptionPlan;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface RequirePlan {
+    SubscriptionPlan[] value() default {};
+}
+
+// File: com/example/sales/util/SignatureUtil.java
+package com.example.sales.util;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+
+public class SignatureUtil {
+
+    public static boolean isValidHmac(String payload, String signature, String secret) {
+        try {
+            Mac sha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(), "HmacSHA256");
+            sha256.init(keySpec);
+            byte[] hash = sha256.doFinal(payload.getBytes());
+            String expected = Base64.getEncoder().encodeToString(hash);
+            return expected.equals(signature);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+}
+
+// File: com/example/sales/constant/SubscriptionActionType.java
+package com.example.sales.constant;
+
+public enum SubscriptionActionType {
+    UPGRADE,          // Người dùng nâng cấp gói
+    DOWNGRADE,        // Người dùng chủ động hạ gói
+    AUTO_DOWNGRADE,   // Hệ thống tự động hạ gói khi hết hạn
+    TRIAL_EXPIRED     // Gói thử nghiệm kết thúc
+}
+
+// File: com/example/sales/controller/SubscriptionController.java
+package com.example.sales.controller;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.subscription.UpgradePlanRequest;
+import com.example.sales.model.Shop;
+import com.example.sales.model.SubscriptionHistory;
+import com.example.sales.model.User;
+import com.example.sales.repository.SubscriptionHistoryRepository;
+import com.example.sales.service.PaymentService;
+import com.example.sales.service.ShopService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/subscription")
+@RequiredArgsConstructor
+public class SubscriptionController {
+
+    private final ShopService shopService;
+    private final PaymentService paymentService;
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+
+    @GetMapping("/me")
+    public ApiResponse<Shop> getCurrentPlan(@AuthenticationPrincipal User user) {
+        Shop shop = shopService.getShopByOwner(user.getId());
+        return ApiResponse.success(ApiCode.SUCCESS, shop);
+    }
+
+    @PostMapping("/upgrade")
+    public ApiResponse<?> upgrade(@AuthenticationPrincipal User user,
+                                  @RequestBody @Valid UpgradePlanRequest req) {
+        Shop shop = shopService.getShopByOwner(user.getId());
+
+        paymentService.upgradeShopPlan(shop, req.getTargetPlan(), req.getMonths());
+
+        shopService.save(shop); // hoặc updateShop()
+
+        return ApiResponse.success(ApiCode.SUCCESS);
+    }
+
+    @GetMapping("/history")
+    public ApiResponse<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal User user) {
+        Shop shop = shopService.getShopByOwner(user.getId());
+        List<SubscriptionHistory> history = subscriptionHistoryRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
+        return ApiResponse.success(ApiCode.SUCCESS, history);
+    }
+}
+
+
+// File: com/example/sales/model/SubscriptionHistory.java
+package com.example.sales.model;
+
+import com.example.sales.constant.SubscriptionActionType;
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document("subscription_histories")
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+public class SubscriptionHistory extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+    private String userId;
+
+    private SubscriptionPlan oldPlan;
+    private SubscriptionPlan newPlan;
+    private int durationMonths;
+
+    private String transactionId; // Mã giao dịch nếu có
+    private String paymentMethod; // "Stripe", "Momo", "Manual"
+    private SubscriptionActionType actionType;
+}
+
+// File: com/example/sales/repository/SubscriptionHistoryRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.SubscriptionHistory;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+
+public interface SubscriptionHistoryRepository extends MongoRepository<SubscriptionHistory, String> {
+    List<SubscriptionHistory> findByShopIdOrderByCreatedAtDesc(String shopId);
+}
+
+// File: com/example/sales/constant/SubscriptionPlan.java
+package com.example.sales.constant;
+
+public enum SubscriptionPlan {
+    FREE, PRO, ENTERPRISE
+}
+
+// File: com/example/sales/dto/subscription/UpgradePlanRequest.java
+package com.example.sales.dto.subscription;
+
+import com.example.sales.constant.SubscriptionPlan;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class UpgradePlanRequest {
+    @NotNull
+    private SubscriptionPlan targetPlan;
+    private int months = 1; // số tháng đăng ký (default = 1)
+}
+
+// File: com/example/sales/controller/WebhookController.java
+package com.example.sales.controller;
+
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.Shop;
+import com.example.sales.service.PaymentService;
+import com.example.sales.service.ShopService;
+import com.example.sales.util.SignatureUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/webhook")
+@RequiredArgsConstructor
+@Slf4j
+public class WebhookController {
+
+    private final ShopService shopService;
+    private final PaymentService paymentService;
+    private final ObjectMapper objectMapper;
+
+    @Value("${webhook.secret}")
+    private String webhookSecret;
+
+    @PostMapping("/payment")
+    public void handlePaymentWebhook(@RequestBody String rawBody,
+                                     @RequestHeader("X-Payment-Signature") String signature) {
+        log.info("Received payment webhook");
+
+        try {
+            // ✅ 1. Verify signature
+            if (!SignatureUtil.isValidHmac(rawBody, signature, webhookSecret)) {
+                log.warn("Invalid webhook signature");
+                return;
+            }
+
+            // ✅ 2. Parse JSON payload
+            Map<String, Object> payload = objectMapper.readValue(rawBody, Map.class);
+            String shopId = (String) payload.get("shopId");
+            String planStr = (String) payload.get("plan");
+            Integer months = (Integer) payload.get("months");
+
+            if (shopId == null || planStr == null || months == null) {
+                log.warn("Missing required fields in webhook payload");
+                return;
+            }
+
+            SubscriptionPlan targetPlan = SubscriptionPlan.valueOf(planStr);
+            Shop shop = shopService.getShopById(shopId);
+
+            // ✅ 3. Upgrade plan
+            paymentService.upgradeShopPlan(shop, targetPlan, months);
+            shopService.save(shop);
+
+            log.info("✅ Shop {} upgraded to {} for {} months", shopId, targetPlan, months);
+        } catch (Exception e) {
+            log.error("Error processing webhook", e);
+        }
+    }
+}
+
 [END]

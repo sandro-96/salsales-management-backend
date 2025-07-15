@@ -4,9 +4,11 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
+import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.PromotionService;
 import jakarta.validation.Valid;
@@ -24,6 +26,7 @@ public class PromotionController {
 
     private final PromotionService promotionService;
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<List<PromotionResponse>> getAll(@RequestParam String shopId,
@@ -31,6 +34,7 @@ public class PromotionController {
         return ApiResponse.success(ApiCode.SUCCESS, promotionService.getAll(shopId, branchId));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<PromotionResponse> create(@RequestParam String shopId,
@@ -38,6 +42,7 @@ public class PromotionController {
         return ApiResponse.success(ApiCode.SUCCESS, promotionService.create(shopId, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<PromotionResponse> update(@RequestParam String shopId,
@@ -46,6 +51,7 @@ public class PromotionController {
         return ApiResponse.success(ApiCode.SUCCESS, promotionService.update(shopId, id, request));
     }
 
+    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     public ApiResponse<?> delete(@RequestParam String shopId,

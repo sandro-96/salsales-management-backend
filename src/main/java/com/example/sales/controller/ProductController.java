@@ -5,12 +5,14 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.ShopType;
+import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.model.Product;
 import com.example.sales.model.User;
+import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.FileUploadService;
@@ -111,6 +113,7 @@ public class ProductController {
         return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.toggleActive(shopId, id));
     }
 
+    @RequirePlan({SubscriptionPlan.ENTERPRISE})
     @GetMapping("/low-stock")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ApiResponse<List<ProductResponse>> getLowStock(@RequestParam String shopId,
