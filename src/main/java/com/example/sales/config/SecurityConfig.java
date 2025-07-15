@@ -1,5 +1,4 @@
-// File: SecurityConfig.java
-
+// File: com/example/sales/config/SecurityConfig.java
 package com.example.sales.config;
 
 import com.example.sales.security.JwtAuthenticationFilter;
@@ -29,8 +28,13 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN") // hiểu là ROLE_ADMIN
+                        .requestMatchers(
+                                "/v3/api-docs/**",    // ✅ Cho phép swagger
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -40,7 +44,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // Mã hóa password khi lưu
+        return new BCryptPasswordEncoder();
     }
 
     @Bean
