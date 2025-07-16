@@ -10,31 +10,33 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Document("orders")
-@Builder
+@Getter
+@Setter
+@ToString(exclude = "items") // 👈 Quan trọng: không in danh sách item
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("orders")
 public class Order extends BaseEntity {
     @Id
     private String id;
 
-    private String shopId;             // ✔️ Ràng buộc chặt với 1 shop
-    private String branchId;            // ✔️ Ràng buộc chặt với 1 chi nhánh
-    private String tableId;            // ✔️ Gắn bàn (có thể null)
+    private String shopId;
+    private String branchId;
+    private String tableId;
+    private String userId;
 
-    private String userId;             // Ai tạo đơn
+    private List<OrderItem> items;
 
-    private List<OrderItem> items;     // Danh sách sản phẩm
     private double totalPrice;
     private double totalAmount;
+
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
-    // Thông tin thanh toán
     private String paymentId;
-    private String paymentMethod;      // Momo, VNPay, Cash
+    private String paymentMethod;
     private LocalDateTime paymentTime;
     private boolean isPaid;
 

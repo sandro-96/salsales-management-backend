@@ -11,13 +11,20 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.Date;
 
+@Getter
+@Setter
+@ToString(exclude = {
+        "password",
+        "verificationToken",
+        "resetToken"
+}) // 👈 Tránh lộ thông tin nhạy cảm & vòng lặp
 @EqualsAndHashCode(callSuper = true)
 @Builder
-@Document(collection = "users")
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "users")
 public class User extends BaseEntity {
+
     @Id
     private String id;
 
@@ -30,15 +37,20 @@ public class User extends BaseEntity {
 
     private String businessType;
     private String shopName;
-    @Builder.Default
-    private boolean verified = false; // Đã xác thực tài khoản chưa?
-    private String verificationToken;
-    private Date verificationExpiry;
-    @Builder.Default
-    private UserRole role = UserRole.ROLE_USER; // Mặc định là USER
-    private String resetToken; // Token dùng để reset password
-    private Date resetTokenExpiry; // Thời hạn token
     private String fullName;
     private String phone;
-    private String avatarUrl; // (nếu có ảnh đại diện)
+    private String avatarUrl;
+
+    @Builder.Default
+    private boolean verified = false;
+
+    private String verificationToken;
+    private Date verificationExpiry;
+
+    @Builder.Default
+    private UserRole role = UserRole.ROLE_USER;
+
+    private String resetToken;
+    private Date resetTokenExpiry;
 }
+

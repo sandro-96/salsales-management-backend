@@ -7,12 +7,14 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "shop_users")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "shop_users")
 public class ShopUser extends BaseEntity {
 
     @Id
@@ -24,3 +26,4 @@ public class ShopUser extends BaseEntity {
 
     private ShopRole role;
 }
+

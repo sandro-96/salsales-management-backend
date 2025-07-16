@@ -30,12 +30,14 @@ public class AuditorAwareImpl implements AuditorAware<String> {
 // File: com/example/sales/config/SecurityConfig.java
 package com.example.sales.config;
 
+import com.example.sales.security.CustomUserDetailsService;
 import com.example.sales.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -43,27 +45,32 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomUserDetailsService userDetailsService;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
+                .cors() // Kích hoạt CORS
+                .and()
+                .csrf(AbstractHttpConfigurer::disable) // Vô hiệu hóa CSRF
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"
                         ).permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/webhook/**").permitAll() // 👈 THÊM DÒNG NÀY
+                        .requestMatchers("/api/auth/**").permitAll() // Allow unauthenticated access
+                        .requestMatchers("/api/webhook/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
@@ -72,14 +79,35 @@ public class SecurityConfig {
         return http.build();
     }
 
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+
+        AuthenticationManagerBuilder builder = http.getSharedObject(AuthenticationManagerBuilder.class);
+        builder.authenticationProvider(provider);
+
+        return builder.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("http://localhost:5173")); // FE origin
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true); // nếu gửi cookie / auth
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
 
@@ -1477,10 +1505,10 @@ package com.example.sales.dto;
 
 import com.example.sales.constant.ApiCode;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Data
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApiResponse<T> {
@@ -1561,7 +1589,6 @@ public class RefreshTokenRequest {
 package com.example.sales.dto;
 
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -1572,10 +1599,8 @@ public class RegisterRequest {
 
     @Size(min = 6, message = "Mật khẩu phải từ 6 ký tự")
     private String password;
-
-    @NotBlank
-    private String businessType;
 }
+
 // File: src/main/java/com/example/sales/dto/SalesReportDto.java
 package com.example.sales.dto;
 
@@ -2007,11 +2032,15 @@ public class ImageCleanupJob {
 }
 
 // File: src/main/java/com/example/sales/model/base/BaseEntity.java
+
 package com.example.sales.model.base;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -2020,9 +2049,12 @@ import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
-@AllArgsConstructor
+@Getter
+@Setter
+@ToString(exclude = {"createdBy", "updatedBy"}) // 👈 Tránh vòng lặp khi log
+@EqualsAndHashCode
 @NoArgsConstructor
-@Data
+@AllArgsConstructor
 public abstract class BaseEntity {
 
     @CreatedDate
@@ -2051,12 +2083,14 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("audit_logs")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("audit_logs")
 public class AuditLog extends BaseEntity {
 
     @Id
@@ -2068,23 +2102,32 @@ public class AuditLog extends BaseEntity {
     private String targetId;     // ID của Order hoặc Product
     private String targetType;   // "ORDER", "PRODUCT"
 
-    private String action;       // Hành động: PRICE_CHANGED, STATUS_UPDATED...
-    private String description;  // Mô tả cụ thể
+    private String action;       // PRICE_CHANGED, STATUS_UPDATED, etc.
+    private String description;
 }
 
-@Document("branches")
-@Builder
+// File: src/main/java/com/example/sales/model/Branch.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("branches")
 public class Branch extends BaseEntity {
 
     @Id
     private String id;
 
     private String shopId;
-
     private String name;
     private String address;
     private String phone;
@@ -2092,6 +2135,7 @@ public class Branch extends BaseEntity {
     @Builder.Default
     private boolean active = true;
 }
+
 
 // File: src/main/java/com/example/sales/model/Customer.java
 package com.example.sales.model;
@@ -2101,25 +2145,27 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
-@Document("customers")
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("customers")
 public class Customer extends BaseEntity {
+
     @Id
     private String id;
 
-    private String userId; // Chủ sở hữu
+    private String userId;     // Chủ sở hữu
     private String name;
     private String phone;
     private String email;
     private String address;
     private String note;
     private String shopId;
-    private String branchId; // Có thể null nếu không phân biệt chi nhánh
-
+    private String branchId;   // Có thể null nếu không phân biệt chi nhánh
 }
 
 // File: src/main/java/com/example/sales/model/Order.java
@@ -2134,31 +2180,33 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Document("orders")
-@Builder
+@Getter
+@Setter
+@ToString(exclude = "items") // 👈 Quan trọng: không in danh sách item
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("orders")
 public class Order extends BaseEntity {
     @Id
     private String id;
 
-    private String shopId;             // ✔️ Ràng buộc chặt với 1 shop
-    private String branchId;            // ✔️ Ràng buộc chặt với 1 chi nhánh
-    private String tableId;            // ✔️ Gắn bàn (có thể null)
+    private String shopId;
+    private String branchId;
+    private String tableId;
+    private String userId;
 
-    private String userId;             // Ai tạo đơn
+    private List<OrderItem> items;
 
-    private List<OrderItem> items;     // Danh sách sản phẩm
     private double totalPrice;
     private double totalAmount;
+
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
 
-    // Thông tin thanh toán
     private String paymentId;
-    private String paymentMethod;      // Momo, VNPay, Cash
+    private String paymentMethod;
     private LocalDateTime paymentTime;
     private boolean isPaid;
 
@@ -2168,16 +2216,26 @@ public class Order extends BaseEntity {
 // File: src/main/java/com/example/sales/model/OrderItem.java
 package com.example.sales.model;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
-@Data
+@Getter
+@Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class OrderItem {
     private String productId;
     private String productName;
     private int quantity;
     private double price;
-    private double priceAfterDiscount; // giá sau khi đã áp dụng khuyến mãi
-    private String appliedPromotionId; // id khuyến mãi được áp dụng (nếu có)
+    private double priceAfterDiscount;
+    private String appliedPromotionId;
 }
 
 // File: src/main/java/com/example/sales/model/Product.java
@@ -2191,14 +2249,15 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("products")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("products")
 public class Product extends BaseEntity {
-
     @Id
     private String id;
 
@@ -2214,20 +2273,18 @@ public class Product extends BaseEntity {
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
     private double price;
 
-    private String unit; // ví dụ: "kg", "cái", "hộp" (tuỳ loại cửa hàng)
-
+    private String unit;
     private String imageUrl;
-
     private String description;
 
     private String shopId;
     private String branchId;
 
     @Builder.Default
-    private boolean active = true; // Có đang bán hay tạm ngưng
-    private String productCode; // mã sản phẩm duy nhất
-}
+    private boolean active = true;
 
+    private String productCode;
+}
 
 // File: src/main/java/com/example/sales/model/Promotion.java
 package com.example.sales.model;
@@ -2241,27 +2298,29 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Document(collection = "promotions")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "promotions")
 public class Promotion extends BaseEntity {
 
     @Id
     private String id;
 
     private String shopId;
-    private String branchId; // có thể null nếu áp dụng toàn bộ chi nhánh
+    private String branchId;
 
     private String name;
 
-    private DiscountType discountType; // PERCENT or AMOUNT
+    private DiscountType discountType; // PERCENT, AMOUNT
 
     private double discountValue;
 
-    private List<String> applicableProductIds; // nếu null hoặc empty: áp dụng toàn bộ
+    private List<String> applicableProductIds;
 
     private LocalDateTime startDate;
     private LocalDateTime endDate;
@@ -2272,18 +2331,22 @@ public class Promotion extends BaseEntity {
 // File: src/main/java/com/example/sales/model/RefreshToken.java
 package com.example.sales.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.Date;
 
-@Data
-@Document(collection = "refresh_tokens")
-@AllArgsConstructor
+@Getter
+@Setter
+@ToString(exclude = "token") // ❗ tránh log token
 @NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "refresh_tokens")
 public class RefreshToken {
     @Id
     private String id;
@@ -2304,38 +2367,46 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-@Document(collection = "shops")
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Document(collection = "shops")
 public class Shop extends BaseEntity {
 
     @Id
     private String id;
 
     private String name;
-    private String ownerId; // user.id
-    private ShopType type; // RESTAURANT, GROCERY, CONVENIENCE, ...
+    private String ownerId;
+    private ShopType type;
     private String address;
     private String phone;
-    private String logoUrl; // nếu cần logo
+    private String logoUrl;
+
     @Builder.Default
     private boolean active = true;
 
     // ====== Nâng cao (SS) ======
     @Builder.Default
-    private boolean trackInventory = true; // Có quản lý tồn kho không
+    private boolean trackInventory = true;
+
     @Builder.Default
-    private String currency = "VND";       // Đơn vị tiền tệ mặc định
+    private String currency = "VND";
+
     @Builder.Default
-    private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
+    private String timezone = "Asia/Ho_Chi_Minh";
+
     @Builder.Default
-    private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
+    private String orderPrefix = "ORD";
+
     @Builder.Default
     private SubscriptionPlan plan = SubscriptionPlan.FREE;
-    private LocalDateTime planExpiry; // optional nếu bạn muốn gói hết hạn
+
+    private LocalDateTime planExpiry;
 }
 
 // File: src/main/java/com/example/sales/model/ShopUser.java
@@ -2347,12 +2418,14 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "shop_users")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "shop_users")
 public class ShopUser extends BaseEntity {
 
     @Id
@@ -2374,24 +2447,26 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "tables")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "tables")
 public class Table extends BaseEntity {
     @Id
     private String id;
 
-    private String shopId;               // ✔️ ID của cửa hàng
-    private String branchId;             // ✔️ ID của chi nhánh (có thể null nếu không phân biệt chi nhánh)
-    private String name;                 // Tên bàn (B1, B2...)
-    private TableStatus status;         // Trạng thái bàn
+    private String shopId;
+    private String branchId;
+    private String name;
+    private TableStatus status;
 
-    private Integer capacity;           // Sức chứa (optional)
-    private String note;                // Ghi chú (optional)
-    private String currentOrderId;      // Đơn đang sử dụng bàn (nếu có)
+    private Integer capacity;
+    private String note;
+    private String currentOrderId;
 }
 
 // File: src/main/java/com/example/sales/model/User.java
@@ -2407,13 +2482,20 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.Date;
 
+@Getter
+@Setter
+@ToString(exclude = {
+        "password",
+        "verificationToken",
+        "resetToken"
+}) // 👈 Tránh lộ thông tin nhạy cảm & vòng lặp
 @EqualsAndHashCode(callSuper = true)
 @Builder
-@Document(collection = "users")
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "users")
 public class User extends BaseEntity {
+
     @Id
     private String id;
 
@@ -2426,17 +2508,21 @@ public class User extends BaseEntity {
 
     private String businessType;
     private String shopName;
-    @Builder.Default
-    private boolean verified = false; // Đã xác thực tài khoản chưa?
-    private String verificationToken;
-    private Date verificationExpiry;
-    @Builder.Default
-    private UserRole role = UserRole.ROLE_USER; // Mặc định là USER
-    private String resetToken; // Token dùng để reset password
-    private Date resetTokenExpiry; // Thời hạn token
     private String fullName;
     private String phone;
-    private String avatarUrl; // (nếu có ảnh đại diện)
+    private String avatarUrl;
+
+    @Builder.Default
+    private boolean verified = false;
+
+    private String verificationToken;
+    private Date verificationExpiry;
+
+    @Builder.Default
+    private UserRole role = UserRole.ROLE_USER;
+
+    private String resetToken;
+    private Date resetTokenExpiry;
 }
 
 // File: src/main/java/com/example/sales/repository/AuditLogRepository.java
@@ -2645,6 +2731,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            return;
+        }
+
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -2666,6 +2757,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             CustomUserDetails userDetails = new CustomUserDetails(
                     userId,
                     email,
+                    null, // Không cần mật khẩu trong UserDetails
                     List.of(new SimpleGrantedAuthority("ROLE_" + role))
             );
 
@@ -2875,7 +2967,6 @@ public class AuthService {
         User user = new User();
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setBusinessType(request.getBusinessType());
 
         String token = UUID.randomUUID().toString();
         user.setVerificationToken(token);
@@ -4544,10 +4635,10 @@ public class CustomUserDetails implements UserDetails {
 
     private final String id;
     private final String email;
+    private final String password; // ✅ THÊM FIELD PASSWORD
     private final Collection<? extends GrantedAuthority> authorities;
 
     @Override public String getUsername() { return email; }
-    @Override public String getPassword() { return null; } // không dùng
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
@@ -4913,28 +5004,30 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("inventory_transactions")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Document("inventory_transactions")
 public class InventoryTransaction extends BaseEntity {
 
     @Id
     private String id;
 
     private String shopId;
-    private String branchId;      // Có thể null nếu không phân biệt chi nhánh
+    private String branchId;
     private String productId;
 
-    private InventoryType type;   // IMPORT, EXPORT, ADJUSTMENT
+    private InventoryType type;  // IMPORT, EXPORT, ADJUSTMENT
 
-    private int quantity;         // Dương nếu nhập, âm nếu xuất
+    private int quantity;
 
-    private String note;          // Ghi chú lý do nhập, xuất, điều chỉnh
+    private String note;
 
-    private String referenceId;   // ID liên quan (vd: orderId nếu export theo đơn)
+    private String referenceId;  // Liên kết đơn hàng, phiếu nhập, v.v.
 }
 
 // File: src/main/java/com/example/sales/repository/InventoryTransactionRepository.java
@@ -5781,12 +5874,14 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("subscription_histories")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Document("subscription_histories")
 public class SubscriptionHistory extends BaseEntity {
 
     @Id
@@ -5799,8 +5894,8 @@ public class SubscriptionHistory extends BaseEntity {
     private SubscriptionPlan newPlan;
     private int durationMonths;
 
-    private String transactionId; // Mã giao dịch nếu có
-    private String paymentMethod; // "Stripe", "Momo", "Manual"
+    private String transactionId;
+    private String paymentMethod;
     private SubscriptionActionType actionType;
 }
 
@@ -5903,4 +5998,36 @@ public class WebhookController {
     }
 }
 
+// File: com/example/sales/security/CustomUserDetailsService.java
+package com.example.sales.security;
+
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class CustomUserDetailsService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        return new CustomUserDetails(
+                user.getId(),
+                user.getEmail(),
+                user.getPassword(), // ✅ THÊM FIELD PASSWORD
+                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole()))
+        );
+    }
+}
 [END]

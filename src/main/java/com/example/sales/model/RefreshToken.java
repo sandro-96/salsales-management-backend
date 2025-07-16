@@ -1,18 +1,22 @@
 // File: src/main/java/com/example/sales/model/RefreshToken.java
 package com.example.sales.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.Date;
 
-@Data
-@Document(collection = "refresh_tokens")
-@AllArgsConstructor
+@Getter
+@Setter
+@ToString(exclude = "token") // ❗ tránh log token
 @NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "refresh_tokens")
 public class RefreshToken {
     @Id
     private String id;
@@ -20,3 +24,4 @@ public class RefreshToken {
     private String userId;
     private Date expiryDate;
 }
+

@@ -42,7 +42,6 @@ public class AuthService {
         User user = new User();
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setBusinessType(request.getBusinessType());
 
         String token = UUID.randomUUID().toString();
         user.setVerificationToken(token);

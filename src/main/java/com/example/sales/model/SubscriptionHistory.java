@@ -8,12 +8,14 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("subscription_histories")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Document("subscription_histories")
 public class SubscriptionHistory extends BaseEntity {
 
     @Id
@@ -26,7 +28,8 @@ public class SubscriptionHistory extends BaseEntity {
     private SubscriptionPlan newPlan;
     private int durationMonths;
 
-    private String transactionId; // Mã giao dịch nếu có
-    private String paymentMethod; // "Stripe", "Momo", "Manual"
+    private String transactionId;
+    private String paymentMethod;
     private SubscriptionActionType actionType;
 }
+

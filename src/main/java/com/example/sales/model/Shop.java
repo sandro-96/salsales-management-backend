@@ -10,36 +10,45 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-@Document(collection = "shops")
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Document(collection = "shops")
 public class Shop extends BaseEntity {
 
     @Id
     private String id;
 
     private String name;
-    private String ownerId; // user.id
-    private ShopType type; // RESTAURANT, GROCERY, CONVENIENCE, ...
+    private String ownerId;
+    private ShopType type;
     private String address;
     private String phone;
-    private String logoUrl; // nếu cần logo
+    private String logoUrl;
+
     @Builder.Default
     private boolean active = true;
 
     // ====== Nâng cao (SS) ======
     @Builder.Default
-    private boolean trackInventory = true; // Có quản lý tồn kho không
+    private boolean trackInventory = true;
+
     @Builder.Default
-    private String currency = "VND";       // Đơn vị tiền tệ mặc định
+    private String currency = "VND";
+
     @Builder.Default
-    private String timezone = "Asia/Ho_Chi_Minh"; // Múi giờ shop
+    private String timezone = "Asia/Ho_Chi_Minh";
+
     @Builder.Default
-    private String orderPrefix = "ORD";    // Tiền tố mã đơn hàng
+    private String orderPrefix = "ORD";
+
     @Builder.Default
     private SubscriptionPlan plan = SubscriptionPlan.FREE;
-    private LocalDateTime planExpiry; // optional nếu bạn muốn gói hết hạn
+
+    private LocalDateTime planExpiry;
 }
+

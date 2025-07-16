@@ -3,10 +3,10 @@ package com.example.sales.dto;
 
 import com.example.sales.constant.ApiCode;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Data
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApiResponse<T> {

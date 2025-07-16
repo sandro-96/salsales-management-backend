@@ -6,12 +6,14 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("audit_logs")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("audit_logs")
 public class AuditLog extends BaseEntity {
 
     @Id
@@ -23,6 +25,7 @@ public class AuditLog extends BaseEntity {
     private String targetId;     // ID của Order hoặc Product
     private String targetType;   // "ORDER", "PRODUCT"
 
-    private String action;       // Hành động: PRICE_CHANGED, STATUS_UPDATED...
-    private String description;  // Mô tả cụ thể
+    private String action;       // PRICE_CHANGED, STATUS_UPDATED, etc.
+    private String description;
 }
+

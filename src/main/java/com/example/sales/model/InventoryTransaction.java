@@ -8,26 +8,29 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("inventory_transactions")
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@Document("inventory_transactions")
 public class InventoryTransaction extends BaseEntity {
 
     @Id
     private String id;
 
     private String shopId;
-    private String branchId;      // Có thể null nếu không phân biệt chi nhánh
+    private String branchId;
     private String productId;
 
-    private InventoryType type;   // IMPORT, EXPORT, ADJUSTMENT
+    private InventoryType type;  // IMPORT, EXPORT, ADJUSTMENT
 
-    private int quantity;         // Dương nếu nhập, âm nếu xuất
+    private int quantity;
 
-    private String note;          // Ghi chú lý do nhập, xuất, điều chỉnh
+    private String note;
 
-    private String referenceId;   // ID liên quan (vd: orderId nếu export theo đơn)
+    private String referenceId;  // Liên kết đơn hàng, phiếu nhập, v.v.
 }
+

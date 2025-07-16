@@ -10,27 +10,29 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Document(collection = "promotions")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "promotions")
 public class Promotion extends BaseEntity {
 
     @Id
     private String id;
 
     private String shopId;
-    private String branchId; // có thể null nếu áp dụng toàn bộ chi nhánh
+    private String branchId;
 
     private String name;
 
-    private DiscountType discountType; // PERCENT or AMOUNT
+    private DiscountType discountType; // PERCENT, AMOUNT
 
     private double discountValue;
 
-    private List<String> applicableProductIds; // nếu null hoặc empty: áp dụng toàn bộ
+    private List<String> applicableProductIds;
 
     private LocalDateTime startDate;
     private LocalDateTime endDate;

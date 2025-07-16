@@ -1,0 +1,67 @@
+✅ 1. Giao diện xác thực người dùng (Auth)
+ Trang Đăng nhập (/login)
+
+ Trang Đăng ký
+
+ Trang Xác minh email
+
+ Trang Quên mật khẩu
+
+ Xử lý refresh token, tự động logout khi token hết hạn
+
+ Phân quyền và điều hướng theo role (ROLE_ADMIN, ShopRole.OWNER, STAFF, CASHIER)
+
+✅ 2. Giao diện quản lý chính (sau khi đăng nhập)
+💼 Chủ Shop (OWNER) / Nhân viên (STAFF)
+ 🏪 Shop/Profile
+
+Thông tin shop (/shop)
+
+Cập nhật shop
+
+Thêm/xoá nhân viên
+
+ 🏬 Chi nhánh
+
+Danh sách chi nhánh
+
+Tạo/sửa/xoá chi nhánh
+
+🛍️ Sản phẩm (/products)
+ Danh sách sản phẩm
+
+ Tìm kiếm, lọc, phân trang
+
+ Tạo mới / sửa / xoá sản phẩm
+
+ Tải Excel / Import file
+
+🎯 Khuyến mãi (/promotions)
+ Tạo khuyến mãi
+
+ Danh sách & chỉnh sửa
+
+📦 Đơn hàng (/orders)
+ Danh sách đơn hàng (lọc theo trạng thái)
+
+ Tạo đơn hàng (chọn sản phẩm + khuyến mãi)
+
+ Xác nhận thanh toán
+
+ Hủy đơn
+
+👨‍💼 Khách hàng (/customers)
+ Danh sách khách hàng
+
+ Tìm kiếm, sửa, xoá
+
+📊 Báo cáo doanh thu (/reports)
+ Xem theo ngày/tháng
+
+ Xuất báo cáo Excel
+
+✅ 3. Admin (ROLE_ADMIN)
+ Trang quản lý người dùng /admin/users
+
+Danh sách user, xoá, sửa
+

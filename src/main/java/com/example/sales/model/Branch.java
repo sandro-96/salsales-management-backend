@@ -6,19 +6,20 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("branches")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("branches")
 public class Branch extends BaseEntity {
 
     @Id
     private String id;
 
     private String shopId;
-
     private String name;
     private String address;
     private String phone;
@@ -26,3 +27,4 @@ public class Branch extends BaseEntity {
     @Builder.Default
     private boolean active = true;
 }
+

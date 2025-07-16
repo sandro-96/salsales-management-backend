@@ -7,22 +7,25 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "tables")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document(collection = "tables")
 public class Table extends BaseEntity {
     @Id
     private String id;
 
-    private String shopId;               // ✔️ ID của cửa hàng
-    private String branchId;             // ✔️ ID của chi nhánh (có thể null nếu không phân biệt chi nhánh)
-    private String name;                 // Tên bàn (B1, B2...)
-    private TableStatus status;         // Trạng thái bàn
+    private String shopId;
+    private String branchId;
+    private String name;
+    private TableStatus status;
 
-    private Integer capacity;           // Sức chứa (optional)
-    private String note;                // Ghi chú (optional)
-    private String currentOrderId;      // Đơn đang sử dụng bàn (nếu có)
+    private Integer capacity;
+    private String note;
+    private String currentOrderId;
 }
+

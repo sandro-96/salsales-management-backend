@@ -14,10 +14,10 @@ public class CustomUserDetails implements UserDetails {
 
     private final String id;
     private final String email;
+    private final String password; // ✅ THÊM FIELD PASSWORD
     private final Collection<? extends GrantedAuthority> authorities;
 
     @Override public String getUsername() { return email; }
-    @Override public String getPassword() { return null; } // không dùng
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }

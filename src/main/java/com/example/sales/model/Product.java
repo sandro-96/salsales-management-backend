@@ -9,14 +9,15 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("products")
-@Builder
+@Getter
+@Setter
+@ToString
 @EqualsAndHashCode(callSuper = true)
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
+@Document("products")
 public class Product extends BaseEntity {
-
     @Id
     private String id;
 
@@ -32,16 +33,15 @@ public class Product extends BaseEntity {
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
     private double price;
 
-    private String unit; // ví dụ: "kg", "cái", "hộp" (tuỳ loại cửa hàng)
-
+    private String unit;
     private String imageUrl;
-
     private String description;
 
     private String shopId;
     private String branchId;
 
     @Builder.Default
-    private boolean active = true; // Có đang bán hay tạm ngưng
-    private String productCode; // mã sản phẩm duy nhất
+    private boolean active = true;
+
+    private String productCode;
 }

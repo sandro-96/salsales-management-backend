@@ -1,9 +1,13 @@
 // File: src/main/java/com/example/sales/model/base/BaseEntity.java
+
 package com.example.sales.model.base;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -12,9 +16,12 @@ import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
-@AllArgsConstructor
+@Getter
+@Setter
+@ToString(exclude = {"createdBy", "updatedBy"}) // 👈 Tránh vòng lặp khi log
+@EqualsAndHashCode
 @NoArgsConstructor
-@Data
+@AllArgsConstructor
 public abstract class BaseEntity {
 
     @CreatedDate
