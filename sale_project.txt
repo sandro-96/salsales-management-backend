@@ -1028,10 +1028,14 @@ public class ShopUserController {
 
     private final ShopUserService shopUserService;
 
+    @GetMapping("/my")
+    public ApiResponse<?> getMyShops(@AuthenticationPrincipal User user) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(user.getId()));
+    }
+
     @PostMapping("/add")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> addUser(@AuthenticationPrincipal User admin,
-                                  @RequestParam String shopId,
+    public ApiResponse<?> addUser(@RequestParam String shopId,
                                   @RequestParam String userId,
                                   @RequestParam ShopRole role) {
         shopUserService.addUser(shopId, userId, role);
@@ -1040,8 +1044,7 @@ public class ShopUserController {
 
     @DeleteMapping("/remove")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> removeUser(@AuthenticationPrincipal User admin,
-                                     @RequestParam String shopId,
+    public ApiResponse<?> removeUser(@RequestParam String shopId,
                                      @RequestParam String userId) {
         shopUserService.removeUser(shopId, userId);
         return ApiResponse.success(ApiCode.SUCCESS);
@@ -2662,12 +2665,15 @@ package com.example.sales.repository;
 import com.example.sales.model.ShopUser;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
     Optional<ShopUser> findByIdAndDeletedFalse(String id);
 
     Optional<ShopUser> findByShopIdAndUserIdAndDeletedFalse(String shopId, String userId);
+
+    List<ShopUser> findByUserIdAndDeletedFalse(String userId);
 }
 
 // File: src/main/java/com/example/sales/repository/TableRepository.java
@@ -4216,13 +4222,18 @@ public class ReportService {
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ShopRequest;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
+import com.example.sales.model.ShopUser;
 import com.example.sales.model.User;
 import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.ShopUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -4230,6 +4241,7 @@ public class ShopService {
 
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
+    private final ShopUserRepository shopUserRepository;
 
     public Shop createShop(User owner, ShopRequest request) {
         if (shopRepository.findByOwnerIdAndDeletedFalse(owner.getId()).isPresent()) {
@@ -4245,6 +4257,12 @@ public class ShopService {
         shop.setOwnerId(owner.getId());
 
         Shop saved = shopRepository.save(shop);
+        ShopUser shopUser = ShopUser.builder()
+                .shopId(shop.getId())
+                .userId(owner.getId())
+                .role(ShopRole.OWNER)
+                .build();
+        shopUserRepository.save(shopUser);
         auditLogService.log(owner, saved.getId(), saved.getId(), "SHOP", "CREATED",
                 String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
         return saved;
@@ -4292,6 +4310,14 @@ public class ShopService {
     public Shop save(Shop shop) {
         return shopRepository.save(shop);
     }
+
+    public List<Shop> getShopsOfUser(String userId) {
+        List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndDeletedFalse(userId);
+        List<String> shopIds = shopUsers.stream()
+                .map(ShopUser::getShopId)
+                .toList();
+        return shopRepository.findAllById(shopIds);
+    }
 }
 
 // File: src/main/java/com/example/sales/service/ShopUserService.java
@@ -4299,13 +4325,17 @@ package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.shopUser.ShopUserResponse;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -4313,6 +4343,7 @@ import java.util.Optional;
 public class ShopUserService {
 
     private final ShopUserRepository shopUserRepository;
+    private final ShopRepository shopRepository;
 
     public ShopRole getUserRoleInShop(String shopId, String userId) {
         return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
@@ -4373,6 +4404,20 @@ public class ShopUserService {
         ShopUser user = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUserRepository.delete(user);
+    }
+
+    public List<ShopUserResponse> getShopsForUser(String userId) {
+        List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndDeletedFalse(userId);
+
+        return shopUsers.stream().map(shopUser -> {
+            Shop shop = shopRepository.findById(shopUser.getShopId())
+                    .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+            return ShopUserResponse.builder()
+                    .shopId(shop.getId())
+                    .shopName(shop.getName())
+                    .role(shopUser.getRole())
+                    .build();
+        }).toList();
     }
 }
 
@@ -6030,4 +6075,20 @@ public class CustomUserDetailsService implements UserDetailsService {
         );
     }
 }
+
+// File: src/main/java/com/example/sales/dto/shopUser/ShopUserResponse.java
+package com.example.sales.dto.shopUser;
+
+import com.example.sales.constant.ShopRole;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class ShopUserResponse {
+    private String shopId;
+    private String shopName;
+    private ShopRole role;
+}
+
 [END]

@@ -3,13 +3,17 @@ package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.shopUser.ShopUserResponse;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -17,6 +21,7 @@ import java.util.Optional;
 public class ShopUserService {
 
     private final ShopUserRepository shopUserRepository;
+    private final ShopRepository shopRepository;
 
     public ShopRole getUserRoleInShop(String shopId, String userId) {
         return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
@@ -77,5 +82,19 @@ public class ShopUserService {
         ShopUser user = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUserRepository.delete(user);
+    }
+
+    public List<ShopUserResponse> getShopsForUser(String userId) {
+        List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndDeletedFalse(userId);
+
+        return shopUsers.stream().map(shopUser -> {
+            Shop shop = shopRepository.findById(shopUser.getShopId())
+                    .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+            return ShopUserResponse.builder()
+                    .shopId(shop.getId())
+                    .shopName(shop.getName())
+                    .role(shopUser.getRole())
+                    .build();
+        }).toList();
     }
 }

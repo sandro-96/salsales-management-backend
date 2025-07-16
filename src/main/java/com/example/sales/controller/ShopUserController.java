@@ -20,10 +20,14 @@ public class ShopUserController {
 
     private final ShopUserService shopUserService;
 
+    @GetMapping("/my")
+    public ApiResponse<?> getMyShops(@AuthenticationPrincipal User user) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(user.getId()));
+    }
+
     @PostMapping("/add")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> addUser(@AuthenticationPrincipal User admin,
-                                  @RequestParam String shopId,
+    public ApiResponse<?> addUser(@RequestParam String shopId,
                                   @RequestParam String userId,
                                   @RequestParam ShopRole role) {
         shopUserService.addUser(shopId, userId, role);
@@ -32,8 +36,7 @@ public class ShopUserController {
 
     @DeleteMapping("/remove")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> removeUser(@AuthenticationPrincipal User admin,
-                                     @RequestParam String shopId,
+    public ApiResponse<?> removeUser(@RequestParam String shopId,
                                      @RequestParam String userId) {
         shopUserService.removeUser(shopId, userId);
         return ApiResponse.success(ApiCode.SUCCESS);
