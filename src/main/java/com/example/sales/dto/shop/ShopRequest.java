@@ -12,5 +12,4 @@ public class ShopRequest {
     private ShopType type;
     private String address;
     private String phone;
-    private String logoUrl;
 }

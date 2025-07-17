@@ -24,7 +24,7 @@ public class ShopService {
     private final AuditLogService auditLogService;
     private final ShopUserRepository shopUserRepository;
 
-    public Shop createShop(String userId, ShopRequest request) {
+    public Shop createShop(String userId, ShopRequest request, String logoUrl) {
         if (shopRepository.findByOwnerIdAndDeletedFalse(userId).isPresent()) {
             throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
@@ -34,7 +34,7 @@ public class ShopService {
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
-        shop.setLogoUrl(request.getLogoUrl());
+        shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
 
         Shop saved = shopRepository.save(shop);
@@ -44,8 +44,10 @@ public class ShopService {
                 .role(ShopRole.OWNER)
                 .build();
         shopUserRepository.save(shopUser);
+
         auditLogService.log(userId, saved.getId(), saved.getId(), "SHOP", "CREATED",
                 String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+
         return saved;
     }
 
@@ -61,7 +63,6 @@ public class ShopService {
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
-        shop.setLogoUrl(request.getLogoUrl());
 
         Shop saved = shopRepository.save(shop);
         auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",

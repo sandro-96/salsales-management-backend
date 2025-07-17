@@ -968,6 +968,7 @@ import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.model.Shop;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ShopService;
 import com.example.sales.service.ShopUserService;
 import jakarta.validation.Valid;
@@ -975,6 +976,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -986,12 +988,19 @@ public class ShopController {
 
     private final ShopService shopService;
     private final ShopUserService shopUserService;
+    private final FileUploadService fileUploadService;
 
-    @PostMapping
+    @PostMapping(consumes = "multipart/form-data")
     public ApiResponse<Shop> create(@AuthenticationPrincipal CustomUserDetails user,
-                                    @RequestBody @Valid ShopRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, shopService.createShop(user.getId(), request));
+                                    @RequestPart("shop") @Valid ShopRequest request,
+                                    @RequestPart(value = "file", required = false) MultipartFile file) {
+        String logoUrl = null;
+        if (file != null && !file.isEmpty()) {
+            logoUrl = fileUploadService.upload(file);
+        }
+        return ApiResponse.success(ApiCode.SUCCESS, shopService.createShop(user.getId(), request, logoUrl));
     }
+
 
     @GetMapping("/me")
     public ApiResponse<?> getMyShop(@AuthenticationPrincipal CustomUserDetails user) {
@@ -1629,6 +1638,7 @@ public class SalesReportDto {
     private long totalOrders;
     private double totalAmount;
 }
+
 // File: src/main/java/com/example/sales/dto/shop/ShopRequest.java
 package com.example.sales.dto.shop;
 
@@ -1643,7 +1653,6 @@ public class ShopRequest {
     private ShopType type;
     private String address;
     private String phone;
-    private String logoUrl;
 }
 
 // File: src/main/java/com/example/sales/dto/TableRequest.java
@@ -4254,7 +4263,7 @@ public class ShopService {
     private final AuditLogService auditLogService;
     private final ShopUserRepository shopUserRepository;
 
-    public Shop createShop(String userId, ShopRequest request) {
+    public Shop createShop(String userId, ShopRequest request, String logoUrl) {
         if (shopRepository.findByOwnerIdAndDeletedFalse(userId).isPresent()) {
             throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
@@ -4264,7 +4273,7 @@ public class ShopService {
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
-        shop.setLogoUrl(request.getLogoUrl());
+        shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
 
         Shop saved = shopRepository.save(shop);
@@ -4274,8 +4283,10 @@ public class ShopService {
                 .role(ShopRole.OWNER)
                 .build();
         shopUserRepository.save(shopUser);
+
         auditLogService.log(userId, saved.getId(), saved.getId(), "SHOP", "CREATED",
                 String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+
         return saved;
     }
 
@@ -4291,7 +4302,6 @@ public class ShopService {
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
-        shop.setLogoUrl(request.getLogoUrl());
 
         Shop saved = shopRepository.save(shop);
         auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",
@@ -4352,7 +4362,6 @@ public class ShopService {
                     .build();
         }
     }
-
 }
 
 // File: src/main/java/com/example/sales/service/ShopUserService.java
@@ -5412,7 +5421,7 @@ class ShopServiceTest {
             return shop;
         });
 
-        Shop result = shopService.createShop("u1", request);
+        Shop result = shopService.createShop("u1", request, null);
 
         assertEquals("Shop ABC", result.getName());
         verify(shopRepository).save(any(Shop.class));

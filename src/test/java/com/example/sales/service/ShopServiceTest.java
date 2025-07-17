@@ -39,7 +39,7 @@ class ShopServiceTest {
             return shop;
         });
 
-        Shop result = shopService.createShop("u1", request);
+        Shop result = shopService.createShop("u1", request, null);
 
         assertEquals("Shop ABC", result.getName());
         verify(shopRepository).save(any(Shop.class));
