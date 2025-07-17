@@ -3,11 +3,11 @@ package com.example.sales.service;
 
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.model.Order;
-import com.example.sales.model.User;
 import com.example.sales.repository.OrderRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
@@ -39,15 +39,12 @@ class OrderServiceTest {
         when(orderRepository.findByIdAndDeletedFalse("ord1"))
                 .thenReturn(Optional.of(mockOrder));
 
-        User user = new User();
-        user.setId("user1");
-
-        orderService.cancelOrder(user, "shop1", "ord1");
+        orderService.cancelOrder("user1", "shop1", "ord1");
 
         assertEquals(OrderStatus.CANCELLED, mockOrder.getStatus());
         verify(orderRepository).save(mockOrder);
 
         // 🟢 Optional: kiểm tra audit log được gọi
-        verify(auditLogService).log(eq(user), eq("shop1"), eq("ord1"), eq("ORDER"), eq("CANCELLED"), anyString());
+        verify(auditLogService).log(eq("user1"), eq("shop1"), eq("ord1"), eq("ORDER"), eq("CANCELLED"), anyString());
     }
 }

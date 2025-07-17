@@ -1,0 +1,11 @@
+// Database Mongodb prod
+username: trichuthanh
+password: JiOAwPBRXnTApA2d
+
+// Database Mongodb test
+username: trichuthanh
+password: 3FoSuC6mwozL9N4Y
+
+// Database Mongodb dev
+username: trichuthanh
+password: z9KMoKKHieqtvTgN

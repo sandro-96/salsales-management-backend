@@ -7,7 +7,6 @@ import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Customer;
-import com.example.sales.model.User;
 import com.example.sales.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,10 +27,10 @@ public class CustomerService {
                 .toList();
     }
 
-    public CustomerResponse createCustomer(String shopId, User user, CustomerRequest request) {
+    public CustomerResponse createCustomer(String shopId, String userId, CustomerRequest request) {
         Customer customer = new Customer();
         customer.setShopId(shopId);
-        customer.setUserId(user.getId());
+        customer.setUserId(userId);
         customer.setName(request.getName());
         customer.setPhone(request.getPhone());
         customer.setEmail(request.getEmail());
@@ -40,7 +39,7 @@ public class CustomerService {
         customer.setBranchId(request.getBranchId());
 
         Customer saved = customerRepository.save(customer);
-        auditLogService.log(user, shopId, saved.getId(), "CUSTOMER", "CREATED",
+        auditLogService.log(userId, shopId, saved.getId(), "CUSTOMER", "CREATED",
                 String.format("Tạo khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
         return toResponse(saved);
     }

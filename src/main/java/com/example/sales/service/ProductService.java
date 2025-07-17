@@ -10,7 +10,6 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.helper.ProductSearchHelper;
 import com.example.sales.model.Product;
 import com.example.sales.model.Shop;
-import com.example.sales.model.User;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
@@ -67,7 +66,7 @@ public class ProductService {
         return toResponse(saved);
     }
 
-    public ProductResponse updateProduct(User user, String shopId, ShopType shopType, String id, ProductRequest request) {
+    public ProductResponse updateProduct(String userId, String shopId, ShopType shopType, String id, ProductRequest request) {
         Product existing = productRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
@@ -84,17 +83,17 @@ public class ProductService {
         Product updatedProduct = productRepository.save(existing);
 
         if (existing.getPrice() != request.getPrice()) {
-            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "PRICE_CHANGED",
+            auditLogService.log(userId, shopId, existing.getId(), "PRODUCT", "PRICE_CHANGED",
                     "Thay đổi giá từ %.2f → %.2f".formatted(existing.getPrice(), request.getPrice()));
         }
 
         if (!existing.getCategory().equals(request.getCategory())) {
-            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
+            auditLogService.log(userId, shopId, existing.getId(), "PRODUCT", "CATEGORY_CHANGED",
                     "Chuyển danh mục từ %s → %s".formatted(existing.getCategory(), request.getCategory()));
         }
 
         if (existing.getQuantity() != request.getQuantity()) {
-            auditLogService.log(user, shopId, existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
+            auditLogService.log(userId, shopId, existing.getId(), "PRODUCT", "QUANTITY_CHANGED",
                     "Thay đổi tồn kho từ %d → %d".formatted(existing.getQuantity(), request.getQuantity()));
         }
 

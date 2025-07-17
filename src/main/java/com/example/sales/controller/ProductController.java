@@ -11,7 +11,7 @@ import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.model.Product;
-import com.example.sales.model.User;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ExcelExportService;
@@ -57,12 +57,12 @@ public class ProductController {
 
     @PutMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<ProductResponse> updateProduct(@AuthenticationPrincipal User user,
+    public ApiResponse<ProductResponse> updateProduct(@AuthenticationPrincipal CustomUserDetails user,
                                                       @RequestParam String shopId,
                                                       @RequestParam ShopType shopType,
                                                       @PathVariable String id,
                                                       @RequestBody @Valid ProductRequest request) {
-        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.updateProduct(user, shopId, shopType, id, request));
+        return ApiResponse.success(ApiCode.PRODUCT_UPDATED, productService.updateProduct(user.getId(), shopId, shopType, id, request));
     }
 
     @DeleteMapping("/{id}")
@@ -125,7 +125,7 @@ public class ProductController {
 
     @PostMapping("/import")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<Map<String, Object>> importExcel(@AuthenticationPrincipal User user,
+    public ApiResponse<Map<String, Object>> importExcel(@AuthenticationPrincipal CustomUserDetails user,
                                                         @RequestParam("file") MultipartFile file,
                                                         @RequestParam String shopId,
                                                         @RequestParam(required = false) String branchId) {

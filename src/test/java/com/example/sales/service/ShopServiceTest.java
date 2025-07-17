@@ -1,7 +1,7 @@
 // File: test/java/com/example/sales/service/ShopServiceTest.java
 package com.example.sales.service;
 
-import com.example.sales.dto.ShopRequest;
+import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.model.Shop;
 import com.example.sales.model.User;
 import com.example.sales.repository.ShopRepository;
@@ -39,13 +39,13 @@ class ShopServiceTest {
             return shop;
         });
 
-        Shop result = shopService.createShop(owner, request);
+        Shop result = shopService.createShop("u1", request);
 
         assertEquals("Shop ABC", result.getName());
         verify(shopRepository).save(any(Shop.class));
 
         // ✅ Optional: kiểm tra ghi log
-        verify(auditLogService).log(eq(owner), eq("s1"), any(), eq("SHOP"), eq("CREATED"), contains("Shop ABC"));
+        verify(auditLogService).log(eq("u1"), eq("s1"), any(), eq("SHOP"), eq("CREATED"), contains("Shop ABC"));
     }
 }
 

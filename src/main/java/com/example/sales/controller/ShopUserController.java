@@ -4,7 +4,7 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
-import com.example.sales.model.User;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ShopUserService;
 import lombok.RequiredArgsConstructor;
@@ -21,8 +21,8 @@ public class ShopUserController {
     private final ShopUserService shopUserService;
 
     @GetMapping("/my")
-    public ApiResponse<?> getMyShops(@AuthenticationPrincipal User user) {
-        return ApiResponse.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(user.getId()));
+    public ApiResponse<?> getMyShops(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
+        return ApiResponse.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(customUserDetails.getId()));
     }
 
     @PostMapping("/add")

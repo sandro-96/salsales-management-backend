@@ -3,17 +3,18 @@ package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ShopRequest;
+import com.example.sales.constant.UserRole;
+import com.example.sales.dto.shop.ShopAdminResponse;
+import com.example.sales.dto.shop.ShopRequest;
+import com.example.sales.dto.shop.ShopResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
-import com.example.sales.model.User;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,8 +24,8 @@ public class ShopService {
     private final AuditLogService auditLogService;
     private final ShopUserRepository shopUserRepository;
 
-    public Shop createShop(User owner, ShopRequest request) {
-        if (shopRepository.findByOwnerIdAndDeletedFalse(owner.getId()).isPresent()) {
+    public Shop createShop(String userId, ShopRequest request) {
+        if (shopRepository.findByOwnerIdAndDeletedFalse(userId).isPresent()) {
             throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
 
@@ -34,16 +35,16 @@ public class ShopService {
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
         shop.setLogoUrl(request.getLogoUrl());
-        shop.setOwnerId(owner.getId());
+        shop.setOwnerId(userId);
 
         Shop saved = shopRepository.save(shop);
         ShopUser shopUser = ShopUser.builder()
                 .shopId(shop.getId())
-                .userId(owner.getId())
+                .userId(userId)
                 .role(ShopRole.OWNER)
                 .build();
         shopUserRepository.save(shopUser);
-        auditLogService.log(owner, saved.getId(), saved.getId(), "SHOP", "CREATED",
+        auditLogService.log(userId, saved.getId(), saved.getId(), "SHOP", "CREATED",
                 String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
         return saved;
     }
@@ -91,11 +92,35 @@ public class ShopService {
         return shopRepository.save(shop);
     }
 
-    public List<Shop> getShopsOfUser(String userId) {
-        List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndDeletedFalse(userId);
-        List<String> shopIds = shopUsers.stream()
-                .map(ShopUser::getShopId)
-                .toList();
-        return shopRepository.findAllById(shopIds);
+    public Object getShopResponse(CustomUserDetails user, Shop shop) {
+        if (user.getRole() == UserRole.ROLE_ADMIN) {
+            return ShopAdminResponse.builder()
+                    .id(shop.getId())
+                    .name(shop.getName())
+                    .type(shop.getType())
+                    .address(shop.getAddress())
+                    .phone(shop.getPhone())
+                    .logoUrl(shop.getLogoUrl())
+                    .active(shop.isActive())
+                    .plan(shop.getPlan())
+                    .currency(shop.getCurrency())
+                    .timezone(shop.getTimezone())
+                    .orderPrefix(shop.getOrderPrefix())
+                    .planExpiry(shop.getPlanExpiry())
+                    .build();
+        } else {
+            return ShopResponse.builder()
+                    .id(shop.getId())
+                    .name(shop.getName())
+                    .type(shop.getType())
+                    .address(shop.getAddress())
+                    .phone(shop.getPhone())
+                    .logoUrl(shop.getLogoUrl())
+                    .active(shop.isActive())
+                    .plan(shop.getPlan())
+                    .currency(shop.getCurrency())
+                    .build();
+        }
     }
+
 }

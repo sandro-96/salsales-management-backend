@@ -28,17 +28,17 @@ public class OrderService {
     private final ShopRepository shopRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
 
-    public List<OrderResponse> getOrdersByUser(User user, String shopId) {
+    public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
         return orderRepository.findByShopIdAndDeletedFalse(shopId)
                 .stream().map(this::toResponse).toList();
     }
 
     @Transactional
-    public OrderResponse createOrder(User user, String shopId, OrderRequest request) {
+    public OrderResponse createOrder(String userId, String shopId, OrderRequest request) {
         Order order = new Order();
         order.setShopId(shopId);
         order.setTableId(request.getTableId());
-        order.setUserId(user.getId());
+        order.setUserId(userId);
         order.setNote(request.getNote());
         order.setStatus(OrderStatus.PENDING);
         order.setPaid(false);
@@ -104,7 +104,7 @@ public class OrderService {
         return toResponse(created);
     }
 
-    public void cancelOrder(User user, String shopId, String orderId) {
+    public void cancelOrder(String userId, String shopId, String orderId) {
         Order order = getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
@@ -113,10 +113,10 @@ public class OrderService {
 
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
-        auditLogService.log(user, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
+        auditLogService.log(userId, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
     }
 
-    public OrderResponse confirmPayment(User user, String shopId, String orderId, String paymentId, String paymentMethod) {
+    public OrderResponse confirmPayment(String userId, String shopId, String orderId, String paymentId, String paymentMethod) {
         Order order = getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
@@ -131,12 +131,12 @@ public class OrderService {
 
         Order updated = orderRepository.save(order);
         releaseTable(updated);
-        auditLogService.log(user, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
+        auditLogService.log(userId, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
                 "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
         return toResponse(updated);
     }
 
-    public OrderResponse updateStatus(User user, String shopId, String orderId, OrderStatus newStatus) {
+    public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
         Order order = getOrderByShop(orderId, shopId);
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
@@ -154,14 +154,14 @@ public class OrderService {
 
         Order updated = orderRepository.save(order);
         if (!oldStatus.equals(newStatus)) {
-            auditLogService.log(user, shopId, order.getId(), "ORDER", "STATUS_UPDATED",
+            auditLogService.log(userId, shopId, order.getId(), "ORDER", "STATUS_UPDATED",
                     "Cập nhật trạng thái từ %s → %s".formatted(oldStatus, newStatus));
         }
 
         return toResponse(updated);
     }
 
-    public List<OrderResponse> getOrdersByStatus(User user, String shopId, OrderStatus status, String branchId) {
+    public List<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId) {
         return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status)
                 .stream().map(this::toResponse).toList();
     }

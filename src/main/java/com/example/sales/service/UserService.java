@@ -16,18 +16,23 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public User getCurrentUser(User user) {
-        return user;
+    public User getCurrentUser(String userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
     }
 
-    public User updateProfile(User user, String fullName, String phone, String businessType) {
+    public User updateProfile(String userId, String fullName, String phone, String businessType) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
         user.setFullName(fullName);
         user.setPhone(phone);
         user.setBusinessType(businessType);
         return userRepository.save(user);
     }
 
-    public void changePassword(User user, String currentPassword, String newPassword) {
+    public void changePassword(String userId, String currentPassword, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new BusinessException(ApiCode.INCORRECT_PASSWORD);
         }

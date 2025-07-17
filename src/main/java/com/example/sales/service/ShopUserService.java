@@ -3,7 +3,7 @@ package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.shopUser.ShopUserResponse;
+import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -84,17 +85,25 @@ public class ShopUserService {
         shopUserRepository.delete(user);
     }
 
-    public List<ShopUserResponse> getShopsForUser(String userId) {
+    public List<ShopSimpleResponse> getShopsForUser(String userId) {
         List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndDeletedFalse(userId);
 
-        return shopUsers.stream().map(shopUser -> {
-            Shop shop = shopRepository.findById(shopUser.getShopId())
-                    .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
-            return ShopUserResponse.builder()
-                    .shopId(shop.getId())
-                    .shopName(shop.getName())
-                    .role(shopUser.getRole())
-                    .build();
-        }).toList();
+        return shopUsers.stream()
+                .map(su -> {
+                    Shop shop = shopRepository.findByIdAndDeletedFalse(su.getShopId())
+                            .orElse(null);
+                    if (shop == null) return null;
+
+                    return ShopSimpleResponse.builder()
+                            .id(shop.getId())
+                            .name(shop.getName())
+                            .type(shop.getType())
+                            .logoUrl(shop.getLogoUrl())
+                            .active(shop.isActive())
+                            .role(su.getRole()) // 👈 gán vai trò
+                            .build();
+                })
+                .filter(Objects::nonNull)
+                .toList();
     }
 }

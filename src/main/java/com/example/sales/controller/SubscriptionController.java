@@ -6,8 +6,8 @@ import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.subscription.UpgradePlanRequest;
 import com.example.sales.model.Shop;
 import com.example.sales.model.SubscriptionHistory;
-import com.example.sales.model.User;
 import com.example.sales.repository.SubscriptionHistoryRepository;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.PaymentService;
 import com.example.sales.service.ShopService;
 import jakarta.validation.Valid;
@@ -27,13 +27,13 @@ public class SubscriptionController {
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
 
     @GetMapping("/me")
-    public ApiResponse<Shop> getCurrentPlan(@AuthenticationPrincipal User user) {
+    public ApiResponse<Shop> getCurrentPlan(@AuthenticationPrincipal CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
         return ApiResponse.success(ApiCode.SUCCESS, shop);
     }
 
     @PostMapping("/upgrade")
-    public ApiResponse<?> upgrade(@AuthenticationPrincipal User user,
+    public ApiResponse<?> upgrade(@AuthenticationPrincipal CustomUserDetails user,
                                   @RequestBody @Valid UpgradePlanRequest req) {
         Shop shop = shopService.getShopByOwner(user.getId());
 
@@ -45,7 +45,7 @@ public class SubscriptionController {
     }
 
     @GetMapping("/history")
-    public ApiResponse<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal User user) {
+    public ApiResponse<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
         List<SubscriptionHistory> history = subscriptionHistoryRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
         return ApiResponse.success(ApiCode.SUCCESS, history);

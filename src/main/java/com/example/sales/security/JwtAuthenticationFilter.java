@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/security/JwtAuthenticationFilter.java
 package com.example.sales.security;
 
+import com.example.sales.constant.UserRole;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -55,12 +56,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             CustomUserDetails userDetails = new CustomUserDetails(
                     userId,
                     email,
-                    null, // Không cần mật khẩu trong UserDetails
+                    null,
+                    UserRole.valueOf(role),
                     List.of(new SimpleGrantedAuthority("ROLE_" + role))
             );
-
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            authToken.setDetails(userDetails);
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
             log.debug("JWT hợp lệ. Gán userId = {}, role = {}", userId, role);

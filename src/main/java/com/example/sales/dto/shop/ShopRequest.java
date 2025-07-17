@@ -1,5 +1,5 @@
-// File: src/main/java/com/example/sales/dto/ShopRequest.java
-package com.example.sales.dto;
+// File: src/main/java/com/example/sales/dto/shop/ShopRequest.java
+package com.example.sales.dto.shop;
 
 import com.example.sales.constant.ShopType;
 import lombok.Getter;

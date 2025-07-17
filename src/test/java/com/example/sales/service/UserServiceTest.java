@@ -28,7 +28,7 @@ class UserServiceTest {
         User mockUser = new User();
         mockUser.setId("user1");
 
-        User result = userService.getCurrentUser(mockUser);
+        User result = userService.getCurrentUser("user1");
 
         assertEquals("user1", result.getId());
     }
@@ -40,7 +40,7 @@ class UserServiceTest {
 
         when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        User updated = userService.updateProfile(user, "Nguyễn Văn A", "0123456789", "Cửa hàng tiện lợi");
+        User updated = userService.updateProfile("u1", "Nguyễn Văn A", "0123456789", "Cửa hàng tiện lợi");
 
         assertEquals("Nguyễn Văn A", updated.getFullName());
         assertEquals("0123456789", updated.getPhone());
@@ -57,7 +57,7 @@ class UserServiceTest {
         when(passwordEncoder.matches("wrong-pass", "encoded-old")).thenReturn(false);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
-                userService.changePassword(user, "wrong-pass", "new-pass")
+                userService.changePassword("user1", "wrong-pass", "new-pass")
         );
 
         assertEquals(ApiCode.INCORRECT_PASSWORD, ex.getError());
@@ -73,7 +73,7 @@ class UserServiceTest {
         when(passwordEncoder.encode("new-pass")).thenReturn("encoded-new");
         when(userRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        userService.changePassword(user, "old-pass", "new-pass");
+        userService.changePassword("user1", "old-pass", "new-pass");
 
         assertEquals("encoded-new", user.getPassword());
         verify(userRepository).save(user);

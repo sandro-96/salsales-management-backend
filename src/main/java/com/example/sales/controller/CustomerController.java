@@ -7,7 +7,7 @@ import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponse;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
-import com.example.sales.model.User;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.CustomerService;
 import jakarta.validation.Valid;
@@ -35,10 +35,10 @@ public class CustomerController {
 
     @PostMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<CustomerResponse> create(@AuthenticationPrincipal User user,
+    public ApiResponse<CustomerResponse> create(@AuthenticationPrincipal CustomUserDetails user,
                                                 @RequestParam String shopId,
                                                 @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user, request));
+        return ApiResponse.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user.getId(), request));
     }
 
     @PutMapping("/{id}")
