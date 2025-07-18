@@ -237,6 +237,10 @@ import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.User;
 import com.example.sales.service.AdminUserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -252,25 +256,48 @@ public class AdminUserController {
 
     private final AdminUserService adminUserService;
 
+    @Operation(summary = "Lấy tất cả người dùng", description = "Chỉ dành cho admin. Trả về danh sách tất cả tài khoản người dùng.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Thành công")
+    })
     @GetMapping
     public ApiResponseDto<List<User>> getAll() {
         return ApiResponseDto.success(ApiCode.SUCCESS, adminUserService.getAllUsers());
     }
 
+    @Operation(summary = "Lấy người dùng theo ID", description = "Lấy thông tin người dùng theo ID.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy người dùng")
+    })
     @GetMapping("/{id}")
-    public ApiResponseDto<User> getById(@PathVariable String id) {
+    public ApiResponseDto<User> getById(
+            @Parameter(description = "ID của người dùng") @PathVariable String id) {
         return ApiResponseDto.success(ApiCode.SUCCESS, adminUserService.getUserById(id));
     }
 
+    @Operation(summary = "Cập nhật thông tin người dùng", description = "Cập nhật thông tin hồ sơ của người dùng bởi admin.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy người dùng")
+    })
     @PutMapping("/{id}")
-    public ApiResponseDto<User> updateUser(@PathVariable String id,
-                                           @RequestBody User userUpdate) {
+    public ApiResponseDto<User> updateUser(
+            @Parameter(description = "ID của người dùng") @PathVariable String id,
+            @RequestBody User userUpdate) {
         return ApiResponseDto.success(ApiCode.USER_UPDATED, adminUserService.updateUser(id, userUpdate));
     }
 
+    @Operation(summary = "Xoá người dùng", description = "Admin xoá người dùng khỏi hệ thống. Không thể tự xoá tài khoản của chính mình.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xoá thành công"),
+            @ApiResponse(responseCode = "400", description = "Không thể tự xoá chính mình"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy người dùng")
+    })
     @DeleteMapping("/{id}")
-    public ApiResponseDto<?> deleteUser(@PathVariable String id,
-                                        @AuthenticationPrincipal User currentUser) {
+    public ApiResponseDto<?> deleteUser(
+            @Parameter(description = "ID của người dùng cần xoá") @PathVariable String id,
+            @AuthenticationPrincipal @Parameter(hidden = true) User currentUser) {
         if (id.equals(currentUser.getId())) {
             throw new BusinessException(ApiCode.CANNOT_DELETE_SELF);
         }
@@ -290,6 +317,10 @@ import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.model.AuditLog;
 import com.example.sales.repository.AuditLogRepository;
 import com.example.sales.security.RequirePlan;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -306,7 +337,13 @@ public class AuditLogController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/{targetId}")
-    public ApiResponseDto<List<AuditLog>> getLogs(@PathVariable String targetId) {
+    @Operation(summary = "Lấy nhật ký thay đổi", description = "Trả về danh sách các bản ghi audit log của một thực thể cụ thể, theo thứ tự mới nhất trước.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lấy danh sách nhật ký thành công"),
+            @ApiResponse(responseCode = "403", description = "Gói dịch vụ không đủ quyền truy cập")
+    })
+    public ApiResponseDto<List<AuditLog>> getLogs(
+            @PathVariable @Parameter(description = "ID của thực thể cần xem lịch sử thay đổi (ví dụ: đơn hàng, sản phẩm, v.v.)") String targetId) {
         List<AuditLog> logs = auditLogRepository.findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(targetId);
         return ApiResponseDto.success(ApiCode.SUCCESS, logs);
     }
@@ -319,6 +356,10 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.*;
 import com.example.sales.service.AuthService;
 import com.example.sales.service.TokenService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
@@ -334,44 +375,85 @@ public class AuthController {
     private final TokenService tokenService;
 
     @PostMapping("/register")
-    public ApiResponseDto<?> register(@RequestBody @Valid RegisterRequest request) {
+    @Operation(summary = "Đăng ký tài khoản", description = "Gửi thông tin đăng ký để tạo tài khoản mới và gửi email xác minh.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Email xác minh đã được gửi"),
+            @ApiResponse(responseCode = "400", description = "Thông tin không hợp lệ hoặc email đã tồn tại")
+    })
+    public ApiResponseDto<?> register(
+            @RequestBody @Valid @Parameter(description = "Thông tin đăng ký") RegisterRequest request) {
         authService.register(request);
         return ApiResponseDto.success(ApiCode.EMAIL_SENT);
     }
 
     @PostMapping("/login")
-    public ApiResponseDto<JwtResponse> login(@RequestBody @Valid LoginRequest request) {
+    @Operation(summary = "Đăng nhập", description = "Xác thực người dùng và trả về token JWT.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đăng nhập thành công"),
+            @ApiResponse(responseCode = "401", description = "Sai thông tin đăng nhập")
+    })
+    public ApiResponseDto<JwtResponse> login(
+            @RequestBody @Valid @Parameter(description = "Thông tin đăng nhập") LoginRequest request) {
         JwtResponse token = authService.login(request);
         return ApiResponseDto.success(ApiCode.SUCCESS, token);
     }
 
     @PostMapping("/forgot-password")
-    public ApiResponseDto<?> forgotPassword(@RequestParam String email) {
+    @Operation(summary = "Quên mật khẩu", description = "Gửi email chứa liên kết đặt lại mật khẩu.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Email đặt lại mật khẩu đã được gửi"),
+            @ApiResponse(responseCode = "404", description = "Email không tồn tại")
+    })
+    public ApiResponseDto<?> forgotPassword(
+            @RequestParam @Parameter(description = "Email đã đăng ký") String email) {
         authService.forgotPassword(email);
         return ApiResponseDto.success(ApiCode.EMAIL_SENT);
     }
 
     @PostMapping("/resend-verification")
-    public ApiResponseDto<?> resendVerification(@RequestParam String email) {
+    @Operation(summary = "Gửi lại email xác minh", description = "Gửi lại email xác minh nếu người dùng chưa xác thực.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Email xác minh đã được gửi lại"),
+            @ApiResponse(responseCode = "404", description = "Email không tồn tại hoặc đã xác minh")
+    })
+    public ApiResponseDto<?> resendVerification(
+            @RequestParam @Parameter(description = "Email người dùng") String email) {
         authService.resendVerification(email);
         return ApiResponseDto.success(ApiCode.EMAIL_SENT);
     }
 
     @GetMapping("/verify")
-    public ApiResponseDto<?> verify(@RequestParam String token) {
+    @Operation(summary = "Xác minh email", description = "Xác minh tài khoản thông qua token từ email.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xác minh thành công"),
+            @ApiResponse(responseCode = "400", description = "Token không hợp lệ hoặc đã hết hạn")
+    })
+    public ApiResponseDto<?> verify(
+            @RequestParam @Parameter(description = "Mã token xác minh email") String token) {
         authService.verifyEmail(token);
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 
     @PostMapping("/refresh-token")
-    public ApiResponseDto<JwtResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
+    @Operation(summary = "Làm mới token", description = "Cung cấp access token mới từ refresh token.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Làm mới token thành công"),
+            @ApiResponse(responseCode = "401", description = "Refresh token không hợp lệ")
+    })
+    public ApiResponseDto<JwtResponse> refreshToken(
+            @RequestBody @Parameter(description = "Yêu cầu làm mới token") RefreshTokenRequest request) {
         String newAccessToken = tokenService.refreshAccessToken(request.getRefreshToken());
         JwtResponse response = new JwtResponse(newAccessToken, request.getRefreshToken());
         return ApiResponseDto.success(ApiCode.SUCCESS, response);
     }
 
     @PostMapping("/logout")
-    public ApiResponseDto<?> logout(@RequestBody RefreshTokenRequest request) {
+    @Operation(summary = "Đăng xuất", description = "Thu hồi refresh token để kết thúc phiên đăng nhập.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đăng xuất thành công")
+    })
+    public ApiResponseDto<?> logout(
+            @RequestBody @Parameter(description = "Yêu cầu thu hồi token") RefreshTokenRequest request) {
         tokenService.revokeToken(request.getRefreshToken());
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
@@ -495,6 +577,10 @@ import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.CustomerService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -513,32 +599,64 @@ public class CustomerController {
 
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponseDto<List<CustomerResponse>> getAll(@RequestParam String shopId,
-                                                         @RequestParam(required = false) String branchId) {
+    @Operation(summary = "Lấy danh sách khách hàng", description = "Trả về danh sách khách hàng theo cửa hàng và (tuỳ chọn) chi nhánh")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lấy danh sách khách hàng thành công"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ApiResponseDto<List<CustomerResponse>> getAll(
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tuỳ chọn)") String branchId) {
         return ApiResponseDto.success(ApiCode.CUSTOMER_LIST, customerService.getCustomers(shopId, branchId));
     }
 
     @PostMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponseDto<CustomerResponse> create(@AuthenticationPrincipal CustomUserDetails user,
-                                                   @RequestParam String shopId,
-                                                   @RequestBody @Valid CustomerRequest request) {
+    @Operation(summary = "Tạo khách hàng", description = "Tạo một khách hàng mới trong cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tạo khách hàng thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ApiResponseDto<CustomerResponse> create(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestBody @Valid @Parameter(description = "Thông tin khách hàng") CustomerRequest request) {
         return ApiResponseDto.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user.getId(), request));
     }
 
     @PutMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponseDto<CustomerResponse> update(@RequestParam String shopId,
-                                                   @PathVariable String id,
-                                                   @RequestBody @Valid CustomerRequest request) {
+    @Operation(summary = "Cập nhật khách hàng", description = "Cập nhật thông tin khách hàng theo ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật khách hàng thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy khách hàng")
+    })
+    public ApiResponseDto<CustomerResponse> update(
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của khách hàng") String id,
+            @RequestBody @Valid @Parameter(description = "Thông tin cập nhật khách hàng") CustomerRequest request) {
         return ApiResponseDto.success(ApiCode.CUSTOMER_UPDATED, customerService.updateCustomer(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponseDto<?> delete(@RequestParam String shopId,
-                                    @RequestParam String branchId,
-                                    @PathVariable String id) {
+    @Operation(summary = "Xóa khách hàng", description = "Xoá mềm một khách hàng theo ID và chi nhánh")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xoá khách hàng thành công"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy khách hàng")
+    })
+    public ApiResponseDto<?> delete(
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam @Parameter(description = "ID của chi nhánh") String branchId,
+            @PathVariable @Parameter(description = "ID của khách hàng") String id) {
         customerService.deleteCustomer(shopId, branchId, id);
         return ApiResponseDto.success(ApiCode.CUSTOMER_DELETED);
     }
@@ -796,7 +914,6 @@ public class PromotionController {
 }
 
 // File: src/main/java/com/example/sales/controller/ReportController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -809,6 +926,11 @@ import com.example.sales.dto.report.ReportResponse;
 import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ReportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -829,25 +951,60 @@ public class ReportController {
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/summary")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponseDto<ReportResponse> getReport(@RequestParam String shopId,
-                                                    @RequestBody ReportRequest request) {
+    @Operation(
+            summary = "Lấy báo cáo tổng hợp",
+            description = "Trả về báo cáo tổng hợp doanh thu, số lượng đơn hàng, sản phẩm đã bán,... trong khoảng thời gian được chỉ định"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Báo cáo tổng hợp được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng hoặc dữ liệu báo cáo")
+    })
+    public ApiResponseDto<ReportResponse> getReport(
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestBody @Valid @Parameter(description = "Thông tin yêu cầu báo cáo") ReportRequest request) {
         return ApiResponseDto.success(ApiCode.SUCCESS, reportService.getReport(shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/daily")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponseDto<List<DailyReportResponse>> getDaily(@RequestParam String shopId,
-                                                              @RequestBody ReportRequest request) {
+    @Operation(
+            summary = "Lấy báo cáo theo ngày",
+            description = "Trả về danh sách báo cáo chi tiết theo từng ngày trong khoảng thời gian chỉ định"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Báo cáo theo ngày được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng hoặc dữ liệu báo cáo")
+    })
+    public ApiResponseDto<List<DailyReportResponse>> getDaily(
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestBody @Valid @Parameter(description = "Thông tin yêu cầu báo cáo theo ngày") ReportRequest request) {
         return ApiResponseDto.success(ApiCode.SUCCESS, reportService.getDailyReport(shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/daily/export")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<byte[]> exportDaily(@RequestParam String shopId,
-                                              @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                              @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+    @Operation(
+            summary = "Xuất báo cáo theo ngày ra file Excel",
+            description = "Xuất dữ liệu báo cáo theo ngày trong khoảng thời gian chỉ định dưới dạng file Excel"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "File Excel được xuất thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng hoặc dữ liệu báo cáo")
+    })
+    public ResponseEntity<byte[]> exportDaily(
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            @Parameter(description = "Ngày bắt đầu (yyyy-MM-dd)") LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            @Parameter(description = "Ngày kết thúc (yyyy-MM-dd)") LocalDate endDate) {
         return reportService.exportDailyReportExcel(shopId, startDate, endDate);
     }
 }
@@ -1171,6 +1328,10 @@ import com.example.sales.dto.UpdateProfileRequest;
 import com.example.sales.model.User;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -1186,20 +1347,40 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/me")
-    public ApiResponseDto<User> getCurrentUser(@AuthenticationPrincipal CustomUserDetails user) {
+    @Operation(summary = "Lấy thông tin người dùng hiện tại", description = "Trả về thông tin chi tiết của người dùng đang đăng nhập.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lấy thông tin thành công"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực hoặc token không hợp lệ")
+    })
+    public ApiResponseDto<User> getCurrentUser(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
         return ApiResponseDto.success(ApiCode.USER_INFO, userService.getCurrentUser(user.getId()));
     }
 
     @PutMapping("/update-profile")
-    public ApiResponseDto<User> updateProfile(@AuthenticationPrincipal CustomUserDetails user,
-                                              @RequestBody UpdateProfileRequest request) {
-        com.example.sales.model.User updated = userService.updateProfile(user.getId(), request.getFullName(), request.getPhone(), request.getBusinessType());
+    @Operation(summary = "Cập nhật thông tin người dùng", description = "Cập nhật họ tên, số điện thoại và loại hình kinh doanh của người dùng.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực hoặc token không hợp lệ")
+    })
+    public ApiResponseDto<User> updateProfile(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestBody @Valid @Parameter(description = "Thông tin cập nhật hồ sơ") UpdateProfileRequest request) {
+        User updated = userService.updateProfile(user.getId(), request.getFullName(), request.getPhone(), request.getBusinessType());
         return ApiResponseDto.success(ApiCode.USER_UPDATED, updated);
     }
 
     @PostMapping("/change-password")
-    public ApiResponseDto<?> changePassword(@AuthenticationPrincipal CustomUserDetails user,
-                                            @RequestBody @Valid ChangePasswordRequest request) {
+    @Operation(summary = "Đổi mật khẩu", description = "Cho phép người dùng đổi mật khẩu bằng cách cung cấp mật khẩu hiện tại và mật khẩu mới.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đổi mật khẩu thành công"),
+            @ApiResponse(responseCode = "400", description = "Mật khẩu hiện tại không đúng hoặc dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực hoặc token không hợp lệ")
+    })
+    public ApiResponseDto<?> changePassword(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestBody @Valid @Parameter(description = "Thông tin đổi mật khẩu") ChangePasswordRequest request) {
         userService.changePassword(user.getId(), request.getCurrentPassword(), request.getNewPassword());
         return ApiResponseDto.success(ApiCode.PASSWORD_CHANGED);
     }
@@ -6469,6 +6650,10 @@ import com.example.sales.repository.SubscriptionHistoryRepository;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.PaymentService;
 import com.example.sales.service.ShopService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -6486,25 +6671,46 @@ public class SubscriptionController {
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
 
     @GetMapping("/me")
-    public ApiResponseDto<Shop> getCurrentPlan(@AuthenticationPrincipal CustomUserDetails user) {
+    @Operation(summary = "Lấy thông tin gói hiện tại", description = "Trả về gói dịch vụ hiện tại của cửa hàng do người dùng sở hữu")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trả về thông tin cửa hàng và gói hiện tại thành công"),
+            @ApiResponse(responseCode = "401", description = "Không xác thực hoặc token không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ApiResponseDto<Shop> getCurrentPlan(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS, shop);
     }
 
     @PostMapping("/upgrade")
-    public ApiResponseDto<?> upgrade(@AuthenticationPrincipal CustomUserDetails user,
-                                     @RequestBody @Valid UpgradePlanRequest req) {
+    @Operation(summary = "Nâng cấp gói dịch vụ", description = "Nâng cấp cửa hàng lên gói dịch vụ cao hơn (Pro, Enterprise)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Nâng cấp gói thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ hoặc gói không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không xác thực hoặc token không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ApiResponseDto<?> upgrade(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestBody @Valid @Parameter(description = "Thông tin nâng cấp gói dịch vụ") UpgradePlanRequest req) {
         Shop shop = shopService.getShopByOwner(user.getId());
 
         paymentService.upgradeShopPlan(shop, req.getTargetPlan(), req.getMonths());
-
-        shopService.save(shop); // hoặc updateShop()
+        shopService.save(shop);
 
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 
     @GetMapping("/history")
-    public ApiResponseDto<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal CustomUserDetails user) {
+    @Operation(summary = "Lịch sử nâng cấp gói", description = "Trả về lịch sử các lần nâng cấp gói dịch vụ của cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lấy lịch sử thành công"),
+            @ApiResponse(responseCode = "401", description = "Không xác thực hoặc token không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ApiResponseDto<List<SubscriptionHistory>> getHistory(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
         List<SubscriptionHistory> history = subscriptionHistoryRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS, history);
@@ -6902,6 +7108,10 @@ import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -6915,106 +7125,95 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
 public class ProductCrudController {
+
     private final ProductService productService;
 
-    /**
-     * Tạo sản phẩm mới.
-     *
-     * @param shopId  ID của cửa hàng
-     * @param request Chi tiết sản phẩm
-     * @return Phản hồi với sản phẩm đã tạo
-     */
+    @Operation(summary = "Tạo sản phẩm mới")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tạo sản phẩm thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền tạo")
+    })
     @PostMapping
     @RequireRole(ShopRole.OWNER)
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
-            @RequestParam String shopId,
+            @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.createProduct(shopId, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
-    /**
-     * Cập nhật sản phẩm.
-     *
-     * @param userId  ID người dùng
-     * @param shopId  ID cửa hàng
-     * @param id      ID sản phẩm
-     * @param request Chi tiết sản phẩm cần cập nhật
-     * @return Phản hồi với sản phẩm đã cập nhật
-     */
+    @Operation(summary = "Cập nhật sản phẩm")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật sản phẩm thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật")
+    })
     @PutMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<ProductResponse>> update(
-            @RequestParam String userId,
-            @RequestParam String shopId,
-            @PathVariable String id,
+            @Parameter(description = "ID người dùng") @RequestParam String userId,
+            @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
+            @Parameter(description = "ID sản phẩm") @PathVariable String id,
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.updateProduct(userId, shopId, id, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_UPDATED, response));
     }
 
-    /**
-     * Xóa sản phẩm (xóa mềm).
-     *
-     * @param shopId ID cửa hàng
-     * @param id     ID sản phẩm
-     * @return Phản hồi xác nhận xóa
-     */
+    @Operation(summary = "Xóa sản phẩm (xóa mềm)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xóa thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền xóa")
+    })
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     public ResponseEntity<ApiResponseDto<Void>> delete(
-            @RequestParam String shopId,
-            @PathVariable String id) {
+            @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
+            @Parameter(description = "ID sản phẩm") @PathVariable String id) {
         productService.deleteProduct(shopId, id);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_DELETED, null));
     }
 
-    /**
-     * Lấy danh sách sản phẩm với phân trang.
-     *
-     * @param shopId   ID cửa hàng
-     * @param pageable Thông tin phân trang
-     * @return Danh sách sản phẩm
-     */
+    @Operation(summary = "Lấy danh sách sản phẩm với phân trang")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm")
+    })
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
-            @RequestParam String shopId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
         Page<ProductResponse> response = productService.getAllByShop(shopId, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
     }
 
-    /**
-     * Lấy chi tiết sản phẩm.
-     *
-     * @param shopId ID cửa hàng
-     * @param id     ID sản phẩm
-     * @return Chi tiết sản phẩm
-     */
+    @Operation(summary = "Lấy chi tiết sản phẩm")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trả về chi tiết sản phẩm"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm")
+    })
     @GetMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<ProductResponse>> getById(
-            @RequestParam String shopId,
-            @PathVariable String id) {
+            @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
+            @Parameter(description = "ID sản phẩm") @PathVariable String id) {
         ProductResponse response = productService.getProduct(shopId, id);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_FOUND, response));
     }
 
-    /**
-     * Lấy danh sách sản phẩm theo từ khóa tìm kiếm.
-     *
-     * @param shopId   ID cửa hàng
-     * @param keyword  Từ khóa tìm kiếm
-     * @param pageable Thông tin phân trang
-     * @return Danh sách sản phẩm phù hợp với từ khóa
-     */
+    @Operation(summary = "Tìm kiếm sản phẩm theo từ khóa")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm khớp từ khóa")
+    })
     @GetMapping("/search")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> search(
-            @RequestParam String shopId,
-            @RequestParam String keyword,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
+            @Parameter(description = "Từ khóa tìm kiếm") @RequestParam String keyword,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
         Page<ProductResponse> response = productService.searchProducts(shopId, keyword, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_SEARCH_RESULTS, response));
     }
@@ -7029,7 +7228,14 @@ import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.ProductImportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -7041,43 +7247,66 @@ import java.util.Map;
 @RequestMapping("/api/products/import-export")
 @RequiredArgsConstructor
 public class ProductImportExportController {
+
     private final ProductImportService productImportService;
     private final ExcelExportService excelExportService;
 
-    /**
-     * Nhập sản phẩm từ file Excel.
-     *
-     * @param shopId ID cửa hàng
-     * @param file   File Excel chứa dữ liệu sản phẩm
-     * @return Kết quả nhập
-     */
-    @PostMapping("/import")
+    @Operation(summary = "Nhập sản phẩm từ file Excel")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Nhập sản phẩm thành công",
+                    content = @Content(schema = @Schema(implementation = ApiResponseDto.class))),
+            @ApiResponse(responseCode = "400", description = "File không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động")
+    })
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequireRole(ShopRole.OWNER)
     public ResponseEntity<ApiResponseDto<Map<String, Object>>> importExcel(
+            @Parameter(description = "ID cửa hàng", required = true)
             @RequestParam String shopId,
+
+            @Parameter(description = "ID chi nhánh (tùy chọn)")
             @RequestParam(required = false) String branchId,
+
+            @Parameter(description = "File Excel chứa danh sách sản phẩm", required = true)
             @RequestParam("file") MultipartFile file) {
+
         Map<String, Object> result = productImportService.importExcel(shopId, branchId, file);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_IMPORTED, result));
     }
 
+    @Operation(summary = "Xuất danh sách sản phẩm ra file Excel")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xuất file Excel thành công",
+                    content = @Content(mediaType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "500", description = "Lỗi xử lý file")
+    })
     @GetMapping("/export")
     @RequireRole(ShopRole.OWNER)
     public ResponseEntity<byte[]> exportExcel(
+            @Parameter(description = "ID cửa hàng", required = true)
             @RequestParam String shopId,
+
+            @Parameter(description = "ID chi nhánh (tùy chọn)")
             @RequestParam(required = false) String branchId) throws IOException {
+
         return excelExportService.exportProducts(shopId, branchId);
     }
 }
 
 // File: main/java/com/example/sales/controller/product/ProductStatusController.java
 package com.example.sales.controller.product;
+
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -7091,36 +7320,48 @@ import java.util.List;
 @RequestMapping("/api/products/status")
 @RequiredArgsConstructor
 public class ProductStatusController {
+
     private final ProductService productService;
 
     /**
-     * Bật/tắt trạng thái sản phẩm.
-     *
-     * @param shopId    ID cửa hàng
-     * @param productId ID sản phẩm
-     * @return Phản hồi với sản phẩm đã cập nhật
+     * Bật/tắt trạng thái hoạt động của sản phẩm.
      */
+    @Operation(summary = "Bật/tắt trạng thái hoạt động của sản phẩm")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật trạng thái thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
     @PatchMapping("/{productId}/toggle")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<ProductResponse>> toggleActive(
+            @Parameter(description = "ID cửa hàng", required = true)
             @RequestParam String shopId,
+
+            @Parameter(description = "ID sản phẩm", required = true)
             @PathVariable String productId) {
+
         ProductResponse response = productService.toggleActive(shopId, productId);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_STATUS_UPDATED, response));
     }
 
     /**
-     * Lấy danh sách sản phẩm tồn kho thấp.
-     *
-     * @param shopId   ID cửa hàng
-     * @param threshold Ngưỡng tồn kho thấp
-     * @return Danh sách sản phẩm tồn kho thấp
+     * Lấy danh sách sản phẩm có tồn kho dưới ngưỡng cảnh báo.
      */
+    @Operation(summary = "Lấy danh sách sản phẩm tồn kho thấp")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách sản phẩm được trả về thành công"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
     @GetMapping("/low-stock")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<List<ProductResponse>>> getLowStock(
+            @Parameter(description = "ID cửa hàng", required = true)
             @RequestParam String shopId,
+
+            @Parameter(description = "Ngưỡng tồn kho thấp. Mặc định là 10", example = "10")
             @RequestParam(defaultValue = "10") int threshold) {
+
         List<ProductResponse> response = productService.getLowStockProducts(shopId, threshold);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LOW_STOCK, response));
     }
