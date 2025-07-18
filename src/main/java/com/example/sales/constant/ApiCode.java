@@ -62,7 +62,13 @@ public enum ApiCode {
     CUSTOMER_CREATED("4121", "Customer created successfully"),
     CUSTOMER_UPDATED("4122", "Customer updated successfully"),
     CUSTOMER_DELETED("4123", "Customer deleted successfully"),
-    CUSTOMER_LIST("4124", "Customer list retrieved");
+    CUSTOMER_LIST("4124", "Customer list retrieved"),
+    PRODUCT_DELETED("4125", "Product deleted successfully"),
+    PRODUCT_LIST("4126", "Product list retrieved"),
+    PRODUCT_FOUND("4127", "Product found"),
+    PRODUCT_IMPORTED("4128", "Product imported successfully"),
+    PRODUCT_STATUS_UPDATED("4129", "Product status updated successfully"),
+    PRODUCT_LOW_STOCK("4130", "Low stock products retrieved");
 
     private final String code;
     private final String message;

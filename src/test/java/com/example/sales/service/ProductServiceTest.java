@@ -34,7 +34,7 @@ class ProductServiceTest {
         // Arrange
         ProductRequest req = new ProductRequest();
         req.setName("Cà phê");
-        req.setPrice(25000);
+        req.setPrice(10000.0);
         req.setQuantity(10);
         req.setCategory("Đồ uống");
         req.setUnit("Cốc");

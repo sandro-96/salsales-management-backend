@@ -2,17 +2,20 @@
 package com.example.sales.repository;
 
 import com.example.sales.model.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repository cho sản phẩm.
+ */
 public interface ProductRepository extends MongoRepository<Product, String> {
-    @Query("{ 'shopId': ?0, 'deleted': false }")
-    List<Product> findByShopId(String shopId);
-
-    List<Product> findByShopIdAndDeletedFalse(String shopId);
     Optional<Product> findByIdAndDeletedFalse(String id);
+    Optional<Product> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
+    Page<Product> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+    List<Product> findByShopIdAndQuantityLessThanAndDeletedFalse(String shopId, int threshold);
 
 }
