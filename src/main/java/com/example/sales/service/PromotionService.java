@@ -9,9 +9,9 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Promotion;
 import com.example.sales.repository.PromotionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,14 +20,12 @@ public class PromotionService {
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
 
-    public List<PromotionResponse> getAll(String shopId, String branchId) {
-        return promotionRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<PromotionResponse> getAll(String userId, String shopId, String branchId, Pageable pageable) {
+        return promotionRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
+                .map(this::toResponse);
     }
 
-    public PromotionResponse create(String shopId, PromotionRequest request) {
+    public PromotionResponse create(String userId, String shopId, PromotionRequest request) {
         Promotion promotion = Promotion.builder()
                 .shopId(shopId)
                 .name(request.getName())
@@ -41,7 +39,7 @@ public class PromotionService {
                 .build();
 
         Promotion saved = promotionRepository.save(promotion);
-        auditLogService.log(null, shopId, saved.getId(), "PROMOTION", "CREATED",
+        auditLogService.log(userId, shopId, saved.getId(), "PROMOTION", "CREATED",
                 String.format("Tạo khuyến mãi: %s (%.2f %s)",
                         saved.getName(),
                         saved.getDiscountValue(),
@@ -49,7 +47,7 @@ public class PromotionService {
         return toResponse(saved);
     }
 
-    public PromotionResponse update(String shopId, String id, PromotionRequest request) {
+    public PromotionResponse update(String userId, String shopId, String id, PromotionRequest request) {
         Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
@@ -67,19 +65,19 @@ public class PromotionService {
         promotion.setActive(request.isActive());
 
         Promotion saved = promotionRepository.save(promotion);
-        auditLogService.log(null, shopId, saved.getId(), "PROMOTION", "UPDATED",
+        auditLogService.log(userId, shopId, saved.getId(), "PROMOTION", "UPDATED",
                 String.format("Cập nhật khuyến mãi: %s", saved.getName()));
         return toResponse(saved);
     }
 
-    public void delete(String shopId, String id) {
+    public void delete(String userId, String shopId, String id) {
         Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
 
         promotion.setDeleted(true);
         promotionRepository.save(promotion);
-        auditLogService.log(null, shopId, promotion.getId(), "PROMOTION", "DELETED",
+        auditLogService.log(userId, shopId, promotion.getId(), "PROMOTION", "DELETED",
                 String.format("Xoá mềm khuyến mãi: %s", promotion.getName()));
 
     }

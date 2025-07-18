@@ -1,50 +1,120 @@
 // File: test/java/com/example/sales/service/OrderServiceTest.java
 package com.example.sales.service;
 
-import com.example.sales.constant.OrderStatus;
-import com.example.sales.model.Order;
-import com.example.sales.repository.OrderRepository;
+import com.example.sales.constant.*;
+import com.example.sales.dto.order.OrderItemRequest;
+import com.example.sales.dto.order.OrderRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.*;
+import com.example.sales.repository.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockitoAnnotations;
 
+import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
-    @InjectMocks
-    private OrderService orderService;
+    @Mock private OrderRepository orderRepository;
+    @Mock private ProductRepository productRepository;
+    @Mock private PromotionRepository promotionRepository;
+    @Mock private ShopRepository shopRepository;
+    @Mock private TableRepository tableRepository;
+    @Mock private InventoryTransactionRepository inventoryTransactionRepository;
+    @Mock private AuditLogService auditLogService;
+    @Mock private ShopUserService shopUserService;
 
-    @Mock
-    private OrderRepository orderRepository;
+    @InjectMocks private OrderService orderService;
 
-    @Mock
-    private AuditLogService auditLogService; // 🟢 THÊM MOCK NÀY
+    private final String userId = "user123";
+    private final String shopId = "shop123";
+    private final String branchId = "branch123";
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
 
     @Test
-    void testCancelOrder() {
-        Order mockOrder = Order.builder()
-                .id("ord1")
-                .shopId("shop1")
-                .userId("user1")
-                .status(OrderStatus.PENDING)
+    void createOrder_shouldCreateOrderAndAdjustInventory() {
+        Product product = Product.builder()
+                .id("prod1")
+                .name("Coca")
+                .quantity(100)
+                .shopId(shopId)
                 .build();
 
-        when(orderRepository.findByIdAndDeletedFalse("ord1"))
-                .thenReturn(Optional.of(mockOrder));
+        Shop shop = new Shop();
+        shop.setId(shopId);
+        shop.setType(ShopType.RETAIL);
 
-        orderService.cancelOrder("user1", "shop1", "ord1");
+        OrderItemRequest itemRequest = new OrderItemRequest("prod1", 2, 10000);
+        OrderRequest request = new OrderRequest();
+        request.setItems(List.of(itemRequest));
+        request.setBranchId(branchId);
 
-        assertEquals(OrderStatus.CANCELLED, mockOrder.getStatus());
-        verify(orderRepository).save(mockOrder);
+        when(productRepository.findById("prod1")).thenReturn(Optional.of(product));
+        when(shopRepository.findByIdAndDeletedFalse(shopId)).thenReturn(Optional.of(shop));
+        when(orderRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        // 🟢 Optional: kiểm tra audit log được gọi
-        verify(auditLogService).log(eq("user1"), eq("shop1"), eq("ord1"), eq("ORDER"), eq("CANCELLED"), anyString());
+        var response = orderService.createOrder(userId, shopId, request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getTotalAmount()).isEqualTo(2);
+        assertThat(response.getTotalPrice()).isEqualTo(20000);
+
+        verify(productRepository).save(any());
+        verify(inventoryTransactionRepository).save(any());
+    }
+
+    @Test
+    void createOrder_shouldThrowIfProductNotFound() {
+        OrderRequest request = new OrderRequest();
+        request.setItems(List.of(new OrderItemRequest("missingProd", 1, 5000)));
+
+        when(productRepository.findById("missingProd")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.createOrder(userId, shopId, request))
+                .isInstanceOf(Exception.class);
+    }
+
+    @Test
+    void cancelOrder_shouldSetStatusCancelled() {
+        Order order = new Order();
+        order.setId("order123");
+        order.setShopId(shopId);
+        order.setUserId(userId);
+        order.setPaid(false);
+
+        when(orderRepository.findByIdAndDeletedFalse("order123")).thenReturn(Optional.of(order));
+
+        orderService.cancelOrder(userId, shopId, "order123");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void cancelOrder_shouldFailIfAlreadyPaid() {
+        Order order = new Order();
+        order.setId("order123");
+        order.setPaid(true);
+        order.setShopId(shopId);
+        order.setUserId(userId);
+
+        when(orderRepository.findByIdAndDeletedFalse("order123")).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(userId, shopId, "order123"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ORDER_ALREADY_PAID");
     }
 }
+

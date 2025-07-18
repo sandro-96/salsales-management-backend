@@ -2,9 +2,10 @@
 package com.example.sales.repository;
 
 import com.example.sales.model.ShopUser;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
@@ -12,5 +13,5 @@ public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
 
     Optional<ShopUser> findByShopIdAndUserIdAndDeletedFalse(String shopId, String userId);
 
-    List<ShopUser> findByUserIdAndDeletedFalse(String userId);
+    Page<ShopUser> findByUserIdAndDeletedFalse(String userId, Pageable pageable);
 }

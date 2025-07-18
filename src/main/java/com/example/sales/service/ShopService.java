@@ -7,6 +7,7 @@ import com.example.sales.constant.UserRole;
 import com.example.sales.dto.shop.ShopAdminResponse;
 import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopResponse;
+import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
@@ -14,17 +15,23 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class ShopService {
+public class ShopService extends BaseService {
 
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
     private final ShopUserRepository shopUserRepository;
 
     public Shop createShop(String userId, ShopRequest request, String logoUrl) {
+        if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
+            throw new BusinessException(ApiCode.SHOP_NAME_EXISTS);
+        }
         if (shopRepository.findByOwnerIdAndDeletedFalse(userId).isPresent()) {
             throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
@@ -51,6 +58,7 @@ public class ShopService {
         return saved;
     }
 
+    @Cacheable(value = "shops", key = "#ownerId")
     public Shop getShopByOwner(String ownerId) {
         return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
@@ -84,9 +92,21 @@ public class ShopService {
                 String.format("Xoá mềm cửa hàng: %s", shop.getName()));
     }
 
+    @Cacheable(value = "shops", key = "#shopId")
     public Shop getShopById(String shopId) {
-        return shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        return checkShopExists(shopRepository, shopId);
+    }
+
+    // File: ShopService.java
+    public Page<ShopSimpleResponse> searchShops(String keyword, Pageable pageable) {
+        return shopRepository.findByKeyword(keyword, pageable)
+                .map(shop -> ShopSimpleResponse.builder()
+                        .id(shop.getId())
+                        .name(shop.getName())
+                        .type(shop.getType())
+                        .logoUrl(shop.getLogoUrl())
+                        .active(shop.isActive())
+                        .build());
     }
 
     public Shop save(Shop shop) {

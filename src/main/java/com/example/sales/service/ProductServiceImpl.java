@@ -11,6 +11,7 @@ import com.example.sales.model.Shop;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-public class ProductServiceImpl implements ProductService {
+public class ProductServiceImpl extends BaseService implements ProductService {
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
@@ -128,6 +129,7 @@ public class ProductServiceImpl implements ProductService {
         return toResponse(product);
     }
 
+    @Cacheable(value = "products", key = "#shopId")
     @Override
     public Page<ProductResponse> getAllByShop(String shopId, Pageable pageable) {
         return productRepository.findByShopIdAndDeletedFalse(shopId, pageable)
@@ -166,6 +168,12 @@ public class ProductServiceImpl implements ProductService {
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable) {
+        return productRepository.findByShopIdAndKeyword(shopId, keyword, pageable)
+                .map(this::toResponse);
     }
 
     private ProductResponse toResponse(Product product) {

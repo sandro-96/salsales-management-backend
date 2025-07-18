@@ -9,9 +9,6 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-/**
- * Mô hình sản phẩm trong cơ sở dữ liệu.
- */
 @Getter
 @Setter
 @ToString
@@ -39,7 +36,6 @@ public class Product extends BaseEntity {
     private String unit;
     private String imageUrl;
     private String description;
-
     private String shopId;
     private String branchId;
 

@@ -3,9 +3,10 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.ChangePasswordRequest;
 import com.example.sales.dto.UpdateProfileRequest;
+import com.example.sales.model.User;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.UserService;
 import jakarta.validation.Valid;
@@ -23,21 +24,21 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/me")
-    public ApiResponse<com.example.sales.model.User> getCurrentUser(@AuthenticationPrincipal CustomUserDetails user) {
-        return ApiResponse.success(ApiCode.USER_INFO, userService.getCurrentUser(user.getId()));
+    public ApiResponseDto<User> getCurrentUser(@AuthenticationPrincipal CustomUserDetails user) {
+        return ApiResponseDto.success(ApiCode.USER_INFO, userService.getCurrentUser(user.getId()));
     }
 
     @PutMapping("/update-profile")
-    public ApiResponse<com.example.sales.model.User> updateProfile(@AuthenticationPrincipal CustomUserDetails user,
-                                           @RequestBody UpdateProfileRequest request) {
+    public ApiResponseDto<User> updateProfile(@AuthenticationPrincipal CustomUserDetails user,
+                                              @RequestBody UpdateProfileRequest request) {
         com.example.sales.model.User updated = userService.updateProfile(user.getId(), request.getFullName(), request.getPhone(), request.getBusinessType());
-        return ApiResponse.success(ApiCode.USER_UPDATED, updated);
+        return ApiResponseDto.success(ApiCode.USER_UPDATED, updated);
     }
 
     @PostMapping("/change-password")
-    public ApiResponse<?> changePassword(@AuthenticationPrincipal CustomUserDetails user,
-                                         @RequestBody @Valid ChangePasswordRequest request) {
+    public ApiResponseDto<?> changePassword(@AuthenticationPrincipal CustomUserDetails user,
+                                            @RequestBody @Valid ChangePasswordRequest request) {
         userService.changePassword(user.getId(), request.getCurrentPassword(), request.getNewPassword());
-        return ApiResponse.success(ApiCode.PASSWORD_CHANGED);
+        return ApiResponseDto.success(ApiCode.PASSWORD_CHANGED);
     }
 }

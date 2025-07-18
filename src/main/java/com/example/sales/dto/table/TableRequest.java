@@ -1,5 +1,5 @@
-// File: src/main/java/com/example/sales/dto/TableRequest.java
-package com.example.sales.dto;
+// File: src/main/java/com/example/sales/dto/table/TableRequest.java
+package com.example.sales.dto.table;
 
 import com.example.sales.constant.TableStatus;
 import jakarta.validation.constraints.NotBlank;

@@ -5,11 +5,15 @@ import com.example.sales.constant.*;
 import com.example.sales.dto.order.OrderItemResponse;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
+import com.example.sales.dto.order.OrderUpdateRequest;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
 import com.example.sales.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +22,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class OrderService {
+public class OrderService extends BaseService {
 
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
@@ -27,6 +31,7 @@ public class OrderService {
     private final AuditLogService auditLogService;
     private final ShopRepository shopRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final ShopUserService shopUserService;
 
     public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
         return orderRepository.findByShopIdAndDeletedFalse(shopId)
@@ -100,7 +105,7 @@ public class OrderService {
                         "Xuất kho theo đơn hàng " + created.getId(), created.getId());
             }
         }
-        releaseTable(created);
+        occupyTable(created);
         return toResponse(created);
     }
 
@@ -166,10 +171,21 @@ public class OrderService {
                 .stream().map(this::toResponse).toList();
     }
 
-    private Order getOrderByShop(String orderId, String shopId) {
-        return orderRepository.findByIdAndDeletedFalse(orderId)
-                .filter(o -> o.getShopId().equals(shopId))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
+    @Cacheable(value = "orders", key = "#orderId + '-' + #shopId")
+    public Order getOrderByShop(String orderId, String shopId) {
+        Order order = checkOrderExists(orderRepository, orderId, shopId);
+        shopUserService.requireAnyRole(shopId, order.getUserId(), ShopRole.OWNER, ShopRole.STAFF);
+        return order;
+    }
+
+    private void occupyTable(Order order) {
+        if (order.getTableId() != null) {
+            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+                table.setStatus(TableStatus.OCCUPIED);
+                table.setCurrentOrderId(order.getId());
+                tableRepository.save(table);
+            });
+        }
     }
 
     private void releaseTable(Order order) {
@@ -222,6 +238,97 @@ public class OrderService {
                 .build();
 
         inventoryTransactionRepository.save(tx);
+    }
+
+    // File: OrderService.java
+    public Page<OrderResponse> getOrdersByUser(String userId, String shopId, Pageable pageable) {
+        return orderRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+                .map(this::toResponse);
+    }
+
+    public Page<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId, Pageable pageable) {
+        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public OrderResponse updateOrder(String userId, String shopId, String orderId, OrderUpdateRequest request) {
+        Order order = getOrderByShop(orderId, shopId);
+
+        if (order.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+
+        // Gỡ bàn cũ nếu đổi bàn
+        if (request.getTableId() != null && !request.getTableId().equals(order.getTableId())) {
+            releaseTable(order);
+            order.setTableId(request.getTableId());
+            occupyTable(order);
+        }
+
+        if (request.getNote() != null) {
+            order.setNote(request.getNote());
+        }
+
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+            if (shop.getType().isTrackInventory()) {
+                // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ
+                for (OrderItem oldItem : order.getItems()) {
+                    Product product = productRepository.findByIdAndDeletedFalse(oldItem.getProductId())
+                            .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.IMPORT, oldItem.getQuantity(),
+                            "Hoàn kho khi cập nhật đơn hàng " + orderId, orderId);
+                }
+            }
+
+            // 🔁 2. Áp dụng lại tồn kho cho danh sách mới
+            List<OrderItem> updatedItems = request.getItems().stream().map(reqItem -> {
+                Product product = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+                double basePrice = reqItem.getPrice();
+                double finalPrice = basePrice;
+                String promoId = null;
+
+                Promotion promo = findApplicablePromotion(shopId, order.getBranchId(), product.getId());
+                if (promo != null) {
+                    promoId = promo.getId();
+                    if (promo.getDiscountType() == DiscountType.PERCENT) {
+                        finalPrice = basePrice * (1 - promo.getDiscountValue() / 100.0);
+                    } else if (promo.getDiscountType() == DiscountType.AMOUNT) {
+                        finalPrice = Math.max(0, basePrice - promo.getDiscountValue());
+                    }
+                }
+
+                OrderItem item = OrderItem.builder()
+                        .productId(product.getId())
+                        .productName(product.getName())
+                        .quantity(reqItem.getQuantity())
+                        .price(basePrice)
+                        .priceAfterDiscount(finalPrice)
+                        .appliedPromotionId(promoId)
+                        .build();
+
+                // Trừ kho mới
+                if (shop.getType().isTrackInventory()) {
+                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
+                            "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
+                }
+
+                return item;
+            }).toList();
+
+            order.setItems(updatedItems);
+            order.setTotalAmount(updatedItems.stream().mapToInt(OrderItem::getQuantity).sum());
+            order.setTotalPrice(updatedItems.stream().mapToDouble(i -> i.getQuantity() * i.getPriceAfterDiscount()).sum());
+        }
+
+        Order updated = orderRepository.save(order);
+        auditLogService.log(userId, shopId, orderId, "ORDER", "UPDATED", "Cập nhật đơn hàng");
+        return toResponse(updated);
     }
 
     private OrderResponse toResponse(Order order) {

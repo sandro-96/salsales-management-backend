@@ -233,7 +233,7 @@ public enum UserRole {
 package com.example.sales.controller.admin;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.User;
 import com.example.sales.service.AdminUserService;
@@ -253,33 +253,32 @@ public class AdminUserController {
     private final AdminUserService adminUserService;
 
     @GetMapping
-    public ApiResponse<List<User>> getAll() {
-        return ApiResponse.success(ApiCode.SUCCESS, adminUserService.getAllUsers());
+    public ApiResponseDto<List<User>> getAll() {
+        return ApiResponseDto.success(ApiCode.SUCCESS, adminUserService.getAllUsers());
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<User> getById(@PathVariable String id) {
-        return ApiResponse.success(ApiCode.SUCCESS, adminUserService.getUserById(id));
+    public ApiResponseDto<User> getById(@PathVariable String id) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, adminUserService.getUserById(id));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<User> updateUser(@PathVariable String id,
-                                        @RequestBody User userUpdate) {
-        return ApiResponse.success(ApiCode.USER_UPDATED, adminUserService.updateUser(id, userUpdate));
+    public ApiResponseDto<User> updateUser(@PathVariable String id,
+                                           @RequestBody User userUpdate) {
+        return ApiResponseDto.success(ApiCode.USER_UPDATED, adminUserService.updateUser(id, userUpdate));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<?> deleteUser(@PathVariable String id,
-                                     @AuthenticationPrincipal User currentUser) {
+    public ApiResponseDto<?> deleteUser(@PathVariable String id,
+                                        @AuthenticationPrincipal User currentUser) {
         if (id.equals(currentUser.getId())) {
             throw new BusinessException(ApiCode.CANNOT_DELETE_SELF);
         }
 
         adminUserService.deleteUser(id);
-        return ApiResponse.success(ApiCode.USER_DELETED);
+        return ApiResponseDto.success(ApiCode.USER_DELETED);
     }
 }
-
 
 // File: src/main/java/com/example/sales/controller/AuditLogController.java
 
@@ -287,7 +286,7 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.SubscriptionPlan;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.model.AuditLog;
 import com.example.sales.repository.AuditLogRepository;
 import com.example.sales.security.RequirePlan;
@@ -307,9 +306,9 @@ public class AuditLogController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/{targetId}")
-    public ApiResponse<List<AuditLog>> getLogs(@PathVariable String targetId) {
+    public ApiResponseDto<List<AuditLog>> getLogs(@PathVariable String targetId) {
         List<AuditLog> logs = auditLogRepository.findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(targetId);
-        return ApiResponse.success(ApiCode.SUCCESS, logs);
+        return ApiResponseDto.success(ApiCode.SUCCESS, logs);
     }
 }
 
@@ -335,49 +334,48 @@ public class AuthController {
     private final TokenService tokenService;
 
     @PostMapping("/register")
-    public ApiResponse<?> register(@RequestBody @Valid RegisterRequest request) {
+    public ApiResponseDto<?> register(@RequestBody @Valid RegisterRequest request) {
         authService.register(request);
-        return ApiResponse.success(ApiCode.EMAIL_SENT);
+        return ApiResponseDto.success(ApiCode.EMAIL_SENT);
     }
 
     @PostMapping("/login")
-    public ApiResponse<JwtResponse> login(@RequestBody @Valid LoginRequest request) {
+    public ApiResponseDto<JwtResponse> login(@RequestBody @Valid LoginRequest request) {
         JwtResponse token = authService.login(request);
-        return ApiResponse.success(ApiCode.SUCCESS, token);
+        return ApiResponseDto.success(ApiCode.SUCCESS, token);
     }
 
     @PostMapping("/forgot-password")
-    public ApiResponse<?> forgotPassword(@RequestParam String email) {
+    public ApiResponseDto<?> forgotPassword(@RequestParam String email) {
         authService.forgotPassword(email);
-        return ApiResponse.success(ApiCode.EMAIL_SENT);
+        return ApiResponseDto.success(ApiCode.EMAIL_SENT);
     }
 
     @PostMapping("/resend-verification")
-    public ApiResponse<?> resendVerification(@RequestParam String email) {
+    public ApiResponseDto<?> resendVerification(@RequestParam String email) {
         authService.resendVerification(email);
-        return ApiResponse.success(ApiCode.EMAIL_SENT);
+        return ApiResponseDto.success(ApiCode.EMAIL_SENT);
     }
 
     @GetMapping("/verify")
-    public ApiResponse<?> verify(@RequestParam String token) {
+    public ApiResponseDto<?> verify(@RequestParam String token) {
         authService.verifyEmail(token);
-        return ApiResponse.success(ApiCode.SUCCESS);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 
     @PostMapping("/refresh-token")
-    public ApiResponse<JwtResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
+    public ApiResponseDto<JwtResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
         String newAccessToken = tokenService.refreshAccessToken(request.getRefreshToken());
         JwtResponse response = new JwtResponse(newAccessToken, request.getRefreshToken());
-        return ApiResponse.success(ApiCode.SUCCESS, response);
+        return ApiResponseDto.success(ApiCode.SUCCESS, response);
     }
 
     @PostMapping("/logout")
-    public ApiResponse<?> logout(@RequestBody RefreshTokenRequest request) {
+    public ApiResponseDto<?> logout(@RequestBody RefreshTokenRequest request) {
         tokenService.revokeToken(request.getRefreshToken());
-        return ApiResponse.success(ApiCode.SUCCESS);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 }
-
 
 // File: src/main/java/com/example/sales/controller/BranchController.java
 
@@ -386,18 +384,24 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.SubscriptionPlan;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.BranchService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/branches")
@@ -409,34 +413,73 @@ public class BranchController {
 
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<BranchResponse>> getAll(@RequestParam String shopId) {
-        return ApiResponse.success(ApiCode.SUCCESS, branchService.getAll(shopId));
+    @Operation(summary = "Lấy danh sách chi nhánh", description = "Lấy danh sách chi nhánh của cửa hàng với phân trang")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách chi nhánh được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<Page<BranchResponse>> getAll(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.getAll(user.getId(), shopId, pageable));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<BranchResponse> create(@RequestParam String shopId,
-                                              @RequestBody @Valid BranchRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, branchService.create(shopId, request));
+    @Operation(summary = "Tạo chi nhánh mới", description = "Tạo một chi nhánh mới cho cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Chi nhánh được tạo thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<BranchResponse> create(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestBody @Valid @Parameter(description = "Thông tin chi nhánh") BranchRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.create(user.getId(), shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<BranchResponse> update(@RequestParam String shopId,
-                                              @PathVariable String id,
-                                              @RequestBody @Valid BranchRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, branchService.update(shopId, id, request));
+    @Operation(summary = "Cập nhật chi nhánh", description = "Cập nhật thông tin chi nhánh của cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Chi nhánh được cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Chi nhánh hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<BranchResponse> update(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của chi nhánh") String id,
+            @RequestBody @Valid @Parameter(description = "Thông tin cập nhật chi nhánh") BranchRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.update(user.getId(), shopId, id, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> delete(@RequestParam String shopId,
-                                 @PathVariable String id) {
-        branchService.delete(shopId, id);
-        return ApiResponse.success(ApiCode.SUCCESS);
+    @Operation(summary = "Xóa chi nhánh", description = "Xóa mềm một chi nhánh của cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Chi nhánh được xóa thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Chi nhánh hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<?> delete(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của chi nhánh") String id) {
+        branchService.delete(user.getId(), shopId, id);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 }
 
@@ -446,7 +489,7 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.security.CustomUserDetails;
@@ -470,58 +513,60 @@ public class CustomerController {
 
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<CustomerResponse>> getAll(@RequestParam String shopId,
-                                                      @RequestParam(required = false) String branchId) {
-        return ApiResponse.success(ApiCode.CUSTOMER_LIST, customerService.getCustomers(shopId, branchId));
+    public ApiResponseDto<List<CustomerResponse>> getAll(@RequestParam String shopId,
+                                                         @RequestParam(required = false) String branchId) {
+        return ApiResponseDto.success(ApiCode.CUSTOMER_LIST, customerService.getCustomers(shopId, branchId));
     }
 
     @PostMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<CustomerResponse> create(@AuthenticationPrincipal CustomUserDetails user,
-                                                @RequestParam String shopId,
-                                                @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user.getId(), request));
+    public ApiResponseDto<CustomerResponse> create(@AuthenticationPrincipal CustomUserDetails user,
+                                                   @RequestParam String shopId,
+                                                   @RequestBody @Valid CustomerRequest request) {
+        return ApiResponseDto.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user.getId(), request));
     }
 
     @PutMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<CustomerResponse> update(@RequestParam String shopId,
-                                                @PathVariable String id,
-                                                @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.CUSTOMER_UPDATED, customerService.updateCustomer(shopId, id, request));
+    public ApiResponseDto<CustomerResponse> update(@RequestParam String shopId,
+                                                   @PathVariable String id,
+                                                   @RequestBody @Valid CustomerRequest request) {
+        return ApiResponseDto.success(ApiCode.CUSTOMER_UPDATED, customerService.updateCustomer(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<?> delete(@RequestParam String shopId,
-                                 @RequestParam String branchId,
-                                 @PathVariable String id) {
+    public ApiResponseDto<?> delete(@RequestParam String shopId,
+                                    @RequestParam String branchId,
+                                    @PathVariable String id) {
         customerService.deleteCustomer(shopId, branchId, id);
-        return ApiResponse.success(ApiCode.CUSTOMER_DELETED);
+        return ApiResponseDto.success(ApiCode.CUSTOMER_DELETED);
     }
 }
 
-
 // File: src/main/java/com/example/sales/controller/OrderController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.OrderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -533,81 +578,140 @@ public class OrderController {
 
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<OrderResponse>> getMyOrders(@AuthenticationPrincipal CustomUserDetails user,
-                                                        @RequestParam String shopId) {
-        List<OrderResponse> orders = orderService.getOrdersByUser(user.getId(), shopId);
-        return ApiResponse.success(ApiCode.ORDER_LIST, orders);
+    @Operation(summary = "Lấy danh sách đơn hàng", description = "Lấy danh sách đơn hàng của cửa hàng với phân trang")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách đơn hàng được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<Page<OrderResponse>> getMyOrders(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+        Page<OrderResponse> orders = orderService.getOrdersByUser(user.getId(), shopId, pageable);
+        return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 
     @PostMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<OrderResponse> createOrder(@AuthenticationPrincipal CustomUserDetails user,
-                                                  @RequestParam String shopId,
-                                                  @RequestBody @Valid OrderRequest request) {
+    @Operation(summary = "Tạo đơn hàng mới", description = "Tạo đơn hàng với danh sách sản phẩm, thông tin bàn và chi nhánh")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đơn hàng được tạo thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng, sản phẩm hoặc bàn không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> createOrder(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestBody @Valid @Parameter(description = "Thông tin đơn hàng") OrderRequest request) {
         OrderResponse created = orderService.createOrder(user.getId(), shopId, request);
-        return ApiResponse.success(ApiCode.ORDER_CREATED, created);
+        return ApiResponseDto.success(ApiCode.ORDER_CREATED, created);
     }
 
     @PutMapping("/{id}/cancel")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<?> cancelOrder(@AuthenticationPrincipal CustomUserDetails user,
-                                      @RequestParam String shopId,
-                                      @PathVariable String id) {
+    @Operation(summary = "Hủy đơn hàng", description = "Hủy đơn hàng nếu chưa được thanh toán")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đơn hàng được hủy thành công"),
+            @ApiResponse(responseCode = "400", description = "Đơn hàng đã được thanh toán"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Đơn hàng hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<?> cancelOrder(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của đơn hàng") String id) {
         orderService.cancelOrder(user.getId(), shopId, id);
-        return ApiResponse.success(ApiCode.ORDER_CANCELLED);
+        return ApiResponseDto.success(ApiCode.ORDER_CANCELLED);
     }
 
     @PostMapping("/{orderId}/confirm-payment")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<OrderResponse> confirmPayment(@PathVariable String orderId,
-                                                     @RequestParam String paymentId,
-                                                     @RequestParam String paymentMethod,
-                                                     @RequestParam String shopId,
-                                                     @AuthenticationPrincipal CustomUserDetails user) {
+    @Operation(summary = "Xác nhận thanh toán", description = "Xác nhận thanh toán cho đơn hàng và cập nhật trạng thái")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Thanh toán được xác nhận thành công"),
+            @ApiResponse(responseCode = "400", description = "Đơn hàng đã được thanh toán"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Đơn hàng hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> confirmPayment(
+            @PathVariable @Parameter(description = "ID của đơn hàng") String orderId,
+            @RequestParam @Parameter(description = "ID của giao dịch thanh toán") String paymentId,
+            @RequestParam @Parameter(description = "Phương thức thanh toán") String paymentMethod,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
         OrderResponse confirmed = orderService.confirmPayment(user.getId(), shopId, orderId, paymentId, paymentMethod);
-        return ApiResponse.success(ApiCode.ORDER_PAYMENT_CONFIRMED, confirmed);
+        return ApiResponseDto.success(ApiCode.ORDER_PAYMENT_CONFIRMED, confirmed);
     }
 
     @PutMapping("/{id}/status")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<OrderResponse> updateStatus(@AuthenticationPrincipal CustomUserDetails user,
-                                                   @RequestParam String shopId,
-                                                   @PathVariable String id,
-                                                   @RequestParam OrderStatus status) {
+    @Operation(summary = "Cập nhật trạng thái đơn hàng", description = "Cập nhật trạng thái đơn hàng (PENDING, COMPLETED, CANCELLED, v.v.)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trạng thái đơn hàng được cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Đơn hàng đã bị hủy hoặc trạng thái không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Đơn hàng hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> updateStatus(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của đơn hàng") String id,
+            @RequestParam @Parameter(description = "Trạng thái mới của đơn hàng") OrderStatus status) {
         OrderResponse updated = orderService.updateStatus(user.getId(), shopId, id, status);
-        return ApiResponse.success(ApiCode.ORDER_STATUS_UPDATED, updated);
+        return ApiResponseDto.success(ApiCode.ORDER_STATUS_UPDATED, updated);
     }
 
     @GetMapping("/filter")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<OrderResponse>> getByStatus(@AuthenticationPrincipal CustomUserDetails user,
-                                                        @RequestParam String shopId,
-                                                        @RequestParam OrderStatus status,
-                                                        @RequestParam(required = false) String branchId) {
-        List<OrderResponse> filtered = orderService.getOrdersByStatus(user.getId(), shopId, status, branchId);
-        return ApiResponse.success(ApiCode.ORDER_LIST, filtered);
+    @Operation(summary = "Lấy đơn hàng theo trạng thái", description = "Lấy danh sách đơn hàng theo trạng thái và chi nhánh với phân trang")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách đơn hàng được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<Page<OrderResponse>> getByStatus(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam @Parameter(description = "Trạng thái đơn hàng (PENDING, COMPLETED, CANCELLED, v.v.)") OrderStatus status,
+            @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+        Page<OrderResponse> filtered = orderService.getOrdersByStatus(user.getId(), shopId, status, branchId, pageable);
+        return ApiResponseDto.success(ApiCode.ORDER_LIST, filtered);
     }
 }
 
 // File: src/main/java/com/example/sales/controller/PromotionController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.SubscriptionPlan;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.PromotionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/promotions")
@@ -620,35 +724,74 @@ public class PromotionController {
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<PromotionResponse>> getAll(@RequestParam String shopId,
-                                                       @RequestParam(required = false) String branchId) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.getAll(shopId, branchId));
+    @Operation(summary = "Lấy danh sách khuyến mãi", description = "Lấy danh sách khuyến mãi của cửa hàng với phân trang")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách khuyến mãi được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<Page<PromotionResponse>> getAll(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, promotionService.getAll(user.getId(), shopId, branchId, pageable));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<PromotionResponse> create(@RequestParam String shopId,
-                                                 @RequestBody @Valid PromotionRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.create(shopId, request));
+    @Operation(summary = "Tạo khuyến mãi mới", description = "Tạo một khuyến mãi mới cho cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Khuyến mãi được tạo thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<PromotionResponse> create(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestBody @Valid @Parameter(description = "Thông tin khuyến mãi") PromotionRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, promotionService.create(user.getId(), shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<PromotionResponse> update(@RequestParam String shopId,
-                                                 @PathVariable String id,
-                                                 @RequestBody @Valid PromotionRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, promotionService.update(shopId, id, request));
+    @Operation(summary = "Cập nhật khuyến mãi", description = "Cập nhật thông tin khuyến mãi của cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Khuyến mãi được cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Khuyến mãi hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<PromotionResponse> update(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của khuyến mãi") String id,
+            @RequestBody @Valid @Parameter(description = "Thông tin cập nhật khuyến mãi") PromotionRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, promotionService.update(user.getId(), shopId, id, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> delete(@RequestParam String shopId,
-                                 @PathVariable String id) {
-        promotionService.delete(shopId, id);
-        return ApiResponse.success(ApiCode.SUCCESS);
+    @Operation(summary = "Xóa khuyến mãi", description = "Xóa mềm một khuyến mãi của cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Khuyến mãi được xóa thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này hoặc gói dịch vụ không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Khuyến mãi hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<?> delete(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của khuyến mãi") String id) {
+        promotionService.delete(user.getId(), shopId, id);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 }
 
@@ -659,7 +802,7 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.SubscriptionPlan;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
@@ -686,17 +829,17 @@ public class ReportController {
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/summary")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<ReportResponse> getReport(@RequestParam String shopId,
-                                                 @RequestBody ReportRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, reportService.getReport(shopId, request));
+    public ApiResponseDto<ReportResponse> getReport(@RequestParam String shopId,
+                                                    @RequestBody ReportRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, reportService.getReport(shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/daily")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<DailyReportResponse>> getDaily(@RequestParam String shopId,
-                                                           @RequestBody ReportRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, reportService.getDailyReport(shopId, request));
+    public ApiResponseDto<List<DailyReportResponse>> getDaily(@RequestParam String shopId,
+                                                              @RequestBody ReportRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, reportService.getDailyReport(shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
@@ -710,26 +853,31 @@ public class ReportController {
 }
 
 // File: src/main/java/com/example/sales/controller/ShopController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.model.Shop;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ShopService;
 import com.example.sales.service.ShopUserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/shop")
@@ -742,37 +890,83 @@ public class ShopController {
     private final FileUploadService fileUploadService;
 
     @PostMapping(consumes = "multipart/form-data")
-    public ApiResponse<Shop> create(@AuthenticationPrincipal CustomUserDetails user,
-                                    @RequestPart("shop") @Valid ShopRequest request,
-                                    @RequestPart(value = "file", required = false) MultipartFile file) {
+    @Operation(summary = "Tạo cửa hàng mới", description = "Tạo cửa hàng với thông tin và logo tùy chọn")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Cửa hàng được tạo thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ApiResponseDto<Shop> create(@AuthenticationPrincipal CustomUserDetails user,
+                                       @RequestPart("shop") @Valid ShopRequest request,
+                                       @RequestPart(value = "file", required = false) MultipartFile file) {
         String logoUrl = null;
         if (file != null && !file.isEmpty()) {
             logoUrl = fileUploadService.upload(file);
         }
-        return ApiResponse.success(ApiCode.SUCCESS, shopService.createShop(user.getId(), request, logoUrl));
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.createShop(user.getId(), request, logoUrl));
     }
 
-
     @GetMapping("/me")
-    public ApiResponse<?> getMyShop(@AuthenticationPrincipal CustomUserDetails user) {
+    @RequireRole(ShopRole.OWNER)
+    @Operation(summary = "Lấy thông tin cửa hàng hiện tại", description = "Trả về thông tin chi tiết của cửa hàng mà người dùng hiện tại sở hữu")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Trả về thông tin cửa hàng thành công"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
+    })
+    public ApiResponseDto<?> getMyShop(@AuthenticationPrincipal CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
-        return ApiResponse.success(ApiCode.SUCCESS, shopService.getShopResponse(user, shop));
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.getShopResponse(user, shop));
     }
 
     @PutMapping("/me")
-    public ApiResponse<Shop> update(@AuthenticationPrincipal CustomUserDetails user,
-                                    @RequestBody @Valid ShopRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, shopService.updateShop(user.getId(), request));
+    @RequireRole(ShopRole.OWNER)
+    @Operation(summary = "Cập nhật thông tin cửa hàng", description = "Cập nhật tên, địa chỉ, số điện thoại hoặc logo của cửa hàng")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
+    })
+    public ApiResponseDto<Shop> update(@AuthenticationPrincipal CustomUserDetails user,
+                                       @RequestBody @Valid ShopRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.updateShop(user.getId(), request));
     }
+
     @GetMapping("/my")
-    public ApiResponse<List<ShopSimpleResponse>> getMyShops(@AuthenticationPrincipal CustomUserDetails user) {
-        return ApiResponse.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(user.getId()));
+    @Operation(summary = "Lấy danh sách các cửa hàng mà người dùng tham gia", description = "Trả về danh sách shop mà người dùng hiện tại có vai trò trong đó (OWNER, STAFF,...)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Trả về danh sách thành công"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ApiResponseDto<Page<ShopSimpleResponse>> getMyShops(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable
+    ) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(user.getId(), pageable));
     }
 
     @DeleteMapping
-    public ApiResponse<?> deleteShop(@AuthenticationPrincipal CustomUserDetails user) {
+    @RequireRole(ShopRole.OWNER)
+    @Operation(summary = "Xóa cửa hàng hiện tại", description = "Xóa cửa hàng mà người dùng hiện tại đang sở hữu. Thao tác không thể hoàn tác.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Xóa thành công"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền xóa"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
+    })
+    public ApiResponseDto<?> deleteShop(@AuthenticationPrincipal CustomUserDetails user) {
         shopService.deleteShop(user.getId());
-        return ApiResponse.success(ApiCode.SUCCESS);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
+    }
+
+    // File: ShopController.java
+    @GetMapping("/search")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @Operation(summary = "Tìm kiếm cửa hàng", description = "Tìm kiếm cửa hàng theo tên hoặc địa chỉ")
+    public ApiResponseDto<Page<ShopSimpleResponse>> search(
+            @RequestParam String keyword,
+            Pageable pageable) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.searchShops(keyword, pageable));
     }
 }
 
@@ -781,11 +975,15 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ShopUserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -799,25 +997,48 @@ public class ShopUserController {
     private final ShopUserService shopUserService;
 
     @GetMapping("/my")
-    public ApiResponse<?> getMyShops(@AuthenticationPrincipal CustomUserDetails customUserDetails) {
-        return ApiResponse.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(customUserDetails.getId()));
+    @Operation(summary = "Lấy danh sách cửa hàng của người dùng hiện tại",
+            description = "Trả về danh sách các cửa hàng mà người dùng hiện tại sở hữu hoặc tham gia")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
+    })
+    public ApiResponseDto<?> getMyShops(
+            @AuthenticationPrincipal CustomUserDetails customUserDetails,
+            @RequestParam(required = false) Pageable pageable
+    ) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(customUserDetails.getId(), pageable));
     }
 
     @PostMapping("/add")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> addUser(@RequestParam String shopId,
-                                  @RequestParam String userId,
-                                  @RequestParam ShopRole role) {
-        shopUserService.addUser(shopId, userId, role);
-        return ApiResponse.success(ApiCode.SUCCESS);
+    @Operation(summary = "Thêm người dùng vào cửa hàng", description = "Thêm người dùng với vai trò cụ thể vào cửa hàng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng hoặc người dùng không tìm thấy")
+    })
+    public ApiResponseDto<?> addUser(@RequestParam String shopId,
+                                     @RequestParam String userId,
+                                     @RequestParam ShopRole role,
+                                     @RequestParam(required = false) String branchId) {
+        shopUserService.addUser(shopId, userId, role, branchId);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 
     @DeleteMapping("/remove")
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<?> removeUser(@RequestParam String shopId,
-                                     @RequestParam String userId) {
+    @Operation(summary = "Xóa người dùng khỏi cửa hàng", description = "Xóa người dùng khỏi cửa hàng theo ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng hoặc người dùng không tìm thấy")
+    })
+    public ApiResponseDto<?> removeUser(@RequestParam String shopId,
+                                        @RequestParam String userId) {
         shopUserService.removeUser(shopId, userId);
-        return ApiResponse.success(ApiCode.SUCCESS);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 }
 
@@ -828,17 +1049,23 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.TableStatus;
-import com.example.sales.dto.ApiResponse;
-import com.example.sales.dto.TableRequest;
-import com.example.sales.dto.TableResponse;
+import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.dto.table.TableRequest;
+import com.example.sales.dto.table.TableResponse;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.TableService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/tables")
@@ -850,22 +1077,86 @@ public class TableController {
 
     @PostMapping
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<TableResponse> create(@RequestBody @Valid TableRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, tableService.create(request));
+    @Operation(summary = "Tạo bàn mới", description = "Tạo một bàn mới trong cửa hàng với thông tin bàn và chi nhánh")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Bàn được tạo thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ hoặc tên bàn đã tồn tại"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<TableResponse> create(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestBody @Valid @Parameter(description = "Thông tin bàn") TableRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, tableService.create(user.getId(), request));
     }
 
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<TableResponse>> getByShop(@RequestParam String shopId,
-                                                      @RequestParam String branchId) {
-        return ApiResponse.success(ApiCode.SUCCESS, tableService.getByShop(shopId, branchId));
+    @Operation(summary = "Lấy danh sách bàn", description = "Lấy danh sách bàn của cửa hàng với phân trang")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách bàn được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<Page<TableResponse>> getByShop(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, tableService.getByShop(user.getId(), shopId, branchId, pageable));
     }
 
     @PutMapping("/{id}/status")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<TableResponse> updateStatus(@PathVariable String id,
-                                                   @RequestParam TableStatus status) {
-        return ApiResponse.success(ApiCode.SUCCESS, tableService.updateStatus(id, status));
+    @Operation(summary = "Cập nhật trạng thái bàn", description = "Cập nhật trạng thái bàn (AVAILABLE, OCCUPIED, v.v.)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trạng thái bàn được cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Trạng thái không hợp lệ hoặc bàn không thể cập nhật"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Bàn hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<TableResponse> updateStatus(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của bàn") String id,
+            @RequestParam @Parameter(description = "Trạng thái mới của bàn") TableStatus status) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, tableService.updateStatus(user.getId(), id, status));
+    }
+
+    @PutMapping("/{id}")
+    @RequireRole(ShopRole.OWNER)
+    @Operation(summary = "Cập nhật thông tin bàn", description = "Cập nhật thông tin bàn như tên, sức chứa, ghi chú")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Thông tin bàn được cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ hoặc bàn đang được sử dụng"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Bàn hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<TableResponse> updateTable(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của bàn") String id,
+            @RequestBody @Valid @Parameter(description = "Thông tin cập nhật bàn") TableRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, tableService.updateTable(user.getId(), id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @RequireRole(ShopRole.OWNER)
+    @Operation(summary = "Xóa bàn", description = "Xóa mềm một bàn nếu bàn không đang được sử dụng")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Bàn được xóa thành công"),
+            @ApiResponse(responseCode = "400", description = "Bàn đang được sử dụng"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Bàn hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<?> deleteTable(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của bàn") String id) {
+        tableService.deleteTable(user.getId(), id);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 }
 
@@ -874,9 +1165,10 @@ public class TableController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.ChangePasswordRequest;
 import com.example.sales.dto.UpdateProfileRequest;
+import com.example.sales.model.User;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.UserService;
 import jakarta.validation.Valid;
@@ -894,22 +1186,22 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/me")
-    public ApiResponse<com.example.sales.model.User> getCurrentUser(@AuthenticationPrincipal CustomUserDetails user) {
-        return ApiResponse.success(ApiCode.USER_INFO, userService.getCurrentUser(user.getId()));
+    public ApiResponseDto<User> getCurrentUser(@AuthenticationPrincipal CustomUserDetails user) {
+        return ApiResponseDto.success(ApiCode.USER_INFO, userService.getCurrentUser(user.getId()));
     }
 
     @PutMapping("/update-profile")
-    public ApiResponse<com.example.sales.model.User> updateProfile(@AuthenticationPrincipal CustomUserDetails user,
-                                           @RequestBody UpdateProfileRequest request) {
+    public ApiResponseDto<User> updateProfile(@AuthenticationPrincipal CustomUserDetails user,
+                                              @RequestBody UpdateProfileRequest request) {
         com.example.sales.model.User updated = userService.updateProfile(user.getId(), request.getFullName(), request.getPhone(), request.getBusinessType());
-        return ApiResponse.success(ApiCode.USER_UPDATED, updated);
+        return ApiResponseDto.success(ApiCode.USER_UPDATED, updated);
     }
 
     @PostMapping("/change-password")
-    public ApiResponse<?> changePassword(@AuthenticationPrincipal CustomUserDetails user,
-                                         @RequestBody @Valid ChangePasswordRequest request) {
+    public ApiResponseDto<?> changePassword(@AuthenticationPrincipal CustomUserDetails user,
+                                            @RequestBody @Valid ChangePasswordRequest request) {
         userService.changePassword(user.getId(), request.getCurrentPassword(), request.getNewPassword());
-        return ApiResponse.success(ApiCode.PASSWORD_CHANGED);
+        return ApiResponseDto.success(ApiCode.PASSWORD_CHANGED);
     }
 }
 
@@ -1016,8 +1308,12 @@ package com.example.sales.dto.order;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@AllArgsConstructor
+@NoArgsConstructor
 @Data
 public class OrderItemRequest {
     @NotBlank
@@ -1386,7 +1682,7 @@ public class ReportResponse {
     private double totalRevenue;
 }
 
-// File: src/main/java/com/example/sales/dto/ApiResponse.java
+// File: src/main/java/com/example/sales/dto/ApiResponseDto.java
 package com.example.sales.dto;
 
 import com.example.sales.constant.ApiCode;
@@ -1402,7 +1698,7 @@ import java.time.Instant;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ApiResponse<T> {
+public class ApiResponseDto<T> {
     private boolean success;
     private String code;
     private String message;
@@ -1412,32 +1708,31 @@ public class ApiResponse<T> {
     /**
      * Creates a successful response with data.
      */
-    public static <T> ApiResponse<T> success(ApiCode code, T data) {
-        return new ApiResponse<>(true, code.getCode(), code.getMessage(), data, Instant.now().toString());
+    public static <T> ApiResponseDto<T> success(ApiCode code, T data) {
+        return new ApiResponseDto<>(true, code.getCode(), code.getMessage(), data, Instant.now().toString());
     }
 
     /**
      * Creates a successful response without data.
      */
-    public static <T> ApiResponse<T> success(ApiCode code) {
-        return new ApiResponse<>(true, code.getCode(), code.getMessage(), null, Instant.now().toString());
+    public static <T> ApiResponseDto<T> success(ApiCode code) {
+        return new ApiResponseDto<>(true, code.getCode(), code.getMessage(), null, Instant.now().toString());
     }
 
     /**
      * Creates an error response without data.
      */
-    public static <T> ApiResponse<T> error(ApiCode code) {
-        return new ApiResponse<>(false, code.getCode(), code.getMessage(), null, Instant.now().toString());
+    public static <T> ApiResponseDto<T> error(ApiCode code) {
+        return new ApiResponseDto<>(false, code.getCode(), code.getMessage(), null, Instant.now().toString());
     }
 
     /**
      * Creates an error response with custom message and data.
      */
-    public static <T> ApiResponse<T> error(ApiCode code, String message, T data) {
-        return new ApiResponse<>(false, code.getCode(), message, data, Instant.now().toString());
+    public static <T> ApiResponseDto<T> error(ApiCode code, String message, T data) {
+        return new ApiResponseDto<>(false, code.getCode(), message, data, Instant.now().toString());
     }
 }
-
 
 // File: src/main/java/com/example/sales/dto/ChangePasswordRequest.java
 package com.example.sales.dto;
@@ -1552,8 +1847,8 @@ public class ShopRequest {
     private String address;
 }
 
-// File: src/main/java/com/example/sales/dto/TableRequest.java
-package com.example.sales.dto;
+// File: src/main/java/com/example/sales/dto/table/TableRequest.java
+package com.example.sales.dto.table;
 
 import com.example.sales.constant.TableStatus;
 import jakarta.validation.constraints.NotBlank;
@@ -1573,8 +1868,8 @@ public class TableRequest {
     private String branchId; // Có thể null nếu không phân biệt chi nhánh
 }
 
-// File: src/main/java/com/example/sales/dto/TableResponse.java
-package com.example.sales.dto;
+// File: src/main/java/com/example/sales/dto/table/TableResponse.java
+package com.example.sales.dto.table;
 
 import com.example.sales.constant.TableStatus;
 import lombok.*;
@@ -1593,7 +1888,6 @@ public class TableResponse {
     private String currentOrderId;
     private String branchId; // Có thể null nếu không phân biệt chi nhánh
 }
-
 
 // File: src/main/java/com/example/sales/dto/UpdateProfileRequest.java
 package com.example.sales.dto;
@@ -1627,7 +1921,7 @@ public class BusinessException extends RuntimeException {
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -1650,7 +1944,7 @@ public class GlobalExceptionHandler {
      * Xử lý lỗi validation cho các DTO
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
+    public ResponseEntity<ApiResponseDto<Map<String, String>>> handleValidationExceptions(
             MethodArgumentNotValidException ex, WebRequest request) {
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
@@ -1659,39 +1953,39 @@ public class GlobalExceptionHandler {
         log.warn("Validation error at {}: {}", request.getDescription(false), errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), errors));
+                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), errors));
     }
 
     /**
      * Xử lý lỗi khi người dùng không có quyền truy cập
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<String>> handleAccessDeniedException(
+    public ResponseEntity<ApiResponseDto<String>> handleAccessDeniedException(
             AccessDeniedException ex, WebRequest request) {
         log.warn("Access denied at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(ApiCode.ACCESS_DENIED, ApiCode.ACCESS_DENIED.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.ACCESS_DENIED, ApiCode.ACCESS_DENIED.getMessage(), ex.getMessage()));
     }
 
     /**
      * Xử lý lỗi kinh doanh
      */
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<String>> handleBusinessException(
+    public ResponseEntity<ApiResponseDto<String>> handleBusinessException(
             BusinessException ex, WebRequest request) {
         log.error("Business error at {}: {} - {}",
                 request.getDescription(false), ex.getError().getCode(), ex.getError().getMessage());
         return ResponseEntity
                 .status(getHttpStatus(ex.getError()))
-                .body(ApiResponse.error(ex.getError(), ex.getError().getMessage(), null));
+                .body(ApiResponseDto.error(ex.getError(), ex.getError().getMessage(), null));
     }
 
     /**
      * Xử lý các lỗi chung (fallback)
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<String>> handleAllExceptions(
+    public ResponseEntity<ApiResponseDto<String>> handleAllExceptions(
             Exception ex, WebRequest request) {
         request.getRemoteUser();
         log.error("Internal server error at {} for user {} (requestId: {}): {}",
@@ -1701,25 +1995,25 @@ public class GlobalExceptionHandler {
                 ex.getMessage(), ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(ApiCode.INTERNAL_ERROR, ApiCode.INTERNAL_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.INTERNAL_ERROR, ApiCode.INTERNAL_ERROR.getMessage(), ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<String>> handleIllegalArgumentException(
+    public ResponseEntity<ApiResponseDto<String>> handleIllegalArgumentException(
             IllegalArgumentException ex, WebRequest request) {
         log.warn("Invalid argument at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<String>> handleHttpMessageNotReadableException(
+    public ResponseEntity<ApiResponseDto<String>> handleHttpMessageNotReadableException(
             HttpMessageNotReadableException ex, WebRequest request) {
         log.warn("Invalid JSON at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
     }
 
     /**
@@ -2244,9 +2538,6 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-/**
- * Mô hình sản phẩm trong cơ sở dữ liệu.
- */
 @Getter
 @Setter
 @ToString
@@ -2274,7 +2565,6 @@ public class Product extends BaseEntity {
     private String unit;
     private String imageUrl;
     private String description;
-
     private String shopId;
     private String branchId;
 
@@ -2426,15 +2716,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @NoArgsConstructor
 @Document(collection = "shop_users")
 public class ShopUser extends BaseEntity {
-
     @Id
     private String id;
-
     private String shopId;
-
     private String userId;
-
     private ShopRole role;
+    private String branchId;
 }
 
 // File: src/main/java/com/example/sales/model/Table.java
@@ -2540,15 +2827,16 @@ public interface AuditLogRepository extends MongoRepository<AuditLog, String> {
 package com.example.sales.repository;
 
 import com.example.sales.model.Branch;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface BranchRepository extends MongoRepository<Branch, String> {
-    List<Branch> findByShopIdAndDeletedFalse(String shopId);
+    Page<Branch> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
     Optional<Branch> findByIdAndDeletedFalse(String id);
 }
 
@@ -2573,19 +2861,19 @@ package com.example.sales.repository;
 
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.model.Order;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository extends MongoRepository<Order, String> {
-
     Optional<Order> findByIdAndDeletedFalse(String id);
-
     List<Order> findByShopIdAndDeletedFalse(String shopId);
-
     List<Order> findByShopIdAndBranchIdAndStatusAndDeletedFalse(String shopId, String branchId, OrderStatus status);
-
+    Page<Order> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+    Page<Order> findByShopIdAndBranchIdAndStatusAndDeletedFalse(String shopId, String branchId, OrderStatus status, Pageable pageable);
 }
 
 // File: src/main/java/com/example/sales/repository/ProductRepository.java
@@ -2595,25 +2883,29 @@ import com.example.sales.model.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Repository cho sản phẩm.
- */
 public interface ProductRepository extends MongoRepository<Product, String> {
     Optional<Product> findByIdAndDeletedFalse(String id);
     Optional<Product> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
     Page<Product> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
     List<Product> findByShopIdAndQuantityLessThanAndDeletedFalse(String shopId, int threshold);
-
+    List<Product> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
+    List<Product> findByShopIdAndDeletedFalse(String shopId);
+    @Query("{ 'shopId': ?0, 'deleted': false, $or: [ { 'name': { $regex: ?1, $options: 'i' } }, { 'sku': { $regex: ?1, $options: 'i' } }, { 'description': { $regex: ?1, $options: 'i' } } ] }")
+    Page<Product> findByShopIdAndKeyword(String shopId, String keyword, Pageable pageable);
 }
+
 
 // File: src/main/java/com/example/sales/repository/PromotionRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.Promotion;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
@@ -2624,8 +2916,7 @@ public interface PromotionRepository extends MongoRepository<Promotion, String> 
 
     Optional<Promotion> findByIdAndDeletedFalse(String id);
 
-    List<Promotion> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
-
+    Page<Promotion> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId, Pageable pageable);
 }
 
 // File: src/main/java/com/example/sales/repository/RefreshTokenRepository.java
@@ -2645,7 +2936,10 @@ package com.example.sales.repository;
 
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.model.Shop;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -2656,15 +2950,20 @@ public interface ShopRepository extends MongoRepository<Shop, String> {
     Optional<Shop> findByIdAndDeletedFalse(String id);
     List<Shop> findByPlanExpiryBeforeAndPlanNot(LocalDateTime date, SubscriptionPlan plan);
     List<Shop> findByPlanExpiryBetween(LocalDateTime start, LocalDateTime end);
+    boolean existsByNameAndDeletedFalse(String name);
+    // File: ShopRepository.java
+    @Query("{ 'deleted': false, $or: [ { 'name': { $regex: ?0, $options: 'i' } }, { 'address': { $regex: ?0, $options: 'i' } } ] }")
+    Page<Shop> findByKeyword(String keyword, Pageable pageable);
 }
 
 // File: src/main/java/com/example/sales/repository/ShopUserRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.ShopUser;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
@@ -2672,13 +2971,15 @@ public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
 
     Optional<ShopUser> findByShopIdAndUserIdAndDeletedFalse(String shopId, String userId);
 
-    List<ShopUser> findByUserIdAndDeletedFalse(String userId);
+    Page<ShopUser> findByUserIdAndDeletedFalse(String userId, Pageable pageable);
 }
 
 // File: src/main/java/com/example/sales/repository/TableRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.Table;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
@@ -2687,6 +2988,7 @@ import java.util.Optional;
 public interface TableRepository extends MongoRepository<Table, String> {
 
     List<Table> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
+    Page<Table> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId, Pageable pageable);
 
     Optional<Table> findByIdAndDeletedFalse(String id);
 }
@@ -3076,9 +3378,9 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
 import com.example.sales.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -3087,14 +3389,12 @@ public class BranchService {
     private final BranchRepository branchRepository;
     private final AuditLogService auditLogService;
 
-    public List<BranchResponse> getAll(String shopId) {
-        return branchRepository.findByShopIdAndDeletedFalse(shopId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<BranchResponse> getAll(String userId, String shopId, Pageable pageable) {
+        return branchRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+                .map(this::toResponse);
     }
 
-    public BranchResponse create(String shopId, BranchRequest req) {
+    public BranchResponse create(String userId, String shopId, BranchRequest req) {
         Branch branch = Branch.builder()
                 .shopId(shopId)
                 .name(req.getName())
@@ -3104,12 +3404,12 @@ public class BranchService {
                 .build();
 
         Branch saved = branchRepository.save(branch);
-        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "CREATED",
+        auditLogService.log(userId, shopId, saved.getId(), "BRANCH", "CREATED",
                 String.format("Tạo chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
         return toResponse(saved);
     }
 
-    public BranchResponse update(String shopId, String id, BranchRequest req) {
+    public BranchResponse update(String userId, String shopId, String id, BranchRequest req) {
         Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
@@ -3120,19 +3420,19 @@ public class BranchService {
         branch.setActive(req.isActive());
 
         Branch saved = branchRepository.save(branch);
-        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "UPDATED",
+        auditLogService.log(userId, shopId, saved.getId(), "BRANCH", "UPDATED",
                 String.format("Cập nhật chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
         return toResponse(saved);
     }
 
-    public void delete(String shopId, String id) {
+    public void delete(String userId, String shopId, String id) {
         Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branch.setDeleted(true);
         branchRepository.save(branch);
-        auditLogService.log(null, shopId, branch.getId(), "BRANCH", "DELETED",
+        auditLogService.log(userId, shopId, branch.getId(), "BRANCH", "DELETED",
                 String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
 
     }
@@ -3247,10 +3547,13 @@ public class CustomerService {
 package com.example.sales.service;
 
 import com.example.sales.export.GenericExcelExporter;
+import com.example.sales.model.Product;
+import com.example.sales.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.function.Function;
@@ -3258,6 +3561,7 @@ import java.util.function.Function;
 @Service
 @RequiredArgsConstructor
 public class ExcelExportService {
+    private final ProductRepository productRepository;
 
     public <T> ResponseEntity<byte[]> exportExcel(String fileName,
                                                   String sheetName,
@@ -3277,6 +3581,20 @@ public class ExcelExportService {
         } catch (Exception e) {
             throw new RuntimeException("Không thể export file Excel", e);
         }
+    }
+
+    public ResponseEntity<byte[]> exportProducts(String shopId, String branchId) throws IOException {
+        List<Product> products = branchId != null
+                ? productRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
+                : productRepository.findByShopIdAndDeletedFalse(shopId);
+        List<String> headers = List.of("ID", "Name", "Price", "Quantity", "Category", "SKU");
+        GenericExcelExporter<Product> exporter = new GenericExcelExporter<>();
+        InputStream stream = exporter.export("Products", headers, products, p -> List.of(
+                p.getId(), p.getName(), String.valueOf(p.getPrice()), String.valueOf(p.getQuantity()),
+                p.getCategory(), p.getSku()));
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=products.xlsx")
+                .body(stream.readAllBytes());
     }
 }
 
@@ -3464,11 +3782,15 @@ import com.example.sales.constant.*;
 import com.example.sales.dto.order.OrderItemResponse;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
+import com.example.sales.dto.order.OrderUpdateRequest;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
 import com.example.sales.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -3477,7 +3799,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class OrderService {
+public class OrderService extends BaseService {
 
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
@@ -3486,6 +3808,7 @@ public class OrderService {
     private final AuditLogService auditLogService;
     private final ShopRepository shopRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final ShopUserService shopUserService;
 
     public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
         return orderRepository.findByShopIdAndDeletedFalse(shopId)
@@ -3559,7 +3882,7 @@ public class OrderService {
                         "Xuất kho theo đơn hàng " + created.getId(), created.getId());
             }
         }
-        releaseTable(created);
+        occupyTable(created);
         return toResponse(created);
     }
 
@@ -3625,10 +3948,21 @@ public class OrderService {
                 .stream().map(this::toResponse).toList();
     }
 
-    private Order getOrderByShop(String orderId, String shopId) {
-        return orderRepository.findByIdAndDeletedFalse(orderId)
-                .filter(o -> o.getShopId().equals(shopId))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
+    @Cacheable(value = "orders", key = "#orderId + '-' + #shopId")
+    public Order getOrderByShop(String orderId, String shopId) {
+        Order order = checkOrderExists(orderRepository, orderId, shopId);
+        shopUserService.requireAnyRole(shopId, order.getUserId(), ShopRole.OWNER, ShopRole.STAFF);
+        return order;
+    }
+
+    private void occupyTable(Order order) {
+        if (order.getTableId() != null) {
+            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+                table.setStatus(TableStatus.OCCUPIED);
+                table.setCurrentOrderId(order.getId());
+                tableRepository.save(table);
+            });
+        }
     }
 
     private void releaseTable(Order order) {
@@ -3681,6 +4015,97 @@ public class OrderService {
                 .build();
 
         inventoryTransactionRepository.save(tx);
+    }
+
+    // File: OrderService.java
+    public Page<OrderResponse> getOrdersByUser(String userId, String shopId, Pageable pageable) {
+        return orderRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+                .map(this::toResponse);
+    }
+
+    public Page<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId, Pageable pageable) {
+        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public OrderResponse updateOrder(String userId, String shopId, String orderId, OrderUpdateRequest request) {
+        Order order = getOrderByShop(orderId, shopId);
+
+        if (order.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+
+        // Gỡ bàn cũ nếu đổi bàn
+        if (request.getTableId() != null && !request.getTableId().equals(order.getTableId())) {
+            releaseTable(order);
+            order.setTableId(request.getTableId());
+            occupyTable(order);
+        }
+
+        if (request.getNote() != null) {
+            order.setNote(request.getNote());
+        }
+
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+            if (shop.getType().isTrackInventory()) {
+                // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ
+                for (OrderItem oldItem : order.getItems()) {
+                    Product product = productRepository.findByIdAndDeletedFalse(oldItem.getProductId())
+                            .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.IMPORT, oldItem.getQuantity(),
+                            "Hoàn kho khi cập nhật đơn hàng " + orderId, orderId);
+                }
+            }
+
+            // 🔁 2. Áp dụng lại tồn kho cho danh sách mới
+            List<OrderItem> updatedItems = request.getItems().stream().map(reqItem -> {
+                Product product = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+                double basePrice = reqItem.getPrice();
+                double finalPrice = basePrice;
+                String promoId = null;
+
+                Promotion promo = findApplicablePromotion(shopId, order.getBranchId(), product.getId());
+                if (promo != null) {
+                    promoId = promo.getId();
+                    if (promo.getDiscountType() == DiscountType.PERCENT) {
+                        finalPrice = basePrice * (1 - promo.getDiscountValue() / 100.0);
+                    } else if (promo.getDiscountType() == DiscountType.AMOUNT) {
+                        finalPrice = Math.max(0, basePrice - promo.getDiscountValue());
+                    }
+                }
+
+                OrderItem item = OrderItem.builder()
+                        .productId(product.getId())
+                        .productName(product.getName())
+                        .quantity(reqItem.getQuantity())
+                        .price(basePrice)
+                        .priceAfterDiscount(finalPrice)
+                        .appliedPromotionId(promoId)
+                        .build();
+
+                // Trừ kho mới
+                if (shop.getType().isTrackInventory()) {
+                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
+                            "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
+                }
+
+                return item;
+            }).toList();
+
+            order.setItems(updatedItems);
+            order.setTotalAmount(updatedItems.stream().mapToInt(OrderItem::getQuantity).sum());
+            order.setTotalPrice(updatedItems.stream().mapToDouble(i -> i.getQuantity() * i.getPriceAfterDiscount()).sum());
+        }
+
+        Order updated = orderRepository.save(order);
+        auditLogService.log(userId, shopId, orderId, "ORDER", "UPDATED", "Cập nhật đơn hàng");
+        return toResponse(updated);
     }
 
     private OrderResponse toResponse(Order order) {
@@ -3816,9 +4241,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing product-related operations.
- */
 public interface ProductService {
 
     /**
@@ -3884,6 +4306,17 @@ public interface ProductService {
      * @return a list of products with low stock
      */
     List<ProductResponse> getLowStockProducts(String shopId, int threshold);
+
+    //searchProducts
+    /**
+     * Searches for products in a shop based on a keyword.
+     *
+     * @param shopId   the ID of the shop
+     * @param keyword  the search keyword
+     * @param pageable the pagination information
+     * @return a paginated list of product responses matching the search criteria
+     */
+    Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable);
 }
 
 // File: src/main/java/com/example/sales/service/PromotionService.java
@@ -3897,9 +4330,9 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Promotion;
 import com.example.sales.repository.PromotionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -3908,14 +4341,12 @@ public class PromotionService {
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
 
-    public List<PromotionResponse> getAll(String shopId, String branchId) {
-        return promotionRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<PromotionResponse> getAll(String userId, String shopId, String branchId, Pageable pageable) {
+        return promotionRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
+                .map(this::toResponse);
     }
 
-    public PromotionResponse create(String shopId, PromotionRequest request) {
+    public PromotionResponse create(String userId, String shopId, PromotionRequest request) {
         Promotion promotion = Promotion.builder()
                 .shopId(shopId)
                 .name(request.getName())
@@ -3929,7 +4360,7 @@ public class PromotionService {
                 .build();
 
         Promotion saved = promotionRepository.save(promotion);
-        auditLogService.log(null, shopId, saved.getId(), "PROMOTION", "CREATED",
+        auditLogService.log(userId, shopId, saved.getId(), "PROMOTION", "CREATED",
                 String.format("Tạo khuyến mãi: %s (%.2f %s)",
                         saved.getName(),
                         saved.getDiscountValue(),
@@ -3937,7 +4368,7 @@ public class PromotionService {
         return toResponse(saved);
     }
 
-    public PromotionResponse update(String shopId, String id, PromotionRequest request) {
+    public PromotionResponse update(String userId, String shopId, String id, PromotionRequest request) {
         Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
@@ -3955,19 +4386,19 @@ public class PromotionService {
         promotion.setActive(request.isActive());
 
         Promotion saved = promotionRepository.save(promotion);
-        auditLogService.log(null, shopId, saved.getId(), "PROMOTION", "UPDATED",
+        auditLogService.log(userId, shopId, saved.getId(), "PROMOTION", "UPDATED",
                 String.format("Cập nhật khuyến mãi: %s", saved.getName()));
         return toResponse(saved);
     }
 
-    public void delete(String shopId, String id) {
+    public void delete(String userId, String shopId, String id) {
         Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
 
         promotion.setDeleted(true);
         promotionRepository.save(promotion);
-        auditLogService.log(null, shopId, promotion.getId(), "PROMOTION", "DELETED",
+        auditLogService.log(userId, shopId, promotion.getId(), "PROMOTION", "DELETED",
                 String.format("Xoá mềm khuyến mãi: %s", promotion.getName()));
 
     }
@@ -4126,6 +4557,7 @@ import com.example.sales.constant.UserRole;
 import com.example.sales.dto.shop.ShopAdminResponse;
 import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopResponse;
+import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
@@ -4133,17 +4565,23 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class ShopService {
+public class ShopService extends BaseService {
 
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
     private final ShopUserRepository shopUserRepository;
 
     public Shop createShop(String userId, ShopRequest request, String logoUrl) {
+        if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
+            throw new BusinessException(ApiCode.SHOP_NAME_EXISTS);
+        }
         if (shopRepository.findByOwnerIdAndDeletedFalse(userId).isPresent()) {
             throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
         }
@@ -4170,6 +4608,7 @@ public class ShopService {
         return saved;
     }
 
+    @Cacheable(value = "shops", key = "#ownerId")
     public Shop getShopByOwner(String ownerId) {
         return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
@@ -4203,9 +4642,21 @@ public class ShopService {
                 String.format("Xoá mềm cửa hàng: %s", shop.getName()));
     }
 
+    @Cacheable(value = "shops", key = "#shopId")
     public Shop getShopById(String shopId) {
-        return shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        return checkShopExists(shopRepository, shopId);
+    }
+
+    // File: ShopService.java
+    public Page<ShopSimpleResponse> searchShops(String keyword, Pageable pageable) {
+        return shopRepository.findByKeyword(keyword, pageable)
+                .map(shop -> ShopSimpleResponse.builder()
+                        .id(shop.getId())
+                        .name(shop.getName())
+                        .type(shop.getType())
+                        .logoUrl(shop.getLogoUrl())
+                        .active(shop.isActive())
+                        .build());
     }
 
     public Shop save(Shop shop) {
@@ -4242,6 +4693,7 @@ public class ShopService {
                     .build();
         }
     }
+
 }
 
 // File: src/main/java/com/example/sales/service/ShopUserService.java
@@ -4256,24 +4708,25 @@ import com.example.sales.model.ShopUser;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class ShopUserService {
+public class ShopUserService extends BaseService {
 
     private final ShopUserRepository shopUserRepository;
     private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
 
+    @Cacheable(value = "shopUsers", key = "#shopId + '-' + #userId")
     public ShopRole getUserRoleInShop(String shopId, String userId) {
-        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
-                .map(ShopUser::getRole)
-                .orElseThrow(() -> new BusinessException(ApiCode.UNAUTHORIZED));
+        return checkShopUserExists(shopUserRepository, shopId, userId).getRole();
     }
 
     public boolean isOwner(String shopId, String userId) {
@@ -4310,47 +4763,49 @@ public class ShopUserService {
         }
     }
 
-    public void addUser(String shopId, String userId, ShopRole role) {
+    public void addUser(String shopId, String userId, ShopRole role, String branchId) {
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        if (!shop.isActive()) {
+            throw new BusinessException(ApiCode.SHOP_INACTIVE);
+        }
         Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId);
         if (existing.isPresent()) {
             throw new BusinessException(ApiCode.DUPLICATE_DATA);
         }
-
         ShopUser shopUser = ShopUser.builder()
                 .shopId(shopId)
                 .userId(userId)
                 .role(role)
+                .branchId(branchId)
                 .build();
-
         shopUserRepository.save(shopUser);
+        auditLogService.log(userId, shopId, shopUser.getId(), "SHOP_USER", "ADDED",
+                String.format("Thêm người dùng %s vào cửa hàng %s với vai trò %s", userId, shopId, role));
     }
 
     public void removeUser(String shopId, String userId) {
         ShopUser user = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUserRepository.delete(user);
+        auditLogService.log(userId, shopId, user.getId(), "SHOP_USER", "REMOVED",
+                String.format("Xoá người dùng %s khỏi cửa hàng %s", userId, shopId));
     }
 
-    public List<ShopSimpleResponse> getShopsForUser(String userId) {
-        List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndDeletedFalse(userId);
-
-        return shopUsers.stream()
+    public Page<ShopSimpleResponse> getShopsForUser(String userId, Pageable pageable) {
+        return shopUserRepository.findByUserIdAndDeletedFalse(userId, pageable)
                 .map(su -> {
-                    Shop shop = shopRepository.findByIdAndDeletedFalse(su.getShopId())
+                    return shopRepository.findByIdAndDeletedFalse(su.getShopId())
+                            .map(shop -> ShopSimpleResponse.builder()
+                                    .id(shop.getId())
+                                    .name(shop.getName())
+                                    .type(shop.getType())
+                                    .logoUrl(shop.getLogoUrl())
+                                    .active(shop.isActive())
+                                    .role(su.getRole())
+                                    .build())
                             .orElse(null);
-                    if (shop == null) return null;
-
-                    return ShopSimpleResponse.builder()
-                            .id(shop.getId())
-                            .name(shop.getName())
-                            .type(shop.getType())
-                            .logoUrl(shop.getLogoUrl())
-                            .active(shop.isActive())
-                            .role(su.getRole()) // 👈 gán vai trò
-                            .build();
-                })
-                .filter(Objects::nonNull)
-                .toList();
+                });
     }
 }
 
@@ -4358,18 +4813,22 @@ public class ShopUserService {
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.TableStatus;
-import com.example.sales.dto.TableRequest;
-import com.example.sales.dto.TableResponse;
+import com.example.sales.dto.table.TableRequest;
+import com.example.sales.dto.table.TableResponse;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.Table;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.TableRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -4379,13 +4838,30 @@ public class TableService {
     private final TableRepository tableRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
+    private final ShopUserService shopUserService;
 
-    public TableResponse create(TableRequest request) {
+    @Transactional
+    public TableResponse create(String userId, TableRequest request) {
         String shopId = request.getShopId();
         String branchId = request.getBranchId();
 
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER);
+
+        // Kiểm tra cửa hàng tồn tại
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        // Kiểm tra trùng lặp tên bàn
+        if (tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
+                .stream().anyMatch(table -> table.getName().equalsIgnoreCase(request.getName()))) {
+            throw new BusinessException(ApiCode.TABLE_NAME_EXISTS);
+        }
+
+        // Kiểm tra capacity hợp lệ
+        if (request.getCapacity() != null && request.getCapacity() <= 0) {
+            throw new BusinessException(ApiCode.INVALID_CAPACITY);
+        }
 
         Table table = Table.builder()
                 .name(request.getName())
@@ -4397,46 +4873,99 @@ public class TableService {
                 .build();
 
         Table saved = tableRepository.save(table);
-        auditLogService.log(null, shopId, saved.getId(), "TABLE", "CREATED",
+        auditLogService.log(userId, shopId, saved.getId(), "TABLE", "CREATED",
                 String.format("Tạo bàn: %s (Chi nhánh: %s)", saved.getName(), saved.getBranchId()));
         return toResponse(saved, shop);
     }
 
-    public List<TableResponse> getByShop(String shopId, String branchId) {
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    public Page<TableResponse> getByShop(String userId, String shopId, String branchId, Pageable pageable) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
 
-        return tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
-                .stream()
-                .map(table -> toResponse(table, shop))
-                .toList();
+        // Kiểm tra cửa hàng tồn tại
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        // Lấy danh sách bàn với phân trang
+        return tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
+                .map(table -> toResponse(table, shop));
     }
 
-    public TableResponse updateStatus(String tableId, TableStatus status) {
+    @Transactional
+    public TableResponse updateStatus(String userId, String tableId, TableStatus status) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(null, userId, ShopRole.OWNER, ShopRole.STAFF);
+
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
-                .orElseThrow(() -> new BusinessException(ApiCode.TABLE_NOT_FOUND));
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
 
         table.setStatus(status);
         Table saved = tableRepository.save(table);
-        auditLogService.log(null, table.getShopId(), saved.getId(), "TABLE", "STATUS_UPDATED",
+        auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "STATUS_UPDATED",
                 String.format("Cập nhật trạng thái bàn: %s → %s", table.getName(), status));
-        return toResponse(saved);
+        return toResponse(saved, shopRepository.findByIdAndDeletedFalse(table.getShopId()).orElse(null));
     }
 
-    private TableResponse toResponse(Table table) {
-        Shop shop = shopRepository.findByIdAndDeletedFalse(table.getShopId()).orElse(null);
+    @Transactional
+    public TableResponse updateTable(String userId, String tableId, TableRequest request) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(request.getShopId(), userId, ShopRole.OWNER);
 
-        return TableResponse.builder()
-                .id(table.getId())
-                .name(table.getName())
-                .status(table.getStatus())
-                .shopId(table.getShopId())
-                .branchId(table.getBranchId())
-                .shopName(shop != null ? shop.getName() : null)
-                .capacity(table.getCapacity())
-                .note(table.getNote())
-                .currentOrderId(table.getCurrentOrderId())
-                .build();
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+
+        // Kiểm tra bàn không đang được sử dụng
+        if (table.getStatus() == TableStatus.OCCUPIED) {
+            throw new BusinessException(ApiCode.TABLE_OCCUPIED);
+        }
+
+        // Kiểm tra cửa hàng tồn tại
+        Shop shop = shopRepository.findByIdAndDeletedFalse(request.getShopId())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        // Kiểm tra trùng lặp tên bàn
+        if (!table.getName().equalsIgnoreCase(request.getName()) &&
+                tableRepository.findByShopIdAndBranchIdAndDeletedFalse(request.getShopId(), request.getBranchId())
+                        .stream().anyMatch(t -> t.getName().equalsIgnoreCase(request.getName()))) {
+            throw new BusinessException(ApiCode.TABLE_NAME_EXISTS);
+        }
+
+        // Kiểm tra capacity hợp lệ
+        if (request.getCapacity() != null && request.getCapacity() <= 0) {
+            throw new BusinessException(ApiCode.INVALID_CAPACITY);
+        }
+
+        // Cập nhật thông tin bàn
+        table.setName(request.getName());
+        table.setShopId(request.getShopId());
+        table.setBranchId(request.getBranchId());
+        table.setCapacity(request.getCapacity());
+        table.setNote(request.getNote());
+        table.setStatus(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE));
+
+        Table saved = tableRepository.save(table);
+        auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "UPDATED",
+                String.format("Cập nhật thông tin bàn: %s", table.getName()));
+        return toResponse(saved, shop);
+    }
+
+    @Transactional
+    public void deleteTable(String userId, String tableId) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(null, userId, ShopRole.OWNER);
+
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+
+        // Kiểm tra bàn không đang được sử dụng
+        if (table.getStatus() == TableStatus.OCCUPIED) {
+            throw new BusinessException(ApiCode.TABLE_OCCUPIED);
+        }
+
+        table.setDeleted(true);
+        tableRepository.save(table);
+        auditLogService.log(userId, table.getShopId(), tableId, "TABLE", "DELETED",
+                String.format("Xóa bàn: %s", table.getName()));
     }
 
     private TableResponse toResponse(Table table, Shop shop) {
@@ -4444,9 +4973,9 @@ public class TableService {
                 .id(table.getId())
                 .name(table.getName())
                 .status(table.getStatus())
-                .shopId(shop.getId())
+                .shopId(table.getShopId())
                 .branchId(table.getBranchId())
-                .shopName(shop.getName())
+                .shopName(shop != null ? shop.getName() : null)
                 .capacity(table.getCapacity())
                 .note(table.getNote())
                 .currentOrderId(table.getCurrentOrderId())
@@ -4556,12 +5085,14 @@ package com.example.sales;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableMongoAuditing(auditorAwareRef = "auditorAware")
 @EnableScheduling
 @SpringBootApplication
+@EnableCaching
 public class SalesApplication {
 
 	public static void main(String[] args) {
@@ -4687,7 +5218,13 @@ public enum ApiCode {
     PRODUCT_FOUND("4127", "Product found"),
     PRODUCT_IMPORTED("4128", "Product imported successfully"),
     PRODUCT_STATUS_UPDATED("4129", "Product status updated successfully"),
-    PRODUCT_LOW_STOCK("4130", "Low stock products retrieved");
+    PRODUCT_LOW_STOCK("4130", "Low stock products retrieved"),
+    PRODUCT_SEARCH_RESULTS("4131", "Product search results retrieved"),
+    SHOP_NAME_EXISTS("4132", "Shop name already exists"),
+    SHOP_INACTIVE("4133", "Shop is inactive"),
+    INVALID_CAPACITY("4134", "Invalid capacity"),
+    TABLE_NAME_EXISTS("4135", "Table name already exists"),
+    TABLE_OCCUPIED("4136", "Table is occupied");
 
     private final String code;
     private final String message;
@@ -5008,12 +5545,12 @@ public class InventoryTransaction extends BaseEntity {
 package com.example.sales.repository;
 
 import com.example.sales.model.InventoryTransaction;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.util.List;
-
 public interface InventoryTransactionRepository extends MongoRepository<InventoryTransaction, String> {
-    List<InventoryTransaction> findByProductIdOrderByCreatedAtDesc(String productId);
+    Page<InventoryTransaction> findByProductIdOrderByCreatedAtDesc(String productId, Pageable pageable);
 }
 
 // File: src/main/java/com/example/sales/constant/InventoryType.java
@@ -5031,35 +5568,63 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.inventory.InventoryRequest;
 import com.example.sales.model.InventoryTransaction;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.InventoryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/inventory")
 @RequiredArgsConstructor
+@Validated
 public class InventoryController {
 
     private final InventoryService inventoryService;
 
     @PostMapping
     @RequireRole(ShopRole.OWNER)
-    public ApiResponse<InventoryTransaction> create(@RequestParam String shopId,
-                                                    @RequestBody @Valid InventoryRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, inventoryService.createTransaction(shopId, request));
+    @Operation(summary = "Tạo giao dịch tồn kho", description = "Tạo một giao dịch nhập hoặc xuất kho cho sản phẩm")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Giao dịch tồn kho được tạo thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ hoặc sản phẩm không đủ tồn kho"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Cửa hàng hoặc sản phẩm không tìm thấy")
+    })
+    public ApiResponseDto<InventoryTransaction> create(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestBody @Valid @Parameter(description = "Thông tin giao dịch tồn kho") InventoryRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, inventoryService.createTransaction(user.getId(), shopId, request));
     }
 
     @GetMapping("/history")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<InventoryTransaction>> getHistory(@RequestParam String productId) {
-        return ApiResponse.success(ApiCode.SUCCESS, inventoryService.getHistory(productId));
+    @Operation(summary = "Lấy lịch sử giao dịch tồn kho", description = "Lấy lịch sử giao dịch tồn kho của sản phẩm với phân trang")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lịch sử giao dịch tồn kho được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Sản phẩm không tìm thấy")
+    })
+    public ApiResponseDto<Page<InventoryTransaction>> getHistory(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của sản phẩm") String productId,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, inventoryService.getHistory(user.getId(), productId, pageable));
     }
 }
 
@@ -5074,9 +5639,9 @@ import com.example.sales.model.Product;
 import com.example.sales.repository.InventoryTransactionRepository;
 import com.example.sales.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -5085,7 +5650,7 @@ public class InventoryService {
     private final ProductRepository productRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
 
-    public InventoryTransaction createTransaction(String shopId, InventoryRequest request) {
+    public InventoryTransaction createTransaction(String userId, String shopId, InventoryRequest request) {
         Product product = productRepository.findByIdAndDeletedFalse(request.getProductId())
                 .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
 
@@ -5114,8 +5679,8 @@ public class InventoryService {
         return inventoryTransactionRepository.save(tx);
     }
 
-    public List<InventoryTransaction> getHistory(String productId) {
-        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId);
+    public Page<InventoryTransaction> getHistory(String userId, String productId, Pageable pageable) {
+        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
     }
 }
 
@@ -5249,54 +5814,72 @@ class UserServiceTest {
     }
 }
 
-// File: test/java/com/example/sales/service/ShopServiceTest.java
+// File: src/test/java/com/example/sales/service/ShopServiceTest.java
 package com.example.sales.service;
 
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopType;
 import com.example.sales.dto.shop.ShopRequest;
+import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
-import com.example.sales.model.User;
 import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.ShopUserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ShopServiceTest {
 
-    @InjectMocks
-    private ShopService shopService;
-
     @Mock
     private ShopRepository shopRepository;
 
     @Mock
-    private AuditLogService auditLogService; // ✅ Thêm dòng này
+    private AuditLogService auditLogService;
+
+    @Mock
+    private ShopUserRepository shopUserRepository;
+
+    @InjectMocks
+    private ShopService shopService;
 
     @Test
     void testCreateShop() {
         ShopRequest request = new ShopRequest();
-        request.setName("Shop ABC");
+        request.setName("Test Shop");
+        request.setType(ShopType.RETAIL);
+        request.setPhone("+123456789");
+        request.setAddress("123 Street");
 
-        User owner = new User();
-        owner.setId("u1");
+        when(shopRepository.findByOwnerIdAndDeletedFalse("user1")).thenReturn(Optional.empty());
+        when(shopRepository.save(any(Shop.class))).thenAnswer(i -> i.getArgument(0));
+        when(shopUserRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        when(shopRepository.save(any())).thenAnswer(invocation -> {
-            Shop shop = invocation.getArgument(0);
-            shop.setId("s1");
-            return shop;
-        });
+        Shop shop = shopService.createShop("user1", request, "logo.png");
 
-        Shop result = shopService.createShop("u1", request, null);
+        assertEquals("Test Shop", shop.getName());
+        assertEquals(ShopType.RETAIL, shop.getType());
+        verify(auditLogService).log(eq("user1"), eq(shop.getId()), eq(shop.getId()), eq("SHOP"), eq("CREATED"), anyString());
+    }
 
-        assertEquals("Shop ABC", result.getName());
-        verify(shopRepository).save(any(Shop.class));
+    @Test
+    void testCreateShop_AlreadyExists() {
+        ShopRequest request = new ShopRequest();
+        request.setName("Test Shop");
+        request.setType(ShopType.RETAIL);
 
-        // ✅ Optional: kiểm tra ghi log
-        verify(auditLogService).log(eq("u1"), eq("s1"), any(), eq("SHOP"), eq("CREATED"), contains("Shop ABC"));
+        when(shopRepository.findByOwnerIdAndDeletedFalse("user1")).thenReturn(Optional.of(new Shop()));
+
+        assertThrows(BusinessException.class, () -> shopService.createShop("user1", request, null),
+                ApiCode.SHOP_ALREADY_EXISTS.getMessage());
     }
 }
 
@@ -5376,56 +5959,154 @@ class ProductServiceTest {
                 contains("Cà phê")
         );
     }
+
+    @Test
+    void testUpdateProduct() {
+        Product product = Product.builder()
+                .id("p1")
+                .shopId("shop1")
+                .name("Cà phê")
+                .price(10000.0)
+                .quantity(10)
+                .category("Đồ uống")
+                .build();
+        when(productRepository.findByIdAndShopIdAndDeletedFalse("p1", "shop1"))
+                .thenReturn(Optional.of(product));
+        when(shopRepository.findByIdAndDeletedFalse("shop1"))
+                .thenReturn(Optional.of(Shop.builder().id("shop1").type(ShopType.CAFE).build()));
+        when(productRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ProductRequest req = new ProductRequest();
+        req.setName("Trà sữa");
+        req.setPrice(15000.0);
+        req.setQuantity(20);
+        req.setCategory("Đồ uống");
+
+        ProductResponse response = productService.updateProduct("user1", "shop1", "p1", req);
+
+        assertEquals("Trà sữa", response.getName());
+        assertEquals(15000.0, response.getPrice());
+        verify(auditLogService).log(eq("user1"), eq("shop1"), eq("p1"), eq("PRODUCT"), eq("PRICE_CHANGED"), anyString());
+    }
 }
 
 // File: test/java/com/example/sales/service/OrderServiceTest.java
 package com.example.sales.service;
 
-import com.example.sales.constant.OrderStatus;
-import com.example.sales.model.Order;
-import com.example.sales.repository.OrderRepository;
+import com.example.sales.constant.*;
+import com.example.sales.dto.order.OrderItemRequest;
+import com.example.sales.dto.order.OrderRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.*;
+import com.example.sales.repository.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockitoAnnotations;
 
+import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
-    @InjectMocks
-    private OrderService orderService;
+    @Mock private OrderRepository orderRepository;
+    @Mock private ProductRepository productRepository;
+    @Mock private PromotionRepository promotionRepository;
+    @Mock private ShopRepository shopRepository;
+    @Mock private TableRepository tableRepository;
+    @Mock private InventoryTransactionRepository inventoryTransactionRepository;
+    @Mock private AuditLogService auditLogService;
+    @Mock private ShopUserService shopUserService;
 
-    @Mock
-    private OrderRepository orderRepository;
+    @InjectMocks private OrderService orderService;
 
-    @Mock
-    private AuditLogService auditLogService; // 🟢 THÊM MOCK NÀY
+    private final String userId = "user123";
+    private final String shopId = "shop123";
+    private final String branchId = "branch123";
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+    }
 
     @Test
-    void testCancelOrder() {
-        Order mockOrder = Order.builder()
-                .id("ord1")
-                .shopId("shop1")
-                .userId("user1")
-                .status(OrderStatus.PENDING)
+    void createOrder_shouldCreateOrderAndAdjustInventory() {
+        Product product = Product.builder()
+                .id("prod1")
+                .name("Coca")
+                .quantity(100)
+                .shopId(shopId)
                 .build();
 
-        when(orderRepository.findByIdAndDeletedFalse("ord1"))
-                .thenReturn(Optional.of(mockOrder));
+        Shop shop = new Shop();
+        shop.setId(shopId);
+        shop.setType(ShopType.RETAIL);
 
-        orderService.cancelOrder("user1", "shop1", "ord1");
+        OrderItemRequest itemRequest = new OrderItemRequest("prod1", 2, 10000);
+        OrderRequest request = new OrderRequest();
+        request.setItems(List.of(itemRequest));
+        request.setBranchId(branchId);
 
-        assertEquals(OrderStatus.CANCELLED, mockOrder.getStatus());
-        verify(orderRepository).save(mockOrder);
+        when(productRepository.findById("prod1")).thenReturn(Optional.of(product));
+        when(shopRepository.findByIdAndDeletedFalse(shopId)).thenReturn(Optional.of(shop));
+        when(orderRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        // 🟢 Optional: kiểm tra audit log được gọi
-        verify(auditLogService).log(eq("user1"), eq("shop1"), eq("ord1"), eq("ORDER"), eq("CANCELLED"), anyString());
+        var response = orderService.createOrder(userId, shopId, request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getTotalAmount()).isEqualTo(2);
+        assertThat(response.getTotalPrice()).isEqualTo(20000);
+
+        verify(productRepository).save(any());
+        verify(inventoryTransactionRepository).save(any());
+    }
+
+    @Test
+    void createOrder_shouldThrowIfProductNotFound() {
+        OrderRequest request = new OrderRequest();
+        request.setItems(List.of(new OrderItemRequest("missingProd", 1, 5000)));
+
+        when(productRepository.findById("missingProd")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.createOrder(userId, shopId, request))
+                .isInstanceOf(Exception.class);
+    }
+
+    @Test
+    void cancelOrder_shouldSetStatusCancelled() {
+        Order order = new Order();
+        order.setId("order123");
+        order.setShopId(shopId);
+        order.setUserId(userId);
+        order.setPaid(false);
+
+        when(orderRepository.findByIdAndDeletedFalse("order123")).thenReturn(Optional.of(order));
+
+        orderService.cancelOrder(userId, shopId, "order123");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void cancelOrder_shouldFailIfAlreadyPaid() {
+        Order order = new Order();
+        order.setId("order123");
+        order.setPaid(true);
+        order.setShopId(shopId);
+        order.setUserId(userId);
+
+        when(orderRepository.findByIdAndDeletedFalse("order123")).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(userId, shopId, "order123"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ORDER_ALREADY_PAID");
     }
 }
 
@@ -5780,7 +6461,7 @@ public enum SubscriptionActionType {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.subscription.UpgradePlanRequest;
 import com.example.sales.model.Shop;
 import com.example.sales.model.SubscriptionHistory;
@@ -5805,28 +6486,28 @@ public class SubscriptionController {
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
 
     @GetMapping("/me")
-    public ApiResponse<Shop> getCurrentPlan(@AuthenticationPrincipal CustomUserDetails user) {
+    public ApiResponseDto<Shop> getCurrentPlan(@AuthenticationPrincipal CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
-        return ApiResponse.success(ApiCode.SUCCESS, shop);
+        return ApiResponseDto.success(ApiCode.SUCCESS, shop);
     }
 
     @PostMapping("/upgrade")
-    public ApiResponse<?> upgrade(@AuthenticationPrincipal CustomUserDetails user,
-                                  @RequestBody @Valid UpgradePlanRequest req) {
+    public ApiResponseDto<?> upgrade(@AuthenticationPrincipal CustomUserDetails user,
+                                     @RequestBody @Valid UpgradePlanRequest req) {
         Shop shop = shopService.getShopByOwner(user.getId());
 
         paymentService.upgradeShopPlan(shop, req.getTargetPlan(), req.getMonths());
 
         shopService.save(shop); // hoặc updateShop()
 
-        return ApiResponse.success(ApiCode.SUCCESS);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 
     @GetMapping("/history")
-    public ApiResponse<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal CustomUserDetails user) {
+    public ApiResponseDto<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
         List<SubscriptionHistory> history = subscriptionHistoryRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
-        return ApiResponse.success(ApiCode.SUCCESS, history);
+        return ApiResponseDto.success(ApiCode.SUCCESS, history);
     }
 }
 
@@ -6085,7 +6766,7 @@ public class ShopSimpleResponse {
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -6119,7 +6800,7 @@ class GlobalExceptionHandlerTest {
         WebRequest webRequest = mock(WebRequest.class);
         when(webRequest.getDescription(false)).thenReturn("POST /api/users");
 
-        ResponseEntity<ApiResponse<Map<String, String>>> response = handler.handleValidationExceptions(ex, webRequest);
+        ResponseEntity<ApiResponseDto<Map<String, String>>> response = handler.handleValidationExceptions(ex, webRequest);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -6134,7 +6815,7 @@ class GlobalExceptionHandlerTest {
         WebRequest webRequest = mock(WebRequest.class);
         when(webRequest.getDescription(false)).thenReturn("GET /api/admin");
 
-        ResponseEntity<ApiResponse<String>> response = handler.handleAccessDeniedException(ex, webRequest);
+        ResponseEntity<ApiResponseDto<String>> response = handler.handleAccessDeniedException(ex, webRequest);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -6149,7 +6830,7 @@ class GlobalExceptionHandlerTest {
         WebRequest webRequest = mock(WebRequest.class);
         when(webRequest.getDescription(false)).thenReturn("GET /api/users/123");
 
-        ResponseEntity<ApiResponse<String>> response = handler.handleBusinessException(ex, webRequest);
+        ResponseEntity<ApiResponseDto<String>> response = handler.handleBusinessException(ex, webRequest);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -6165,7 +6846,7 @@ class GlobalExceptionHandlerTest {
         when(webRequest.getDescription(false)).thenReturn("GET /api/test");
         when(webRequest.getRemoteUser()).thenReturn("testUser");
 
-        ResponseEntity<ApiResponse<String>> response = handler.handleAllExceptions(ex, webRequest);
+        ResponseEntity<ApiResponseDto<String>> response = handler.handleAllExceptions(ex, webRequest);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -6176,7 +6857,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseSuccessWithData() {
-        ApiResponse<String> response = ApiResponse.success(ApiCode.SUCCESS, "Test data");
+        ApiResponseDto<String> response = ApiResponseDto.success(ApiCode.SUCCESS, "Test data");
         assertEquals(true, response.isSuccess());
         assertEquals("2000", response.getCode());
         assertEquals("Operation successful", response.getMessage());
@@ -6185,7 +6866,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseSuccessWithoutData() {
-        ApiResponse<?> response = ApiResponse.success(ApiCode.SUCCESS);
+        ApiResponseDto<?> response = ApiResponseDto.success(ApiCode.SUCCESS);
         assertEquals(true, response.isSuccess());
         assertEquals("2000", response.getCode());
         assertEquals("Operation successful", response.getMessage());
@@ -6194,7 +6875,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseErrorWithoutData() {
-        ApiResponse<?> response = ApiResponse.error(ApiCode.INTERNAL_ERROR);
+        ApiResponseDto<?> response = ApiResponseDto.error(ApiCode.INTERNAL_ERROR);
         assertEquals(false, response.isSuccess());
         assertEquals("5000", response.getCode());
         assertEquals("Internal server error", response.getMessage());
@@ -6203,7 +6884,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseErrorWithCustomMessageAndData() {
-        ApiResponse<String> response = ApiResponse.error(ApiCode.VALIDATION_ERROR, "Custom validation error", "Details");
+        ApiResponseDto<String> response = ApiResponseDto.error(ApiCode.VALIDATION_ERROR, "Custom validation error", "Details");
         assertEquals(false, response.isSuccess());
         assertEquals("4000", response.getCode());
         assertEquals("Custom validation error", response.getMessage());
@@ -6216,7 +6897,7 @@ package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.RequireRole;
@@ -6230,9 +6911,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Controller xử lý các thao tác CRUD cho sản phẩm.
- */
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
@@ -6248,11 +6926,11 @@ public class ProductCrudController {
      */
     @PostMapping
     @RequireRole(ShopRole.OWNER)
-    public ResponseEntity<ApiResponse<ProductResponse>> create(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @RequestParam String shopId,
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.createProduct(shopId, request);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_CREATED, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
     /**
@@ -6266,13 +6944,13 @@ public class ProductCrudController {
      */
     @PutMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<ProductResponse>> update(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> update(
             @RequestParam String userId,
             @RequestParam String shopId,
             @PathVariable String id,
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.updateProduct(userId, shopId, id, request);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_UPDATED, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_UPDATED, response));
     }
 
     /**
@@ -6284,11 +6962,11 @@ public class ProductCrudController {
      */
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
-    public ResponseEntity<ApiResponse<Void>> delete(
+    public ResponseEntity<ApiResponseDto<Void>> delete(
             @RequestParam String shopId,
             @PathVariable String id) {
         productService.deleteProduct(shopId, id);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_DELETED, null));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_DELETED, null));
     }
 
     /**
@@ -6300,11 +6978,11 @@ public class ProductCrudController {
      */
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAll(
+    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
             @RequestParam String shopId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<ProductResponse> response = productService.getAllByShop(shopId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_LIST, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
     }
 
     /**
@@ -6316,11 +6994,29 @@ public class ProductCrudController {
      */
     @GetMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<ProductResponse>> getById(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> getById(
             @RequestParam String shopId,
             @PathVariable String id) {
         ProductResponse response = productService.getProduct(shopId, id);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_FOUND, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_FOUND, response));
+    }
+
+    /**
+     * Lấy danh sách sản phẩm theo từ khóa tìm kiếm.
+     *
+     * @param shopId   ID cửa hàng
+     * @param keyword  Từ khóa tìm kiếm
+     * @param pageable Thông tin phân trang
+     * @return Danh sách sản phẩm phù hợp với từ khóa
+     */
+    @GetMapping("/search")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> search(
+            @RequestParam String shopId,
+            @RequestParam String keyword,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<ProductResponse> response = productService.searchProducts(shopId, keyword, pageable);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_SEARCH_RESULTS, response));
     }
 }
 
@@ -6329,23 +7025,18 @@ package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.ProductImportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Map;
 
-/**
- * Controller xử lý nhập/xuất sản phẩm (Excel, CSV).
- */
 @RestController
 @RequestMapping("/api/products/import-export")
 @RequiredArgsConstructor
@@ -6362,12 +7053,20 @@ public class ProductImportExportController {
      */
     @PostMapping("/import")
     @RequireRole(ShopRole.OWNER)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> importExcel(
+    public ResponseEntity<ApiResponseDto<Map<String, Object>>> importExcel(
             @RequestParam String shopId,
             @RequestParam(required = false) String branchId,
             @RequestParam("file") MultipartFile file) {
         Map<String, Object> result = productImportService.importExcel(shopId, branchId, file);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_IMPORTED, result));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_IMPORTED, result));
+    }
+
+    @GetMapping("/export")
+    @RequireRole(ShopRole.OWNER)
+    public ResponseEntity<byte[]> exportExcel(
+            @RequestParam String shopId,
+            @RequestParam(required = false) String branchId) throws IOException {
+        return excelExportService.exportProducts(shopId, branchId);
     }
 }
 
@@ -6375,7 +7074,7 @@ public class ProductImportExportController {
 package com.example.sales.controller.product;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ProductService;
@@ -6403,11 +7102,11 @@ public class ProductStatusController {
      */
     @PatchMapping("/{productId}/toggle")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<ProductResponse>> toggleActive(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> toggleActive(
             @RequestParam String shopId,
             @PathVariable String productId) {
         ProductResponse response = productService.toggleActive(shopId, productId);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_STATUS_UPDATED, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_STATUS_UPDATED, response));
     }
 
     /**
@@ -6419,11 +7118,11 @@ public class ProductStatusController {
      */
     @GetMapping("/low-stock")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStock(
+    public ResponseEntity<ApiResponseDto<List<ProductResponse>>> getLowStock(
             @RequestParam String shopId,
             @RequestParam(defaultValue = "10") int threshold) {
         List<ProductResponse> response = productService.getLowStockProducts(shopId, threshold);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_LOW_STOCK, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LOW_STOCK, response));
     }
 }
 
@@ -6440,6 +7139,7 @@ import com.example.sales.model.Shop;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -6454,7 +7154,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-public class ProductServiceImpl implements ProductService {
+public class ProductServiceImpl extends BaseService implements ProductService {
     private final ProductRepository productRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
@@ -6557,6 +7257,7 @@ public class ProductServiceImpl implements ProductService {
         return toResponse(product);
     }
 
+    @Cacheable(value = "products", key = "#shopId")
     @Override
     public Page<ProductResponse> getAllByShop(String shopId, Pageable pageable) {
         return productRepository.findByShopIdAndDeletedFalse(shopId, pageable)
@@ -6597,6 +7298,12 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable) {
+        return productRepository.findByShopIdAndKeyword(shopId, keyword, pageable)
+                .map(this::toResponse);
+    }
+
     private ProductResponse toResponse(Product product) {
         return ProductResponse.builder()
                 .id(product.getId())
@@ -6621,4 +7328,246 @@ public class ProductServiceImpl implements ProductService {
         };
     }
 }
+
+// File: src/main/java/com/example/sales/service/BaseService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Order;
+import com.example.sales.model.Shop;
+import com.example.sales.model.ShopUser;
+import com.example.sales.repository.OrderRepository;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.ShopUserRepository;
+
+public abstract class BaseService {
+    protected Shop checkShopExists(ShopRepository shopRepository, String shopId) {
+        return shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
+    protected ShopUser checkShopUserExists(ShopUserRepository shopUserRepository, String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
+    }
+    protected Order checkOrderExists(OrderRepository orderRepository, String orderId, String shopId) {
+        return orderRepository.findByIdAndDeletedFalse(orderId)
+                .filter(o -> o.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
+    }
+}
+
+// File: src/main/java/com/example/sales/dto/order/OrderUpdateRequest.java
+package com.example.sales.dto.order;
+import lombok.Data;
+import java.util.List;
+
+@Data
+public class OrderUpdateRequest {
+    private String note;
+    private String tableId;
+    private List<OrderItemRequest> items;
+}
+
+// File: src/test/java/com/example/sales/service/ShopUserServiceTest.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.ShopType;
+import com.example.sales.dto.shop.ShopSimpleResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
+import com.example.sales.model.ShopUser;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.ShopUserRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class ShopUserServiceTest {
+
+    @Mock
+    private ShopUserRepository shopUserRepository;
+
+    @Mock
+    private ShopRepository shopRepository;
+
+    @InjectMocks
+    private ShopUserService shopUserService;
+
+    @Test
+    void testAddUser() {
+        Shop shop = Shop.builder()
+                .id("shop1")
+                .name("Test Shop")
+                .type(ShopType.RETAIL)
+                .active(true)
+                .build();
+        when(shopRepository.findByIdAndDeletedFalse("shop1")).thenReturn(Optional.of(shop));
+        when(shopUserRepository.findByShopIdAndUserIdAndDeletedFalse("shop1", "user1"))
+                .thenReturn(Optional.empty());
+        when(shopUserRepository.save(any(ShopUser.class))).thenAnswer(i -> i.getArgument(0));
+
+        shopUserService.addUser("shop1", "user1", ShopRole.STAFF, null);
+
+        verify(shopUserRepository).save(argThat(su ->
+                su.getShopId().equals("shop1") &&
+                        su.getUserId().equals("user1") &&
+                        su.getRole() == ShopRole.STAFF));
+    }
+
+    @Test
+    void testAddUser_Duplicate() {
+        Shop shop = Shop.builder()
+                .id("shop1")
+                .name("Test Shop")
+                .active(true)
+                .build();
+        ShopUser shopUser = ShopUser.builder()
+                .shopId("shop1")
+                .userId("user1")
+                .role(ShopRole.STAFF)
+                .build();
+        when(shopRepository.findByIdAndDeletedFalse("shop1")).thenReturn(Optional.of(shop));
+        when(shopUserRepository.findByShopIdAndUserIdAndDeletedFalse("shop1", "user1"))
+                .thenReturn(Optional.of(shopUser));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> shopUserService.addUser("shop1", "user1", ShopRole.STAFF, null));
+        assertEquals(ApiCode.DUPLICATE_DATA.getMessage(), exception.getMessage());
+    }
+
+    @Test
+    void testAddUser_ShopNotFound() {
+        when(shopRepository.findByIdAndDeletedFalse("shop1")).thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> shopUserService.addUser("shop1", "user1", ShopRole.STAFF, null));
+        assertEquals(ApiCode.SHOP_NOT_FOUND.getMessage(), exception.getMessage());
+    }
+
+    @Test
+    void testRemoveUser() {
+        ShopUser shopUser = ShopUser.builder()
+                .shopId("shop1")
+                .userId("user1")
+                .role(ShopRole.STAFF)
+                .build();
+        when(shopUserRepository.findByShopIdAndUserIdAndDeletedFalse("shop1", "user1"))
+                .thenReturn(Optional.of(shopUser));
+
+        shopUserService.removeUser("shop1", "user1");
+
+        verify(shopUserRepository).delete(shopUser);
+    }
+
+    @Test
+    void testRemoveUser_NotFound() {
+        when(shopUserRepository.findByShopIdAndUserIdAndDeletedFalse("shop1", "user1"))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> shopUserService.removeUser("shop1", "user1"));
+        assertEquals(ApiCode.NOT_FOUND.getMessage(), exception.getMessage());
+    }
+
+    @Test
+    void testGetShopsForUser() {
+        ShopUser shopUser = ShopUser.builder()
+                .shopId("shop1")
+                .userId("user1")
+                .role(ShopRole.STAFF)
+                .build();
+        Shop shop = Shop.builder()
+                .id("shop1")
+                .name("Test Shop")
+                .type(ShopType.RETAIL)
+                .active(true)
+                .build();
+        Page<ShopUser> shopUserPage = new PageImpl<>(List.of(shopUser), PageRequest.of(0, 10), 1);
+        when(shopUserRepository.findByUserIdAndDeletedFalse(eq("user1"), any(Pageable.class)))
+                .thenReturn(shopUserPage);
+        when(shopRepository.findByIdAndDeletedFalse("shop1")).thenReturn(Optional.of(shop));
+
+        List<ShopSimpleResponse> shops = shopUserService.getShopsForUser("user1", PageRequest.of(0, 10)).getContent();
+
+        assertEquals(1, shops.size());
+        assertEquals("Test Shop", shops.get(0).getName());
+        assertEquals(ShopRole.STAFF, shops.get(0).getRole());
+        assertEquals(ShopType.RETAIL, shops.get(0).getType());
+    }
+
+    @Test
+    void testGetShopsForUser_Empty() {
+        Page<ShopUser> emptyPage = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(shopUserRepository.findByUserIdAndDeletedFalse(eq("user1"), any(Pageable.class)))
+                .thenReturn(emptyPage);
+
+        List<ShopSimpleResponse> shops = shopUserService.getShopsForUser("user1", PageRequest.of(0, 10)).getContent();
+
+        assertTrue(shops.isEmpty());
+    }
+
+    @Test
+    void testGetUserRoleInShop() {
+        ShopUser shopUser = ShopUser.builder()
+                .shopId("shop1")
+                .userId("user1")
+                .role(ShopRole.OWNER)
+                .build();
+        when(shopUserRepository.findByShopIdAndUserIdAndDeletedFalse("shop1", "user1"))
+                .thenReturn(Optional.of(shopUser));
+
+        ShopRole role = shopUserService.getUserRoleInShop("shop1", "user1");
+
+        assertEquals(ShopRole.OWNER, role);
+    }
+
+    @Test
+    void testGetUserRoleInShop_NotFound() {
+        when(shopUserRepository.findByShopIdAndUserIdAndDeletedFalse("shop1", "user1"))
+                .thenReturn(Optional.empty());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> shopUserService.getUserRoleInShop("shop1", "user1"));
+        assertEquals(ApiCode.UNAUTHORIZED.getMessage(), exception.getMessage());
+    }
+}
+
+// File: main/java/com/example/sales/dto/table/TableUpdateRequest.java
+package com.example.sales.dto.table;
+
+import com.example.sales.constant.TableStatus;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class TableUpdateRequest {
+    @NotBlank
+    private String name;
+    private TableStatus status;
+    private String shopId;
+    @Min(1)
+    private Integer capacity;
+    private String note;
+    private String branchId;
+}
+
 [END]

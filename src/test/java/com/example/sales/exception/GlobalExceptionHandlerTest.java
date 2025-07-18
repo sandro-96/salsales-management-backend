@@ -2,7 +2,7 @@
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,7 +36,7 @@ class GlobalExceptionHandlerTest {
         WebRequest webRequest = mock(WebRequest.class);
         when(webRequest.getDescription(false)).thenReturn("POST /api/users");
 
-        ResponseEntity<ApiResponse<Map<String, String>>> response = handler.handleValidationExceptions(ex, webRequest);
+        ResponseEntity<ApiResponseDto<Map<String, String>>> response = handler.handleValidationExceptions(ex, webRequest);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -51,7 +51,7 @@ class GlobalExceptionHandlerTest {
         WebRequest webRequest = mock(WebRequest.class);
         when(webRequest.getDescription(false)).thenReturn("GET /api/admin");
 
-        ResponseEntity<ApiResponse<String>> response = handler.handleAccessDeniedException(ex, webRequest);
+        ResponseEntity<ApiResponseDto<String>> response = handler.handleAccessDeniedException(ex, webRequest);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -66,7 +66,7 @@ class GlobalExceptionHandlerTest {
         WebRequest webRequest = mock(WebRequest.class);
         when(webRequest.getDescription(false)).thenReturn("GET /api/users/123");
 
-        ResponseEntity<ApiResponse<String>> response = handler.handleBusinessException(ex, webRequest);
+        ResponseEntity<ApiResponseDto<String>> response = handler.handleBusinessException(ex, webRequest);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -82,7 +82,7 @@ class GlobalExceptionHandlerTest {
         when(webRequest.getDescription(false)).thenReturn("GET /api/test");
         when(webRequest.getRemoteUser()).thenReturn("testUser");
 
-        ResponseEntity<ApiResponse<String>> response = handler.handleAllExceptions(ex, webRequest);
+        ResponseEntity<ApiResponseDto<String>> response = handler.handleAllExceptions(ex, webRequest);
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
@@ -93,7 +93,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseSuccessWithData() {
-        ApiResponse<String> response = ApiResponse.success(ApiCode.SUCCESS, "Test data");
+        ApiResponseDto<String> response = ApiResponseDto.success(ApiCode.SUCCESS, "Test data");
         assertEquals(true, response.isSuccess());
         assertEquals("2000", response.getCode());
         assertEquals("Operation successful", response.getMessage());
@@ -102,7 +102,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseSuccessWithoutData() {
-        ApiResponse<?> response = ApiResponse.success(ApiCode.SUCCESS);
+        ApiResponseDto<?> response = ApiResponseDto.success(ApiCode.SUCCESS);
         assertEquals(true, response.isSuccess());
         assertEquals("2000", response.getCode());
         assertEquals("Operation successful", response.getMessage());
@@ -111,7 +111,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseErrorWithoutData() {
-        ApiResponse<?> response = ApiResponse.error(ApiCode.INTERNAL_ERROR);
+        ApiResponseDto<?> response = ApiResponseDto.error(ApiCode.INTERNAL_ERROR);
         assertEquals(false, response.isSuccess());
         assertEquals("5000", response.getCode());
         assertEquals("Internal server error", response.getMessage());
@@ -120,7 +120,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void testApiResponseErrorWithCustomMessageAndData() {
-        ApiResponse<String> response = ApiResponse.error(ApiCode.VALIDATION_ERROR, "Custom validation error", "Details");
+        ApiResponseDto<String> response = ApiResponseDto.error(ApiCode.VALIDATION_ERROR, "Custom validation error", "Details");
         assertEquals(false, response.isSuccess());
         assertEquals("4000", response.getCode());
         assertEquals("Custom validation error", response.getMessage());

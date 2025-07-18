@@ -4,7 +4,7 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.security.CustomUserDetails;
@@ -28,33 +28,33 @@ public class CustomerController {
 
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<CustomerResponse>> getAll(@RequestParam String shopId,
-                                                      @RequestParam(required = false) String branchId) {
-        return ApiResponse.success(ApiCode.CUSTOMER_LIST, customerService.getCustomers(shopId, branchId));
+    public ApiResponseDto<List<CustomerResponse>> getAll(@RequestParam String shopId,
+                                                         @RequestParam(required = false) String branchId) {
+        return ApiResponseDto.success(ApiCode.CUSTOMER_LIST, customerService.getCustomers(shopId, branchId));
     }
 
     @PostMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<CustomerResponse> create(@AuthenticationPrincipal CustomUserDetails user,
-                                                @RequestParam String shopId,
-                                                @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user.getId(), request));
+    public ApiResponseDto<CustomerResponse> create(@AuthenticationPrincipal CustomUserDetails user,
+                                                   @RequestParam String shopId,
+                                                   @RequestBody @Valid CustomerRequest request) {
+        return ApiResponseDto.success(ApiCode.CUSTOMER_CREATED, customerService.createCustomer(shopId, user.getId(), request));
     }
 
     @PutMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<CustomerResponse> update(@RequestParam String shopId,
-                                                @PathVariable String id,
-                                                @RequestBody @Valid CustomerRequest request) {
-        return ApiResponse.success(ApiCode.CUSTOMER_UPDATED, customerService.updateCustomer(shopId, id, request));
+    public ApiResponseDto<CustomerResponse> update(@RequestParam String shopId,
+                                                   @PathVariable String id,
+                                                   @RequestBody @Valid CustomerRequest request) {
+        return ApiResponseDto.success(ApiCode.CUSTOMER_UPDATED, customerService.updateCustomer(shopId, id, request));
     }
 
     @DeleteMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<?> delete(@RequestParam String shopId,
-                                 @RequestParam String branchId,
-                                 @PathVariable String id) {
+    public ApiResponseDto<?> delete(@RequestParam String shopId,
+                                    @RequestParam String branchId,
+                                    @PathVariable String id) {
         customerService.deleteCustomer(shopId, branchId, id);
-        return ApiResponse.success(ApiCode.CUSTOMER_DELETED);
+        return ApiResponseDto.success(ApiCode.CUSTOMER_DELETED);
     }
 }

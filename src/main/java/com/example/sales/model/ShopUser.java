@@ -16,14 +16,11 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @NoArgsConstructor
 @Document(collection = "shop_users")
 public class ShopUser extends BaseEntity {
-
     @Id
     private String id;
-
     private String shopId;
-
     private String userId;
-
     private ShopRole role;
+    private String branchId;
 }
 

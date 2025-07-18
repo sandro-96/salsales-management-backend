@@ -8,9 +8,9 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
 import com.example.sales.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -19,14 +19,12 @@ public class BranchService {
     private final BranchRepository branchRepository;
     private final AuditLogService auditLogService;
 
-    public List<BranchResponse> getAll(String shopId) {
-        return branchRepository.findByShopIdAndDeletedFalse(shopId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<BranchResponse> getAll(String userId, String shopId, Pageable pageable) {
+        return branchRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+                .map(this::toResponse);
     }
 
-    public BranchResponse create(String shopId, BranchRequest req) {
+    public BranchResponse create(String userId, String shopId, BranchRequest req) {
         Branch branch = Branch.builder()
                 .shopId(shopId)
                 .name(req.getName())
@@ -36,12 +34,12 @@ public class BranchService {
                 .build();
 
         Branch saved = branchRepository.save(branch);
-        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "CREATED",
+        auditLogService.log(userId, shopId, saved.getId(), "BRANCH", "CREATED",
                 String.format("Tạo chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
         return toResponse(saved);
     }
 
-    public BranchResponse update(String shopId, String id, BranchRequest req) {
+    public BranchResponse update(String userId, String shopId, String id, BranchRequest req) {
         Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
@@ -52,19 +50,19 @@ public class BranchService {
         branch.setActive(req.isActive());
 
         Branch saved = branchRepository.save(branch);
-        auditLogService.log(null, shopId, saved.getId(), "BRANCH", "UPDATED",
+        auditLogService.log(userId, shopId, saved.getId(), "BRANCH", "UPDATED",
                 String.format("Cập nhật chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
         return toResponse(saved);
     }
 
-    public void delete(String shopId, String id) {
+    public void delete(String userId, String shopId, String id) {
         Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
 
         branch.setDeleted(true);
         branchRepository.save(branch);
-        auditLogService.log(null, shopId, branch.getId(), "BRANCH", "DELETED",
+        auditLogService.log(userId, shopId, branch.getId(), "BRANCH", "DELETED",
                 String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
 
     }

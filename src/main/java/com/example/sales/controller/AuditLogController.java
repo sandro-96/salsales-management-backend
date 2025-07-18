@@ -4,7 +4,7 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.SubscriptionPlan;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.model.AuditLog;
 import com.example.sales.repository.AuditLogRepository;
 import com.example.sales.security.RequirePlan;
@@ -24,8 +24,8 @@ public class AuditLogController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/{targetId}")
-    public ApiResponse<List<AuditLog>> getLogs(@PathVariable String targetId) {
+    public ApiResponseDto<List<AuditLog>> getLogs(@PathVariable String targetId) {
         List<AuditLog> logs = auditLogRepository.findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(targetId);
-        return ApiResponse.success(ApiCode.SUCCESS, logs);
+        return ApiResponseDto.success(ApiCode.SUCCESS, logs);
     }
 }

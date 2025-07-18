@@ -3,7 +3,7 @@ package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.RequireRole;
@@ -17,9 +17,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Controller xử lý các thao tác CRUD cho sản phẩm.
- */
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
@@ -35,11 +32,11 @@ public class ProductCrudController {
      */
     @PostMapping
     @RequireRole(ShopRole.OWNER)
-    public ResponseEntity<ApiResponse<ProductResponse>> create(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @RequestParam String shopId,
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.createProduct(shopId, request);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_CREATED, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
     /**
@@ -53,13 +50,13 @@ public class ProductCrudController {
      */
     @PutMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<ProductResponse>> update(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> update(
             @RequestParam String userId,
             @RequestParam String shopId,
             @PathVariable String id,
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.updateProduct(userId, shopId, id, request);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_UPDATED, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_UPDATED, response));
     }
 
     /**
@@ -71,11 +68,11 @@ public class ProductCrudController {
      */
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
-    public ResponseEntity<ApiResponse<Void>> delete(
+    public ResponseEntity<ApiResponseDto<Void>> delete(
             @RequestParam String shopId,
             @PathVariable String id) {
         productService.deleteProduct(shopId, id);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_DELETED, null));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_DELETED, null));
     }
 
     /**
@@ -87,11 +84,11 @@ public class ProductCrudController {
      */
     @GetMapping
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAll(
+    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
             @RequestParam String shopId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<ProductResponse> response = productService.getAllByShop(shopId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_LIST, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
     }
 
     /**
@@ -103,10 +100,28 @@ public class ProductCrudController {
      */
     @GetMapping("/{id}")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<ProductResponse>> getById(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> getById(
             @RequestParam String shopId,
             @PathVariable String id) {
         ProductResponse response = productService.getProduct(shopId, id);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_FOUND, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_FOUND, response));
+    }
+
+    /**
+     * Lấy danh sách sản phẩm theo từ khóa tìm kiếm.
+     *
+     * @param shopId   ID cửa hàng
+     * @param keyword  Từ khóa tìm kiếm
+     * @param pageable Thông tin phân trang
+     * @return Danh sách sản phẩm phù hợp với từ khóa
+     */
+    @GetMapping("/search")
+    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> search(
+            @RequestParam String shopId,
+            @RequestParam String keyword,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<ProductResponse> response = productService.searchProducts(shopId, keyword, pageable);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_SEARCH_RESULTS, response));
     }
 }

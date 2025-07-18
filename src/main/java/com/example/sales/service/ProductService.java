@@ -8,9 +8,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-/**
- * Service interface for managing product-related operations.
- */
 public interface ProductService {
 
     /**
@@ -76,4 +73,15 @@ public interface ProductService {
      * @return a list of products with low stock
      */
     List<ProductResponse> getLowStockProducts(String shopId, int threshold);
+
+    //searchProducts
+    /**
+     * Searches for products in a shop based on a keyword.
+     *
+     * @param shopId   the ID of the shop
+     * @param keyword  the search keyword
+     * @param pageable the pagination information
+     * @return a paginated list of product responses matching the search criteria
+     */
+    Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable);
 }

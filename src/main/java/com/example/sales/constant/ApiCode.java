@@ -68,7 +68,13 @@ public enum ApiCode {
     PRODUCT_FOUND("4127", "Product found"),
     PRODUCT_IMPORTED("4128", "Product imported successfully"),
     PRODUCT_STATUS_UPDATED("4129", "Product status updated successfully"),
-    PRODUCT_LOW_STOCK("4130", "Low stock products retrieved");
+    PRODUCT_LOW_STOCK("4130", "Low stock products retrieved"),
+    PRODUCT_SEARCH_RESULTS("4131", "Product search results retrieved"),
+    SHOP_NAME_EXISTS("4132", "Shop name already exists"),
+    SHOP_INACTIVE("4133", "Shop is inactive"),
+    INVALID_CAPACITY("4134", "Invalid capacity"),
+    TABLE_NAME_EXISTS("4135", "Table name already exists"),
+    TABLE_OCCUPIED("4136", "Table is occupied");
 
     private final String code;
     private final String message;

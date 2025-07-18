@@ -2,14 +2,15 @@
 package com.example.sales.repository;
 
 import com.example.sales.model.Branch;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface BranchRepository extends MongoRepository<Branch, String> {
-    List<Branch> findByShopIdAndDeletedFalse(String shopId);
+    Page<Branch> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
     Optional<Branch> findByIdAndDeletedFalse(String id);
 }

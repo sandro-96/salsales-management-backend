@@ -5,7 +5,7 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.SubscriptionPlan;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
@@ -32,17 +32,17 @@ public class ReportController {
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/summary")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<ReportResponse> getReport(@RequestParam String shopId,
-                                                 @RequestBody ReportRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, reportService.getReport(shopId, request));
+    public ApiResponseDto<ReportResponse> getReport(@RequestParam String shopId,
+                                                    @RequestBody ReportRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, reportService.getReport(shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/daily")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ApiResponse<List<DailyReportResponse>> getDaily(@RequestParam String shopId,
-                                                           @RequestBody ReportRequest request) {
-        return ApiResponse.success(ApiCode.SUCCESS, reportService.getDailyReport(shopId, request));
+    public ApiResponseDto<List<DailyReportResponse>> getDaily(@RequestParam String shopId,
+                                                              @RequestBody ReportRequest request) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, reportService.getDailyReport(shopId, request));
     }
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})

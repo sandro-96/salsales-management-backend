@@ -74,4 +74,33 @@ class ProductServiceTest {
                 contains("Cà phê")
         );
     }
+
+    @Test
+    void testUpdateProduct() {
+        Product product = Product.builder()
+                .id("p1")
+                .shopId("shop1")
+                .name("Cà phê")
+                .price(10000.0)
+                .quantity(10)
+                .category("Đồ uống")
+                .build();
+        when(productRepository.findByIdAndShopIdAndDeletedFalse("p1", "shop1"))
+                .thenReturn(Optional.of(product));
+        when(shopRepository.findByIdAndDeletedFalse("shop1"))
+                .thenReturn(Optional.of(Shop.builder().id("shop1").type(ShopType.CAFE).build()));
+        when(productRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        ProductRequest req = new ProductRequest();
+        req.setName("Trà sữa");
+        req.setPrice(15000.0);
+        req.setQuantity(20);
+        req.setCategory("Đồ uống");
+
+        ProductResponse response = productService.updateProduct("user1", "shop1", "p1", req);
+
+        assertEquals("Trà sữa", response.getName());
+        assertEquals(15000.0, response.getPrice());
+        verify(auditLogService).log(eq("user1"), eq("shop1"), eq("p1"), eq("PRODUCT"), eq("PRICE_CHANGED"), anyString());
+    }
 }

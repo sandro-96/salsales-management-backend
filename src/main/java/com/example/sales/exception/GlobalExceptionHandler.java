@@ -2,7 +2,7 @@
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
      * Xử lý lỗi validation cho các DTO
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
+    public ResponseEntity<ApiResponseDto<Map<String, String>>> handleValidationExceptions(
             MethodArgumentNotValidException ex, WebRequest request) {
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
@@ -34,39 +34,39 @@ public class GlobalExceptionHandler {
         log.warn("Validation error at {}: {}", request.getDescription(false), errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), errors));
+                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), errors));
     }
 
     /**
      * Xử lý lỗi khi người dùng không có quyền truy cập
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<String>> handleAccessDeniedException(
+    public ResponseEntity<ApiResponseDto<String>> handleAccessDeniedException(
             AccessDeniedException ex, WebRequest request) {
         log.warn("Access denied at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(ApiCode.ACCESS_DENIED, ApiCode.ACCESS_DENIED.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.ACCESS_DENIED, ApiCode.ACCESS_DENIED.getMessage(), ex.getMessage()));
     }
 
     /**
      * Xử lý lỗi kinh doanh
      */
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<String>> handleBusinessException(
+    public ResponseEntity<ApiResponseDto<String>> handleBusinessException(
             BusinessException ex, WebRequest request) {
         log.error("Business error at {}: {} - {}",
                 request.getDescription(false), ex.getError().getCode(), ex.getError().getMessage());
         return ResponseEntity
                 .status(getHttpStatus(ex.getError()))
-                .body(ApiResponse.error(ex.getError(), ex.getError().getMessage(), null));
+                .body(ApiResponseDto.error(ex.getError(), ex.getError().getMessage(), null));
     }
 
     /**
      * Xử lý các lỗi chung (fallback)
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<String>> handleAllExceptions(
+    public ResponseEntity<ApiResponseDto<String>> handleAllExceptions(
             Exception ex, WebRequest request) {
         request.getRemoteUser();
         log.error("Internal server error at {} for user {} (requestId: {}): {}",
@@ -76,25 +76,25 @@ public class GlobalExceptionHandler {
                 ex.getMessage(), ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(ApiCode.INTERNAL_ERROR, ApiCode.INTERNAL_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.INTERNAL_ERROR, ApiCode.INTERNAL_ERROR.getMessage(), ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<String>> handleIllegalArgumentException(
+    public ResponseEntity<ApiResponseDto<String>> handleIllegalArgumentException(
             IllegalArgumentException ex, WebRequest request) {
         log.warn("Invalid argument at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<String>> handleHttpMessageNotReadableException(
+    public ResponseEntity<ApiResponseDto<String>> handleHttpMessageNotReadableException(
             HttpMessageNotReadableException ex, WebRequest request) {
         log.warn("Invalid JSON at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
     }
 
     /**

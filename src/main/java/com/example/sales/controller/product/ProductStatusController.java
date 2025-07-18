@@ -2,7 +2,7 @@
 package com.example.sales.controller.product;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ProductService;
@@ -30,11 +30,11 @@ public class ProductStatusController {
      */
     @PatchMapping("/{productId}/toggle")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<ProductResponse>> toggleActive(
+    public ResponseEntity<ApiResponseDto<ProductResponse>> toggleActive(
             @RequestParam String shopId,
             @PathVariable String productId) {
         ProductResponse response = productService.toggleActive(shopId, productId);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_STATUS_UPDATED, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_STATUS_UPDATED, response));
     }
 
     /**
@@ -46,10 +46,10 @@ public class ProductStatusController {
      */
     @GetMapping("/low-stock")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStock(
+    public ResponseEntity<ApiResponseDto<List<ProductResponse>>> getLowStock(
             @RequestParam String shopId,
             @RequestParam(defaultValue = "10") int threshold) {
         List<ProductResponse> response = productService.getLowStockProducts(shopId, threshold);
-        return ResponseEntity.ok(ApiResponse.success(ApiCode.PRODUCT_LOW_STOCK, response));
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LOW_STOCK, response));
     }
 }

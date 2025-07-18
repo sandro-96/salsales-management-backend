@@ -2,7 +2,7 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.ApiResponse;
+import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.subscription.UpgradePlanRequest;
 import com.example.sales.model.Shop;
 import com.example.sales.model.SubscriptionHistory;
@@ -27,27 +27,27 @@ public class SubscriptionController {
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
 
     @GetMapping("/me")
-    public ApiResponse<Shop> getCurrentPlan(@AuthenticationPrincipal CustomUserDetails user) {
+    public ApiResponseDto<Shop> getCurrentPlan(@AuthenticationPrincipal CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
-        return ApiResponse.success(ApiCode.SUCCESS, shop);
+        return ApiResponseDto.success(ApiCode.SUCCESS, shop);
     }
 
     @PostMapping("/upgrade")
-    public ApiResponse<?> upgrade(@AuthenticationPrincipal CustomUserDetails user,
-                                  @RequestBody @Valid UpgradePlanRequest req) {
+    public ApiResponseDto<?> upgrade(@AuthenticationPrincipal CustomUserDetails user,
+                                     @RequestBody @Valid UpgradePlanRequest req) {
         Shop shop = shopService.getShopByOwner(user.getId());
 
         paymentService.upgradeShopPlan(shop, req.getTargetPlan(), req.getMonths());
 
         shopService.save(shop); // hoặc updateShop()
 
-        return ApiResponse.success(ApiCode.SUCCESS);
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 
     @GetMapping("/history")
-    public ApiResponse<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal CustomUserDetails user) {
+    public ApiResponseDto<List<SubscriptionHistory>> getHistory(@AuthenticationPrincipal CustomUserDetails user) {
         Shop shop = shopService.getShopByOwner(user.getId());
         List<SubscriptionHistory> history = subscriptionHistoryRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
-        return ApiResponse.success(ApiCode.SUCCESS, history);
+        return ApiResponseDto.success(ApiCode.SUCCESS, history);
     }
 }

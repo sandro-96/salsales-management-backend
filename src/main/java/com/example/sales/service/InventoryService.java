@@ -9,9 +9,9 @@ import com.example.sales.model.Product;
 import com.example.sales.repository.InventoryTransactionRepository;
 import com.example.sales.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +20,7 @@ public class InventoryService {
     private final ProductRepository productRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
 
-    public InventoryTransaction createTransaction(String shopId, InventoryRequest request) {
+    public InventoryTransaction createTransaction(String userId, String shopId, InventoryRequest request) {
         Product product = productRepository.findByIdAndDeletedFalse(request.getProductId())
                 .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
 
@@ -49,7 +49,7 @@ public class InventoryService {
         return inventoryTransactionRepository.save(tx);
     }
 
-    public List<InventoryTransaction> getHistory(String productId) {
-        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId);
+    public Page<InventoryTransaction> getHistory(String userId, String productId, Pageable pageable) {
+        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
     }
 }

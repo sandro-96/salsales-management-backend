@@ -1,5 +1,5 @@
-// File: src/main/java/com/example/sales/dto/TableResponse.java
-package com.example.sales.dto;
+// File: src/main/java/com/example/sales/dto/table/TableResponse.java
+package com.example.sales.dto.table;
 
 import com.example.sales.constant.TableStatus;
 import lombok.*;
