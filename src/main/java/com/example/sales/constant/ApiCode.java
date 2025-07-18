@@ -2,66 +2,81 @@
 package com.example.sales.constant;
 
 public enum ApiCode {
+    // Success
+    SUCCESS("2000", "Operation successful"),
+    PRODUCT_CREATED("2001", "Product created successfully"),
+    USER_UPDATED("2002", "User updated successfully"),
+    PASSWORD_CHANGED("2003", "Password changed successfully"),
+    EMAIL_SENT("2004", "Email sent successfully"),
 
-    // ===== Success =====
-    SUCCESS,
-    PRODUCT_CREATED,
-    USER_UPDATED,
-    PASSWORD_CHANGED,
-    EMAIL_SENT,
+    // Validation & Client Errors
+    VALIDATION_ERROR("4000", "Validation error"),
+    UNAUTHORIZED("4001", "Unauthorized access"),
+    ACCESS_DENIED("4002", "Access denied"),
+    NOT_FOUND("4003", "Resource not found"),
+    INVALID_TOKEN("4004", "Invalid token"),
+    ACCOUNT_LOCKED("4005", "Account is locked"),
+    REFRESH_TOKEN_EXPIRED("4006", "Refresh token expired"),
+    REFRESH_TOKEN_INVALID("4007", "Invalid refresh token"),
+    INCORRECT_PASSWORD("4008", "Incorrect password"),
+    EMAIL_EXISTS("4009", "Email already exists"),
+    EMAIL_NOT_VERIFIED("4010", "Email not verified"),
+    ALREADY_VERIFIED("4011", "Email already verified"),
+    TOKEN_EXPIRED("4012", "Token expired"),
+    VALIDATION_FILE_ERROR("4013", "Invalid file format"),
+    ORDER_ALREADY_PAID("4014", "Order already paid"),
+    INVALID_STATUS_TRANSITION("4015", "Invalid status transition"),
+    PRODUCT_OUT_OF_STOCK("4016", "Product out of stock"),
+    DUPLICATE_DATA("4017", "Duplicate data"),
+    CANNOT_DELETE_SELF("4018", "Cannot delete self"),
+    SHOP_ALREADY_EXISTS("4019", "Shop already exists"),
+    PLAN_UPGRADE_REQUIRED("4020", "Plan upgrade required"),
 
-    // ===== Validation & Client Errors =====
-    VALIDATION_ERROR,
-    UNAUTHORIZED,
-    ACCESS_DENIED,
-    NOT_FOUND,
-    INVALID_TOKEN,
-    ACCOUNT_LOCKED,
-    REFRESH_TOKEN_EXPIRED,
-    REFRESH_TOKEN_INVALID,
-    INCORRECT_PASSWORD,
+    // System Errors
+    INTERNAL_ERROR("5000", "Internal server error"),
+    FILE_UPLOAD_FAILED("5001", "File upload failed"),
+    FILE_TYPE_NOT_ALLOWED("5002", "File type not allowed"),
 
-    // ===== System Errors =====
-    INTERNAL_ERROR,
-    FILE_UPLOAD_FAILED,
-    FILE_TYPE_NOT_ALLOWED,
+    // Business Logic
+    SHOP_REQUIRED("4100", "Shop is required"),
+    ORDER_ALREADY_COMPLETED("4101", "Order already completed"),
+    PRODUCT_UPDATED("4102", "Product updated successfully"),
+    SHOP_NOT_FOUND("4103", "Shop not found"),
+    TABLE_CREATED("4104", "Table created successfully"),
+    TABLE_LIST("4105", "Table list retrieved"),
+    TABLE_STATUS_UPDATED("4106", "Table status updated"),
+    USER_INFO("4107", "User info retrieved"),
+    USER_NOT_FOUND("4108", "User not found"),
+    BRANCH_NOT_FOUND("4109", "Branch not found"),
+    CUSTOMER_NOT_FOUND("4110", "Customer not found"),
+    ORDER_NOT_FOUND("4111", "Order not found"),
+    PRODUCT_NOT_FOUND("4112", "Product not found"),
+    PROMOTION_NOT_FOUND("4113", "Promotion not found"),
+    TABLE_NOT_FOUND("4114", "Table not found"),
+    USER_DELETED("4115", "User deleted successfully"),
+    ORDER_PAYMENT_CONFIRMED("4116", "Order payment confirmed"),
+    ORDER_STATUS_UPDATED("4117", "Order status updated"),
+    ORDER_LIST("4118", "Order list retrieved"),
+    ORDER_CANCELLED("4119", "Order cancelled"),
+    ORDER_CREATED("4120", "Order created successfully"),
+    CUSTOMER_CREATED("4121", "Customer created successfully"),
+    CUSTOMER_UPDATED("4122", "Customer updated successfully"),
+    CUSTOMER_DELETED("4123", "Customer deleted successfully"),
+    CUSTOMER_LIST("4124", "Customer list retrieved");
 
-    // ===== Business Logic =====
-    SHOP_REQUIRED,
-    CANNOT_DELETE_SELF,
-    SHOP_ALREADY_EXISTS,
-    ORDER_ALREADY_COMPLETED,
-    PRODUCT_UPDATED,
-    SHOP_NOT_FOUND,
-    TABLE_CREATED,
-    TABLE_LIST,
-    TABLE_STATUS_UPDATED,
-    USER_INFO,
-    USER_NOT_FOUND,
-    EMAIL_EXISTS,
-    EMAIL_NOT_VERIFIED,
-    ALREADY_VERIFIED,
-    TOKEN_EXPIRED,
-    BRANCH_NOT_FOUND,
-    CUSTOMER_NOT_FOUND,
-    VALIDATION_FILE_ERROR,
-    ORDER_NOT_FOUND,
-    ORDER_ALREADY_PAID,
-    INVALID_STATUS_TRANSITION,
-    PRODUCT_OUT_OF_STOCK,
-    PRODUCT_NOT_FOUND,
-    PROMOTION_NOT_FOUND,
-    DUPLICATE_DATA,
-    TABLE_NOT_FOUND,
-    USER_DELETED,
-    ORDER_PAYMENT_CONFIRMED,
-    ORDER_STATUS_UPDATED,
-    ORDER_LIST,
-    ORDER_CANCELLED,
-    ORDER_CREATED,
-    CUSTOMER_CREATED,
-    CUSTOMER_UPDATED,
-    CUSTOMER_DELETED,
-    CUSTOMER_LIST,
-    PLAN_UPGRADE_REQUIRED
+    private final String code;
+    private final String message;
+
+    ApiCode(String code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
 }

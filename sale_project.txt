@@ -154,113 +154,6 @@ public class WebConfig implements WebMvcConfigurer {
     }
 }
 
-// File: ApiErrorCode.java
-
-package com.example.sales.constant;
-
-import lombok.Getter;
-
-@Getter
-public enum ApiErrorCode {
-    UNAUTHORIZED("ERR_401", "UNAUTHORIZED"),
-    FORBIDDEN("ERR_403", "FORBIDDEN"),
-    NOT_FOUND("ERR_404", "NOT_FOUND"),
-    INTERNAL_ERROR("ERR_500", "INTERNAL_ERROR"),
-    ACCESS_DENIED("ERR_403_ACCESS_DENIED", "ACCESS_DENIED"),
-    VALIDATION_ERROR("ERR_400_VALIDATION", "VALIDATION_ERROR"),
-    EMAIL_EXISTS("ERR_400_EMAIL_EXISTS", "EMAIL_EXISTS"),
-    USER_NOT_FOUND("ERR_404_USER_NOT_FOUND", "USER_NOT_FOUND"),
-    INVALID_TOKEN("ERR_400_INVALID_TOKEN", "INVALID_TOKEN"),
-    ALREADY_VERIFIED("ERR_400_ALREADY_VERIFIED", "ALREADY_VERIFIED"),
-    TOKEN_EXPIRED("ERR_400_TOKEN_EXPIRED", "TOKEN_EXPIRED"),
-    EMAIL_NOT_VERIFIED("ERR_400_EMAIL_NOT_VERIFIED", "EMAIL_NOT_VERIFIED"),
-    REFRESH_TOKEN_INVALID("ERR_400_REFRESH_TOKEN_INVALID", "REFRESH_TOKEN_INVALID"),
-    REFRESH_TOKEN_EXPIRED("ERR_400_REFRESH_TOKEN_EXPIRED", "REFRESH_TOKEN_EXPIRED"),
-    INCORRECT_PASSWORD("INCORRECT_PASSWORD", "INCORRECT_PASSWORD"),
-    CUSTOMER_NOT_FOUND("CUSTOMER_NOT_FOUND", "CUSTOMER_NOT_FOUND"),
-    CANNOT_DELETE_SELF("CANNOT_DELETE_SELF", "CANNOT_DELETE_SELF"),
-    SHOP_ALREADY_EXISTS("SHOP_ALREADY_EXISTS", "SHOP_ALREADY_EXISTS"),
-    SHOP_NOT_FOUND("SHOP_NOT_FOUND", "SHOP_NOT_FOUND"),
-    PRODUCT_NOT_FOUND("PRODUCT_NOT_FOUND", "PRODUCT_NOT_FOUND"),
-    TABLE_NOT_FOUND("TABLE_NOT_FOUND", "TABLE_NOT_FOUND"),
-    ORDER_NOT_FOUND("ORDER_NOT_FOUND", "ORDER_NOT_FOUND"),
-    ORDER_ALREADY_PAID("ORDER_ALREADY_PAID", "ORDER_ALREADY_PAID"),
-    INVALID_STATUS_TRANSITION("INVALID_STATUS_TRANSITION", "INVALID_STATUS_TRANSITION"),
-    PRODUCT_OUT_OF_STOCK("PRODUCT_OUT_OF_STOCK", "PRODUCT_OUT_OF_STOCK"),
-    PROMOTION_NOT_FOUND("PROMOTION_NOT_FOUND", "PROMOTION_NOT_FOUND"),
-    DUPLICATE_DATA("DUPLICATE_DATA", "DUPLICATE_DATA"),
-    BRANCH_NOT_FOUND("BRANCH_NOT_FOUND", "BRANCH_NOT_FOUND");
-
-
-    private final String code;
-    private final String message;
-
-    ApiErrorCode(String code, String message) {
-        this.code = code;
-        this.message = message;
-    }
-}
-// File: ApiMessage.java
-
-package com.example.sales.constant;
-
-public enum ApiMessage {
-    SUCCESS("SUCCESS", "SUCCESS"),
-    REGISTER_SUCCESS("REGISTER_SUCCESS", "REGISTER_SUCCESS"),
-    LOGIN_SUCCESS("LOGIN_SUCCESS", "LOGIN_SUCCESS"),
-    PASSWORD_RESET_SENT("PASSWORD_RESET_SENT", "PASSWORD_RESET_SENT"),
-    VERIFICATION_EMAIL_SENT("VERIFICATION_EMAIL_SENT", "VERIFICATION_EMAIL_SENT"),
-    PRODUCT_CREATED("PRODUCT_CREATED", "PRODUCT_CREATED"),
-    PRODUCT_UPDATED("PRODUCT_UPDATED", "PRODUCT_UPDATED"),
-    PRODUCT_DELETED("PRODUCT_DELETED", "PRODUCT_DELETED"),
-    PRODUCT_LIST("PRODUCT_LIST", "PRODUCT_LIST"),
-    PRODUCT_IMPORT_SUCCESS("PRODUCT_IMPORT_SUCCESS", "PRODUCT_IMPORT_SUCCESS"),
-    PRODUCT_UPLOAD_IMAGE_SUCCESS("PRODUCT_UPLOAD_IMAGE_SUCCESS", "PRODUCT_UPLOAD_IMAGE_SUCCESS"),
-    PRODUCT_NOT_FOUND("PRODUCT_NOT_FOUND", "PRODUCT_NOT_FOUND"),
-    USER_NOT_FOUND("USER_NOT_FOUND", "USER_NOT_FOUND"),
-    ACCESS_DENIED("ACCESS_DENIED", "ACCESS_DENIED"),
-    ORDER_CREATED("ORDER_CREATED", "ORDER_CREATED"),
-    ORDER_UPDATED("ORDER_UPDATED", "ORDER_UPDATED"),
-    ORDER_DELETED("ORDER_DELETED", "ORDER_DELETED"),
-    ORDER_LIST("ORDER_LIST", "ORDER_LIST"),
-    ORDER_CANCELLED("ORDER_CANCELLED", "ORDER_CANCELLED"),
-    ORDER_STATUS_UPDATED("ORDER_STATUS_UPDATED", "ORDER_STATUS_UPDATED"),
-    VERIFY_SUCCESS("VERIFY_SUCCESS", "VERIFY_SUCCESS"),
-    EMAIL_VERIFICATION_SENT("EMAIL_VERIFICATION_SENT", "EMAIL_VERIFICATION_SENT"),
-    REFRESH_SUCCESS("REFRESH_SUCCESS", "REFRESH_SUCCESS"),
-    LOGOUT_SUCCESS("LOGOUT_SUCCESS", "LOGOUT_SUCCESS"),
-    USER_INFO("USER_INFO", "USER_INFO"),
-    USER_UPDATED("USER_UPDATED", "USER_UPDATED"),
-    PASSWORD_CHANGED("PASSWORD_CHANGED", "PASSWORD_CHANGED"),
-    USER_LIST("USER_LIST", "USER_LIST"),
-    USER_DETAIL("USER_DETAIL", "USER_DETAIL"),
-    CUSTOMER_LIST("CUSTOMER_LIST", "CUSTOMER_LIST"),
-    CUSTOMER_CREATED("CUSTOMER_CREATED", "CUSTOMER_CREATED"),
-    CUSTOMER_UPDATED("CUSTOMER_UPDATED", "CUSTOMER_UPDATED"),
-    CUSTOMER_DELETED("CUSTOMER_DELETED", "CUSTOMER_DELETED"),
-    USER_DELETED("USER_DELETED", "USER_DELETED"),
-    SALES_REPORT_CREATED("SALES_REPORT_CREATED", "SALES_REPORT_CREATED"),
-    SALES_REPORT("SALES_REPORT", "SALES_REPORT"),
-    SHOP_NOT_FOUND("SHOP_NOT_FOUND", "SHOP_NOT_FOUND"),
-    TABLE_CREATED("TABLE_CREATED", "TABLE_CREATED"),
-    TABLE_LIST("TABLE_LIST", "TABLE_LIST"),
-    TABLE_STATUS_UPDATED("TABLE_STATUS_UPDATED", "TABLE_STATUS_UPDATED"),
-    ORDER_PAYMENT_CONFIRMED("ORDER_PAYMENT_CONFIRMED", "ORDER_PAYMENT_CONFIRMED"),
-    TABLE_NOT_FOUND("TABLE_NOT_FOUND", "TABLE_NOT_FOUND"),
-    AUDIT_LOG_LIST("AUDIT_LOG_LIST", "AUDIT_LOG_LIST");
-
-    private final String code;
-    private final String message;
-
-    ApiMessage(String code, String message) {
-        this.code = code;
-        this.message = message;
-    }
-
-    public String getCode() { return code; }
-
-    public String getMessage() { return message; }
-}
 // File: DiscountType.java
 
 package com.example.sales.constant;
@@ -1522,6 +1415,7 @@ public class ReportResponse {
     private long totalProductsSold;
     private double totalRevenue;
 }
+
 // File: src/main/java/com/example/sales/dto/ApiResponse.java
 package com.example.sales.dto;
 
@@ -1530,26 +1424,50 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
+/**
+ * Generic response class for API responses, including success status, error code, message, data, and timestamp.
+ */
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApiResponse<T> {
     private boolean success;
-    private ApiCode code;
+    private String code;
+    private String message;
     private T data;
+    private String timestamp;
 
+    /**
+     * Creates a successful response with data.
+     */
     public static <T> ApiResponse<T> success(ApiCode code, T data) {
-        return new ApiResponse<>(true, code, data);
+        return new ApiResponse<>(true, code.getCode(), code.getMessage(), data, Instant.now().toString());
     }
 
+    /**
+     * Creates a successful response without data.
+     */
     public static <T> ApiResponse<T> success(ApiCode code) {
-        return new ApiResponse<>(true, code, null);
+        return new ApiResponse<>(true, code.getCode(), code.getMessage(), null, Instant.now().toString());
     }
 
-    public static ApiResponse<?> error(ApiCode code) {
-        return new ApiResponse<>(false, code, null);
+    /**
+     * Creates an error response without data.
+     */
+    public static <T> ApiResponse<T> error(ApiCode code) {
+        return new ApiResponse<>(false, code.getCode(), code.getMessage(), null, Instant.now().toString());
+    }
+
+    /**
+     * Creates an error response with custom message and data.
+     */
+    public static <T> ApiResponse<T> error(ApiCode code, String message, T data) {
+        return new ApiResponse<>(false, code.getCode(), message, data, Instant.now().toString());
     }
 }
+
 
 // File: src/main/java/com/example/sales/dto/ChangePasswordRequest.java
 package com.example.sales.dto;
@@ -1726,52 +1644,127 @@ public class BusinessException extends RuntimeException {
     }
 }
 
-// File: src/main/java/com/example/sales/exception/GlobalExceptionHandler.java
+// File: main/java/com/example/sales/exception/GlobalExceptionHandler.java
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<?> handleNotFound(ResourceNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(ex.getError()));
-    }
-
+    /**
+     * Xử lý lỗi validation cho các DTO
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR));
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
+            MethodArgumentNotValidException ex, WebRequest request) {
+        Map<String, String> errors = new HashMap<>();
+        for (FieldError error : ex.getBindingResult().getFieldErrors()) {
+            errors.put(error.getField(), error.getDefaultMessage());
+        }
+        log.warn("Validation error at {}: {}", request.getDescription(false), errors);
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), errors));
     }
 
+    /**
+     * Xử lý lỗi khi người dùng không có quyền truy cập
+     */
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<?> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error(ApiCode.ACCESS_DENIED));
+    public ResponseEntity<ApiResponse<String>> handleAccessDeniedException(
+            AccessDeniedException ex, WebRequest request) {
+        log.warn("Access denied at {}: {}", request.getDescription(false), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ApiCode.ACCESS_DENIED, ApiCode.ACCESS_DENIED.getMessage(), ex.getMessage()));
     }
 
+    /**
+     * Xử lý lỗi kinh doanh
+     */
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<?> handleBusiness(BusinessException ex) {
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.error(ex.getError()));
+    public ResponseEntity<ApiResponse<String>> handleBusinessException(
+            BusinessException ex, WebRequest request) {
+        log.error("Business error at {}: {} - {}",
+                request.getDescription(false), ex.getError().getCode(), ex.getError().getMessage());
+        return ResponseEntity
+                .status(getHttpStatus(ex.getError()))
+                .body(ApiResponse.error(ex.getError(), ex.getError().getMessage(), null));
     }
 
+    /**
+     * Xử lý các lỗi chung (fallback)
+     */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleGeneral(Exception ex) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(ApiCode.INTERNAL_ERROR));
+    public ResponseEntity<ApiResponse<String>> handleAllExceptions(
+            Exception ex, WebRequest request) {
+        request.getRemoteUser();
+        log.error("Internal server error at {} for user {} (requestId: {}): {}",
+                request.getDescription(false),
+                request.getRemoteUser(),
+                request.getHeader("X-Request-ID"),
+                ex.getMessage(), ex);
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ApiCode.INTERNAL_ERROR, ApiCode.INTERNAL_ERROR.getMessage(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<String>> handleIllegalArgumentException(
+            IllegalArgumentException ex, WebRequest request) {
+        log.warn("Invalid argument at {}: {}", request.getDescription(false), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<String>> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException ex, WebRequest request) {
+        log.warn("Invalid JSON at {}: {}", request.getDescription(false), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+    }
+
+    /**
+     * Ánh xạ ApiCode sang mã trạng thái HTTP
+     */
+    private HttpStatus getHttpStatus(ApiCode errorCode) {
+        return switch (errorCode) {
+            case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+            case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
+            case NOT_FOUND, USER_NOT_FOUND, SHOP_NOT_FOUND, PRODUCT_NOT_FOUND, ORDER_NOT_FOUND,
+                    TABLE_NOT_FOUND, BRANCH_NOT_FOUND, CUSTOMER_NOT_FOUND, PROMOTION_NOT_FOUND ->
+                    HttpStatus.NOT_FOUND;
+            case VALIDATION_ERROR, INVALID_TOKEN, ACCOUNT_LOCKED, REFRESH_TOKEN_EXPIRED,
+                    REFRESH_TOKEN_INVALID, INCORRECT_PASSWORD, VALIDATION_FILE_ERROR,
+                    PLAN_UPGRADE_REQUIRED, ORDER_ALREADY_PAID, INVALID_STATUS_TRANSITION,
+                    PRODUCT_OUT_OF_STOCK, DUPLICATE_DATA, CANNOT_DELETE_SELF, SHOP_ALREADY_EXISTS,
+                    EMAIL_EXISTS, ALREADY_VERIFIED, TOKEN_EXPIRED, EMAIL_NOT_VERIFIED ->
+                    HttpStatus.BAD_REQUEST;
+            case INTERNAL_ERROR, FILE_UPLOAD_FAILED, FILE_TYPE_NOT_ALLOWED ->
+                    HttpStatus.INTERNAL_SERVER_ERROR;
+            default -> HttpStatus.OK;
+        };
     }
 }
-
 
 // File: src/main/java/com/example/sales/exception/ResourceNotFoundException.java
 package com.example.sales.exception;
@@ -4671,25 +4664,6 @@ public class UserService {
     }
 }
 
-// File: src/main/java/com/example/sales/util/MessageService.java
-package com.example.sales.util;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.context.MessageSource;
-import org.springframework.stereotype.Component;
-
-import java.util.Locale;
-
-@Component
-@RequiredArgsConstructor
-public class MessageService {
-
-    private final MessageSource messageSource;
-
-    public String get(String code, Locale locale) {
-        return messageSource.getMessage(code, null, code, locale);
-    }
-}
 // File: src/main/java/com/example/sales/SalesApplication.java
 package com.example.sales;
 
@@ -4707,19 +4681,6 @@ public class SalesApplication {
 		SpringApplication.run(SalesApplication.class, args);
 	}
 
-}
-
-// File: src/main/java/com/example/sales/exception/ApiError.java
-package com.example.sales.exception;
-
-import lombok.AllArgsConstructor;
-import lombok.Data;
-
-@Data
-@AllArgsConstructor
-public class ApiError {
-    private int status;
-    private String message;
 }
 
 // File: src/main/java/com/example/sales/security/CustomUserDetails.java
@@ -4773,68 +4734,83 @@ public class DateRangeValidator implements ConstraintValidator<ValidDateRange, R
 package com.example.sales.constant;
 
 public enum ApiCode {
+    // Success
+    SUCCESS("2000", "Operation successful"),
+    PRODUCT_CREATED("2001", "Product created successfully"),
+    USER_UPDATED("2002", "User updated successfully"),
+    PASSWORD_CHANGED("2003", "Password changed successfully"),
+    EMAIL_SENT("2004", "Email sent successfully"),
 
-    // ===== Success =====
-    SUCCESS,
-    PRODUCT_CREATED,
-    USER_UPDATED,
-    PASSWORD_CHANGED,
-    EMAIL_SENT,
+    // Validation & Client Errors
+    VALIDATION_ERROR("4000", "Validation error"),
+    UNAUTHORIZED("4001", "Unauthorized access"),
+    ACCESS_DENIED("4002", "Access denied"),
+    NOT_FOUND("4003", "Resource not found"),
+    INVALID_TOKEN("4004", "Invalid token"),
+    ACCOUNT_LOCKED("4005", "Account is locked"),
+    REFRESH_TOKEN_EXPIRED("4006", "Refresh token expired"),
+    REFRESH_TOKEN_INVALID("4007", "Invalid refresh token"),
+    INCORRECT_PASSWORD("4008", "Incorrect password"),
+    EMAIL_EXISTS("4009", "Email already exists"),
+    EMAIL_NOT_VERIFIED("4010", "Email not verified"),
+    ALREADY_VERIFIED("4011", "Email already verified"),
+    TOKEN_EXPIRED("4012", "Token expired"),
+    VALIDATION_FILE_ERROR("4013", "Invalid file format"),
+    ORDER_ALREADY_PAID("4014", "Order already paid"),
+    INVALID_STATUS_TRANSITION("4015", "Invalid status transition"),
+    PRODUCT_OUT_OF_STOCK("4016", "Product out of stock"),
+    DUPLICATE_DATA("4017", "Duplicate data"),
+    CANNOT_DELETE_SELF("4018", "Cannot delete self"),
+    SHOP_ALREADY_EXISTS("4019", "Shop already exists"),
+    PLAN_UPGRADE_REQUIRED("4020", "Plan upgrade required"),
 
-    // ===== Validation & Client Errors =====
-    VALIDATION_ERROR,
-    UNAUTHORIZED,
-    ACCESS_DENIED,
-    NOT_FOUND,
-    INVALID_TOKEN,
-    ACCOUNT_LOCKED,
-    REFRESH_TOKEN_EXPIRED,
-    REFRESH_TOKEN_INVALID,
-    INCORRECT_PASSWORD,
+    // System Errors
+    INTERNAL_ERROR("5000", "Internal server error"),
+    FILE_UPLOAD_FAILED("5001", "File upload failed"),
+    FILE_TYPE_NOT_ALLOWED("5002", "File type not allowed"),
 
-    // ===== System Errors =====
-    INTERNAL_ERROR,
-    FILE_UPLOAD_FAILED,
-    FILE_TYPE_NOT_ALLOWED,
+    // Business Logic
+    SHOP_REQUIRED("4100", "Shop is required"),
+    ORDER_ALREADY_COMPLETED("4101", "Order already completed"),
+    PRODUCT_UPDATED("4102", "Product updated successfully"),
+    SHOP_NOT_FOUND("4103", "Shop not found"),
+    TABLE_CREATED("4104", "Table created successfully"),
+    TABLE_LIST("4105", "Table list retrieved"),
+    TABLE_STATUS_UPDATED("4106", "Table status updated"),
+    USER_INFO("4107", "User info retrieved"),
+    USER_NOT_FOUND("4108", "User not found"),
+    BRANCH_NOT_FOUND("4109", "Branch not found"),
+    CUSTOMER_NOT_FOUND("4110", "Customer not found"),
+    ORDER_NOT_FOUND("4111", "Order not found"),
+    PRODUCT_NOT_FOUND("4112", "Product not found"),
+    PROMOTION_NOT_FOUND("4113", "Promotion not found"),
+    TABLE_NOT_FOUND("4114", "Table not found"),
+    USER_DELETED("4115", "User deleted successfully"),
+    ORDER_PAYMENT_CONFIRMED("4116", "Order payment confirmed"),
+    ORDER_STATUS_UPDATED("4117", "Order status updated"),
+    ORDER_LIST("4118", "Order list retrieved"),
+    ORDER_CANCELLED("4119", "Order cancelled"),
+    ORDER_CREATED("4120", "Order created successfully"),
+    CUSTOMER_CREATED("4121", "Customer created successfully"),
+    CUSTOMER_UPDATED("4122", "Customer updated successfully"),
+    CUSTOMER_DELETED("4123", "Customer deleted successfully"),
+    CUSTOMER_LIST("4124", "Customer list retrieved");
 
-    // ===== Business Logic =====
-    SHOP_REQUIRED,
-    CANNOT_DELETE_SELF,
-    SHOP_ALREADY_EXISTS,
-    ORDER_ALREADY_COMPLETED,
-    PRODUCT_UPDATED,
-    SHOP_NOT_FOUND,
-    TABLE_CREATED,
-    TABLE_LIST,
-    TABLE_STATUS_UPDATED,
-    USER_INFO,
-    USER_NOT_FOUND,
-    EMAIL_EXISTS,
-    EMAIL_NOT_VERIFIED,
-    ALREADY_VERIFIED,
-    TOKEN_EXPIRED,
-    BRANCH_NOT_FOUND,
-    CUSTOMER_NOT_FOUND,
-    VALIDATION_FILE_ERROR,
-    ORDER_NOT_FOUND,
-    ORDER_ALREADY_PAID,
-    INVALID_STATUS_TRANSITION,
-    PRODUCT_OUT_OF_STOCK,
-    PRODUCT_NOT_FOUND,
-    PROMOTION_NOT_FOUND,
-    DUPLICATE_DATA,
-    TABLE_NOT_FOUND,
-    USER_DELETED,
-    ORDER_PAYMENT_CONFIRMED,
-    ORDER_STATUS_UPDATED,
-    ORDER_LIST,
-    ORDER_CANCELLED,
-    ORDER_CREATED,
-    CUSTOMER_CREATED,
-    CUSTOMER_UPDATED,
-    CUSTOMER_DELETED,
-    CUSTOMER_LIST,
-    PLAN_UPGRADE_REQUIRED
+    private final String code;
+    private final String message;
+
+    ApiCode(String code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
 }
 
 // File: src/main/java/com/example/sales/security/PermissionChecker.java
@@ -6210,6 +6186,136 @@ public class ShopSimpleResponse {
     private String logoUrl;
     private boolean active;
     private ShopRole role; // 👈 vai trò của user trong shop
+}
+
+// File: test/java/com/example/sales/exception/GlobalExceptionHandlerTest.java
+package com.example.sales.exception;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.ApiResponse;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.context.request.WebRequest;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class GlobalExceptionHandlerTest {
+
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    @Test
+    void testHandleValidationExceptions() {
+        BindingResult bindingResult = mock(BindingResult.class);
+        FieldError fieldError = new FieldError("objectName", "name", "Field is required");
+        when(bindingResult.getFieldErrors()).thenReturn(List.of(fieldError));
+
+        MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);
+        WebRequest webRequest = mock(WebRequest.class);
+        when(webRequest.getDescription(false)).thenReturn("POST /api/users");
+
+        ResponseEntity<ApiResponse<Map<String, String>>> response = handler.handleValidationExceptions(ex, webRequest);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+        assertEquals("4000", response.getBody().getCode());
+        assertEquals("Validation error", response.getBody().getMessage());
+        assertEquals("Field is required", response.getBody().getData().get("name"));
+    }
+
+    @Test
+    void testHandleAccessDeniedException() {
+        AccessDeniedException ex = new AccessDeniedException("Access denied");
+        WebRequest webRequest = mock(WebRequest.class);
+        when(webRequest.getDescription(false)).thenReturn("GET /api/admin");
+
+        ResponseEntity<ApiResponse<String>> response = handler.handleAccessDeniedException(ex, webRequest);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+        assertEquals("4002", response.getBody().getCode());
+        assertEquals("Access denied", response.getBody().getMessage());
+        assertEquals("Access denied", response.getBody().getData());
+    }
+
+    @Test
+    void testHandleBusinessException() {
+        BusinessException ex = new BusinessException(ApiCode.USER_NOT_FOUND);
+        WebRequest webRequest = mock(WebRequest.class);
+        when(webRequest.getDescription(false)).thenReturn("GET /api/users/123");
+
+        ResponseEntity<ApiResponse<String>> response = handler.handleBusinessException(ex, webRequest);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+        assertEquals("4108", response.getBody().getCode());
+        assertEquals("User not found", response.getBody().getMessage());
+        assertEquals(null, response.getBody().getData());
+    }
+
+    @Test
+    void testHandleAllExceptions() {
+        Exception ex = new RuntimeException("Unexpected error");
+        WebRequest webRequest = mock(WebRequest.class);
+        when(webRequest.getDescription(false)).thenReturn("GET /api/test");
+        when(webRequest.getRemoteUser()).thenReturn("testUser");
+
+        ResponseEntity<ApiResponse<String>> response = handler.handleAllExceptions(ex, webRequest);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+        assertEquals("5000", response.getBody().getCode());
+        assertEquals("Internal server error", response.getBody().getMessage());
+        assertEquals("Unexpected error", response.getBody().getData());
+    }
+
+    @Test
+    void testApiResponseSuccessWithData() {
+        ApiResponse<String> response = ApiResponse.success(ApiCode.SUCCESS, "Test data");
+        assertEquals(true, response.isSuccess());
+        assertEquals("2000", response.getCode());
+        assertEquals("Operation successful", response.getMessage());
+        assertEquals("Test data", response.getData());
+    }
+
+    @Test
+    void testApiResponseSuccessWithoutData() {
+        ApiResponse<?> response = ApiResponse.success(ApiCode.SUCCESS);
+        assertEquals(true, response.isSuccess());
+        assertEquals("2000", response.getCode());
+        assertEquals("Operation successful", response.getMessage());
+        assertEquals(null, response.getData());
+    }
+
+    @Test
+    void testApiResponseErrorWithoutData() {
+        ApiResponse<?> response = ApiResponse.error(ApiCode.INTERNAL_ERROR);
+        assertEquals(false, response.isSuccess());
+        assertEquals("5000", response.getCode());
+        assertEquals("Internal server error", response.getMessage());
+        assertEquals(null, response.getData());
+    }
+
+    @Test
+    void testApiResponseErrorWithCustomMessageAndData() {
+        ApiResponse<String> response = ApiResponse.error(ApiCode.VALIDATION_ERROR, "Custom validation error", "Details");
+        assertEquals(false, response.isSuccess());
+        assertEquals("4000", response.getCode());
+        assertEquals("Custom validation error", response.getMessage());
+        assertEquals("Details", response.getData());
+    }
 }
 
 [END]
