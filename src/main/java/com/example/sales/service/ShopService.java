@@ -9,8 +9,10 @@ import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopResponse;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Branch;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.security.CustomUserDetails;
@@ -27,6 +29,7 @@ public class ShopService extends BaseService {
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
     private final ShopUserRepository shopUserRepository;
+    private final BranchRepository branchRepository; // Thêm BranchRepository
 
     public Shop createShop(String userId, ShopRequest request, String logoUrl) {
         if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
@@ -44,18 +47,30 @@ public class ShopService extends BaseService {
         shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
 
-        Shop saved = shopRepository.save(shop);
+        Shop savedShop = shopRepository.save(shop); // Đổi tên biến để rõ ràng hơn
+
+        // ✅ Tạo chi nhánh mặc định
+        Branch defaultBranch = Branch.builder()
+                .shopId(savedShop.getId())
+                .name("Chi nhánh chính") // Tên chi nhánh mặc định
+                .address(request.getAddress()) // Lấy địa chỉ từ request của shop
+                .phone(request.getPhone()) // Lấy số điện thoại từ request của shop
+                .build();
+        Branch savedBranch = branchRepository.save(defaultBranch); // Lưu chi nhánh
+
+        // ✅ Cập nhật ShopUser để liên kết với chi nhánh mặc định
         ShopUser shopUser = ShopUser.builder()
-                .shopId(shop.getId())
+                .shopId(savedShop.getId())
                 .userId(userId)
                 .role(ShopRole.OWNER)
+                .branchId(savedBranch.getId()) // Gắn owner vào chi nhánh mặc định
                 .build();
         shopUserRepository.save(shopUser);
 
-        auditLogService.log(userId, saved.getId(), saved.getId(), "SHOP", "CREATED",
-                String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+        auditLogService.log(userId, savedShop.getId(), savedShop.getId(), "SHOP", "CREATED",
+                String.format("Tạo cửa hàng: %s (%s)", savedShop.getName(), savedShop.getType()));
 
-        return saved;
+        return savedShop;
     }
 
     @Cacheable(value = "shops", key = "#ownerId")
@@ -76,12 +91,6 @@ public class ShopService extends BaseService {
         auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",
                 String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
         return saved;
-    }
-
-    public String getShopIdByOwner(String ownerId) {
-        return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
-                .getId();
     }
 
     public void deleteShop(String ownerId) {
@@ -143,5 +152,4 @@ public class ShopService extends BaseService {
                     .build();
         }
     }
-
 }

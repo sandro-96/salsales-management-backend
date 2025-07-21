@@ -13,4 +13,5 @@ import java.util.Optional;
 public interface BranchRepository extends MongoRepository<Branch, String> {
     Page<Branch> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
     Optional<Branch> findByIdAndDeletedFalse(String id);
+    long countByShopIdAndDeletedFalse(String shopId);
 }

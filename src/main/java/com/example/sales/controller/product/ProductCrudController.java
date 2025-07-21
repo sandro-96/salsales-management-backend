@@ -35,7 +35,7 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền tạo")
     })
     @PostMapping
-    @RequireRole(ShopRole.OWNER)
+    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @Valid @RequestBody ProductRequest request) {
@@ -50,7 +50,7 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật")
     })
     @PutMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
     public ResponseEntity<ApiResponseDto<ProductResponse>> update(
             @Parameter(description = "ID người dùng") @RequestParam String userId,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
@@ -67,7 +67,7 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền xóa")
     })
     @DeleteMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
     public ResponseEntity<ApiResponseDto<Void>> delete(
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @Parameter(description = "ID sản phẩm") @PathVariable String id) {
@@ -80,7 +80,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm")
     })
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
@@ -95,7 +94,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm")
     })
     @GetMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<ProductResponse>> getById(
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @Parameter(description = "ID sản phẩm") @PathVariable String id) {
@@ -108,7 +106,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm khớp từ khóa")
     })
     @GetMapping("/search")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> search(
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @Parameter(description = "Từ khóa tìm kiếm") @RequestParam String keyword,

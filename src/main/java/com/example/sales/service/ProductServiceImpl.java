@@ -15,6 +15,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,8 +38,13 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
-        // Tạo productCode nếu không được cung cấp
-        String productCode = request.getSku() != null && !request.getSku().isBlank()
+        // Kiểm tra branchId nếu có
+        if (!StringUtils.hasText(request.getBranchId())) {
+            throw new BusinessException(ApiCode.BRANCH_NOT_FOUND);
+        }
+
+        // Tạo sku nếu không được cung cấp
+        String sku = request.getSku() != null && !request.getSku().isBlank()
                 ? request.getSku()
                 : UUID.randomUUID().toString();
 
@@ -49,11 +55,12 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .price(request.getPrice())
                 .quantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0)
                 .category(request.getCategory())
-                .sku(productCode)
+                .sku(sku)
                 .imageUrl(request.getImageUrl())
                 .description(request.getDescription())
                 .active(true)
                 .unit(request.getUnit())
+                .branchId(request.getBranchId())
                 .build();
 
         product = productRepository.save(product);
@@ -84,11 +91,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         product.setPrice(request.getPrice());
         product.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
         product.setCategory(request.getCategory());
-        product.setSku(request.getSku());
         product.setImageUrl(request.getImageUrl());
         product.setDescription(request.getDescription());
         product.setUnit(request.getUnit());
-        product.setUpdatedAt(LocalDateTime.now());
 
         product = productRepository.save(product);
 

@@ -49,7 +49,7 @@ public class BranchController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
-    @RequireRole(ShopRole.OWNER)
+    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
     @Operation(summary = "Tạo chi nhánh mới", description = "Tạo một chi nhánh mới cho cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được tạo thành công"),
@@ -65,9 +65,8 @@ public class BranchController {
         return ApiResponseDto.success(ApiCode.SUCCESS, branchService.create(user.getId(), shopId, request));
     }
 
-    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
     @Operation(summary = "Cập nhật chi nhánh", description = "Cập nhật thông tin chi nhánh của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được cập nhật thành công"),
@@ -84,7 +83,6 @@ public class BranchController {
         return ApiResponseDto.success(ApiCode.SUCCESS, branchService.update(user.getId(), shopId, id, request));
     }
 
-    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
     @RequireRole(ShopRole.OWNER)
     @Operation(summary = "Xóa chi nhánh", description = "Xóa mềm một chi nhánh của cửa hàng")

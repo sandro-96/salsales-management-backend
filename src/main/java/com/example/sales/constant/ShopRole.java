@@ -4,6 +4,7 @@ package com.example.sales.constant;
 public enum ShopRole {
     ADMIN,
     OWNER,
+    MANAGER,
     STAFF,
     CASHIER
 }

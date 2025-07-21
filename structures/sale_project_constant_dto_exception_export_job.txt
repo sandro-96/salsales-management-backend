@@ -75,7 +75,9 @@ public enum ApiCode {
     SHOP_INACTIVE("4133", "Shop is inactive"),
     INVALID_CAPACITY("4134", "Invalid capacity"),
     TABLE_NAME_EXISTS("4135", "Table name already exists"),
-    TABLE_OCCUPIED("4136", "Table is occupied");
+    TABLE_OCCUPIED("4136", "Table is occupied"),
+    USER_ALREADY_IN_SHOP("4137", "User already in shop"),
+    CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop");
 
     private final String code;
     private final String message;
@@ -128,6 +130,7 @@ package com.example.sales.constant;
 public enum ShopRole {
     ADMIN,
     OWNER,
+    MANAGER,
     STAFF,
     CASHIER
 }

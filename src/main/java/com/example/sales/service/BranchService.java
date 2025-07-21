@@ -4,6 +4,7 @@ package com.example.sales.service;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
+import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
 import com.example.sales.repository.BranchRepository;
@@ -56,6 +57,11 @@ public class BranchService {
     }
 
     public void delete(String userId, String shopId, String id) {
+        long branchCount = branchRepository.countByShopIdAndDeletedFalse(shopId);
+        if (branchCount <= 1) {
+            throw new BusinessException(ApiCode.CANNOT_DELETE_ONLY_BRANCH);
+        }
+
         Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
@@ -64,7 +70,6 @@ public class BranchService {
         branchRepository.save(branch);
         auditLogService.log(userId, shopId, branch.getId(), "BRANCH", "DELETED",
                 String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
-
     }
 
     private BranchResponse toResponse(Branch branch) {
