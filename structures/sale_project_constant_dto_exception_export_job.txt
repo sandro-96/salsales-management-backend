@@ -77,7 +77,8 @@ public enum ApiCode {
     TABLE_NAME_EXISTS("4135", "Table name already exists"),
     TABLE_OCCUPIED("4136", "Table is occupied"),
     USER_ALREADY_IN_SHOP("4137", "User already in shop"),
-    CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop");
+    CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop"),
+    INSUFFICIENT_STOCK ("4139", "Insufficient stock for product");
 
     private final String code;
     private final String message;
@@ -296,23 +297,31 @@ import com.example.sales.constant.InventoryType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class InventoryRequest {
+    @NotBlank(message = "Branch ID không được để trống")
+    private String branchId; // ID của chi nhánh
 
-    @NotBlank
-    private String productId;
+    @NotBlank(message = "Branch Product ID không được để trống")
+    private String branchProductId; // ID của BranchProduct
 
-    private String branchId; // optional
+    @NotNull(message = "Loại giao dịch không được để trống")
+    private InventoryType type; // IMPORT, EXPORT, ADJUSTMENT
 
-    @NotNull
-    private InventoryType type;
-
-    @Min(1)
-    private int quantity;
+    @Min(value = 1, message = "Số lượng phải lớn hơn 0 cho IMPORT/EXPORT")
+    // Đối với ADJUSTMENT, có thể chấp nhận newQuantity = 0, nhưng ở đây ta dùng quantity cho cả 3 loại
+    private int quantity; // Số lượng thay đổi (cho IMPORT/EXPORT) hoặc số lượng mới (cho ADJUSTMENT)
 
     private String note;
+    private String referenceId; // Dùng cho EXPORT, ví dụ: Order ID
 }
 
 // File: src/main/java/com/example/sales/dto/order/OrderItemRequest.java
@@ -340,247 +349,248 @@ public class OrderItemRequest {
 
 // File: src/main/java/com/example/sales/dto/order/OrderItemResponse.java
 package com.example.sales.dto.order;
+
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrderItemResponse {
-    private String productId;
+    private String productId;       // ID của Product (master product)
+    private String branchProductId; // ID của BranchProduct (sản phẩm cụ thể tại chi nhánh)
     private String productName;
     private int quantity;
-    private double price;
-    private double priceAfterDiscount; // giá sau khi đã áp dụng khuyến mãi
-    private String appliedPromotionId; // id khuyến mãi được áp dụng (nếu có)
+    private double price;             // Giá gốc tại thời điểm đặt hàng
+    private double priceAfterDiscount; // Giá sau khi áp dụng khuyến mãi
+    private String appliedPromotionId; // ID của khuyến mãi đã áp dụng
 }
 
 // File: src/main/java/com/example/sales/dto/order/OrderRequest.java
 package com.example.sales.dto.order;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrderRequest {
-    @NotNull
+    @NotBlank(message = "Shop ID không được để trống")
+    private String shopId;
+
+    @NotBlank(message = "Branch ID không được để trống")
+    private String branchId; // Đơn hàng luôn thuộc về một chi nhánh cụ thể
+
+    private String tableId; // Có thể null nếu không phải đơn hàng tại bàn
+
+    private String note;
+
     @Valid
+    @NotEmpty(message = "Đơn hàng phải có ít nhất một sản phẩm")
     private List<OrderItemRequest> items;
 
-    private String tableId; // optional
-    private String note;
-    private String branchId;
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OrderItemRequest {
+        @NotBlank(message = "Product ID không được để trống")
+        private String productId; // Đây là ID của Product master
+
+        @Min(value = 1, message = "Số lượng phải lớn hơn 0")
+        private int quantity;
+
+        @Min(value = 0, message = "Giá sản phẩm không được âm")
+        private double price; // Giá tại thời điểm đặt hàng (có thể khác giá hiện tại của sản phẩm)
+    }
 }
 
 // File: src/main/java/com/example/sales/dto/order/OrderResponse.java
 package com.example.sales.dto.order;
 
 import com.example.sales.constant.OrderStatus;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrderResponse {
     private String id;
-    private String tableId;
+    private String shopId;          // ID của cửa hàng
+    private String branchId;        // ID của chi nhánh mà đơn hàng thuộc về
+    private String tableId;         // ID của bàn (nếu có)
+    private String userId;          // ID của người dùng tạo đơn hàng
     private String note;
-    private OrderStatus status;
+    private OrderStatus status;     // Trạng thái đơn hàng (PENDING, COMPLETED, CANCELLED, etc.)
+    private boolean paid;           // Đã thanh toán chưa
+    private String paymentMethod;   // Phương thức thanh toán
+    private String paymentId;       // ID giao dịch thanh toán (nếu có)
+    private LocalDateTime paymentTime; // Thời gian thanh toán
+    private double totalAmount;     // Tổng số lượng sản phẩm (ví dụ: tổng số lượng items)
+    private double totalPrice;      // Tổng giá trị đơn hàng sau chiết khấu
+    private List<OrderItemResponse> items; // Danh sách các mục trong đơn hàng
 
-    private boolean paid;
-    private String paymentMethod;
-    private String paymentId;
-    private LocalDateTime paymentTime;
-
-    private double totalAmount;
-    private double totalPrice;
-
-    private List<OrderItemResponse> items;
+    // OrderItemResponse đã được định nghĩa trong OrderService trước đó, nhưng ta có thể định nghĩa lại tại đây cho rõ ràng.
+    // Nếu bạn muốn giữ nó là inner class trong OrderService.java (như trong OrderService.java bạn đã cung cấp),
+    // thì không cần định nghĩa lại ở đây.
+    // Tuy nhiên, việc có một DTO riêng biệt cho OrderItemResponse thường tốt hơn để tái sử dụng.
+    // Tôi sẽ định nghĩa nó như một inner static class ở đây để đảm bảo nó tồn tại,
+    // hoặc bạn có thể tạo một file OrderItemResponse.java riêng biệt.
+    // Để giữ cho tổ chức gọn gàng, tôi sẽ tạo một file riêng cho OrderItemResponse.java
 }
 
 // File: src/main/java/com/example/sales/dto/order/OrderUpdateRequest.java
 package com.example.sales.dto.order;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrderUpdateRequest {
-    private String note;
     private String tableId;
-    private List<OrderItemRequest> items;
+    private String note;
+
+    @Valid
+    private List<OrderItemUpdateRequest> items; // Có thể cập nhật danh sách sản phẩm
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class OrderItemUpdateRequest {
+        // ID của Product master, không phải BranchProduct ID
+        private String productId;
+
+        @Min(value = 1, message = "Số lượng phải lớn hơn 0")
+        private int quantity;
+
+        @Min(value = 0, message = "Giá sản phẩm không được âm")
+        private double price; // Giá tại thời điểm cập nhật (có thể khác giá hiện tại của sản phẩm)
+    }
 }
 
 // File: src/main/java/com/example/sales/dto/product/ProductRequest.java
 package com.example.sales.dto.product;
 
-import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * DTO yêu cầu tạo/cập nhật sản phẩm.
+ * DTO dùng để tạo hoặc cập nhật thông tin sản phẩm tại một chi nhánh cụ thể.
+ * Các trường như name, category, sku sẽ ảnh hưởng đến định nghĩa sản phẩm chung (Product).
+ * Các trường như price, quantity, unit, imageUrl, description, active sẽ ảnh hưởng đến BranchProduct.
  */
-@Getter
-@Setter
+@Data
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
 public class ProductRequest {
 
-    /**
-     * Tên sản phẩm, không được để trống.
-     */
+    // Các trường ảnh hưởng đến Product (định nghĩa chung)
     @NotBlank(message = "Tên sản phẩm không được để trống")
-    @Size(max = 100, message = "Tên sản phẩm không được vượt quá 100 ký tự")
     private String name;
 
-    /**
-     * Giá sản phẩm, phải là số dương.
-     */
-    @NotNull(message = "Giá sản phẩm là bắt buộc")
-    @Positive(message = "Giá sản phẩm phải lớn hơn 0")
-    private Double price;
-
-    /**
-     * Số lượng tồn kho, phải là số không âm.
-     */
-    @NotNull(message = "Số lượng tồn kho là bắt buộc")
-    @PositiveOrZero(message = "Số lượng tồn kho phải là số không âm")
-    private Integer quantity;
-
-    /**
-     * Danh mục sản phẩm, không được để trống.
-     */
-    @NotBlank(message = "Danh mục sản phẩm không được để trống")
-    @Size(max = 50, message = "Danh mục không được vượt quá 50 ký tự")
+    @NotBlank(message = "Danh mục không được để trống")
     private String category;
 
-    /**
-     * Mã sản phẩm, nếu có, phải tuân theo định dạng (ví dụ: SKU-123).
-     */
-    @Pattern(regexp = "^[A-Z0-9-]{0,20}$", message = "Mã sản phẩm không hợp lệ")
-    private String sku;
+    @NotBlank(message = "SKU không được để trống")
+    private String sku; // SKU là duy nhất trong phạm vi shop, dùng để tìm/tạo Product chính
 
-    /**
-     * URL hình ảnh sản phẩm, nếu có.
-     */
-    @Size(max = 255, message = "URL hình ảnh không được vượt quá 255 ký tự")
-    private String imageUrl;
+    // Các trường ảnh hưởng đến BranchProduct (chi tiết tại chi nhánh)
+    @Min(value = 0, message = "Số lượng không được âm")
+    private int quantity;
 
-    /**
-     * Mô tả sản phẩm, nếu có.
-     */
-    @Size(max = 500, message = "Mô tả không được vượt quá 500 ký tự")
-    private String description;
+    @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
+    private double price;
 
-    /**
-     * Đơn vị sản phẩm (ví dụ: kg, cái), nếu có.
-     */
-    @Size(max = 20, message = "Đơn vị không được vượt quá 20 ký tự")
+    @NotBlank(message = "Đơn vị tính không được để trống")
     private String unit;
 
-    /**
-     * Trạng thái sản phẩm (mặc định là true).
-     */
+    private String imageUrl;
+    private String description;
+
+    @NotBlank(message = "Branch ID không được để trống")
+    private String branchId; // Chi nhánh mà sản phẩm này thuộc về
+
+    // active sẽ được ánh xạ tới activeInBranch của BranchProduct
+    @Builder.Default
     private boolean active = true;
-
-    /**
-     * Mã định danh sản phẩm, nếu có.
-     */
-    @Size(max = 50, message = "Mã định danh sản phẩm không được vượt quá 50 ký tự")
-    private String productCode;
-
-    /**
-     * ID chi nhánh, có thể để null nếu không thuộc chi nhánh cụ thể.
-     */
-    @Size(max = 50, message = "ID chi nhánh không được vượt quá 50 ký tự")
-    private String branchId;
 }
 
 // File: src/main/java/com/example/sales/dto/product/ProductResponse.java
 package com.example.sales.dto.product;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 /**
- * DTO phản hồi thông tin sản phẩm.
+ * DTO dùng để trả về thông tin chi tiết của một sản phẩm tại một chi nhánh cụ thể.
+ * Kết hợp thông tin từ cả Product (định nghĩa chung) và BranchProduct (chi tiết chi nhánh).
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ProductResponse {
-    /**
-     * ID sản phẩm.
-     */
+    // ID của bản ghi BranchProduct
     private String id;
 
-    /**
-     * Tên sản phẩm.
-     */
+    // ID của định nghĩa sản phẩm chung (từ Product)
+    private String productId;
+
+    // Các trường từ Product (định nghĩa chung)
     private String name;
-
-    /**
-     * Giá sản phẩm.
-     */
-    private double price;
-
-    /**
-     * Số lượng tồn kho.
-     */
-    private int quantity;
-
-    /**
-     * Danh mục sản phẩm.
-     */
     private String category;
-
-    /**
-     * Mã sản phẩm.
-     */
     private String sku;
 
-    /**
-     * URL hình ảnh sản phẩm.
-     */
-    private String imageUrl;
-
-    /**
-     * Mô tả sản phẩm.
-     */
-    private String description;
-
-    /**
-     * Trạng thái sản phẩm (kích hoạt hay không).
-     */
-    private boolean active;
-
-    /**
-     * Đơn vị sản phẩm (ví dụ: kg, lít).
-     */
+    // Các trường từ BranchProduct (chi tiết tại chi nhánh)
+    private int quantity;
+    private double price;
     private String unit;
+    private String imageUrl;
+    private String description;
+    private String branchId;
+    private boolean activeInBranch; // Trạng thái kích hoạt tại chi nhánh này
 
-    /**
-     * Mã định danh sản phẩm.
-     */
-    private String productCode;
-
-    /**
-     * ID cửa hàng sở hữu sản phẩm.
-     */
-    private String shopId;
-
-    /**
-     * Thời gian tạo sản phẩm.
-     */
     private LocalDateTime createdAt;
-
-    /**
-     * Thời gian cập nhật sản phẩm.
-     */
     private LocalDateTime updatedAt;
 }
 
@@ -1204,52 +1214,56 @@ package com.example.sales.export;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.OutputStream; // Import OutputStream
 import java.util.List;
 import java.util.function.Function;
 
 public class GenericExcelExporter<T> {
 
-    public InputStream export(String sheetName, List<String> headers, List<T> data, Function<T, List<String>> mapper) throws IOException {
+    /**
+     * Xuất dữ liệu vào một file Excel.
+     *
+     * @param sheetName Tên của sheet.
+     * @param headers Danh sách các tiêu đề cột.
+     * @param data Danh sách dữ liệu cần xuất.
+     * @param rowMapper Hàm ánh xạ một đối tượng T thành một danh sách các String cho một hàng.
+     * @param outputStream OutputStream để ghi dữ liệu Excel.
+     * @throws IOException Nếu có lỗi trong quá trình ghi file.
+     */
+    public void export(String sheetName,
+                       List<String> headers,
+                       List<T> data,
+                       Function<T, List<String>> rowMapper,
+                       OutputStream outputStream) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet(sheetName);
 
-            // Header row
+            // Tạo hàng tiêu đề
             Row headerRow = sheet.createRow(0);
-            CellStyle headerStyle = createHeaderStyle(workbook);
             for (int i = 0; i < headers.size(); i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers.get(i));
-                cell.setCellStyle(headerStyle);
             }
 
-            // Data rows
+            // Ghi dữ liệu
             int rowNum = 1;
             for (T item : data) {
                 Row row = sheet.createRow(rowNum++);
-                List<String> values = mapper.apply(item);
-                for (int i = 0; i < values.size(); i++) {
-                    row.createCell(i).setCellValue(values.get(i));
+                List<String> rowData = rowMapper.apply(item);
+                for (int i = 0; i < rowData.size(); i++) {
+                    Cell cell = row.createCell(i);
+                    cell.setCellValue(rowData.get(i));
                 }
             }
 
-            // Auto-size columns
+            // Tự động điều chỉnh độ rộng cột (tùy chọn)
             for (int i = 0; i < headers.size(); i++) {
                 sheet.autoSizeColumn(i);
             }
 
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            workbook.write(out);
-            return new ByteArrayInputStream(out.toByteArray());
+            workbook.write(outputStream); // Ghi workbook vào OutputStream
         }
-    }
-
-    private CellStyle createHeaderStyle(Workbook wb) {
-        CellStyle style = wb.createCellStyle();
-        Font font = wb.createFont();
-        font.setBold(true);
-        style.setFont(font);
-        return style;
     }
 }
 
@@ -1430,5 +1444,34 @@ public class PlanReminderScheduler {
             log.info("📧 Đã gửi email nhắc hạn cho shop {}", shop.getName());
         }
     }
+}
+
+// File: src/main/java/com/example/sales/dto/inventory/InventoryTransactionResponse.java
+package com.example.sales.dto.inventory;
+
+import com.example.sales.constant.InventoryType;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Data // Bao gồm @Getter, @Setter, @EqualsAndHashCode, @ToString
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class InventoryTransactionResponse {
+    private String id;
+    private String shopId;
+    private String branchId;
+    private String branchProductId; // ID của BranchProduct liên quan đến giao dịch
+    private String productName;     // Tên của sản phẩm (từ Product master)
+    private InventoryType type;     // Loại giao dịch (IMPORT, EXPORT, ADJUSTMENT)
+    private int quantity;           // Số lượng thay đổi trong giao dịch
+    private String note;
+    private String referenceId;     // ID tham chiếu (ví dụ: Order ID)
+    private LocalDateTime createdAt;
+    private String createdBy;       // ID người dùng thực hiện giao dịch
 }
 [END]

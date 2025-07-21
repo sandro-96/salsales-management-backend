@@ -5,6 +5,7 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,45 +30,43 @@ public class ProductStatusController {
     private final ProductService productService;
 
     /**
-     * Bật/tắt trạng thái hoạt động của sản phẩm.
+     * Bật/tắt trạng thái hoạt động của sản phẩm tại một chi nhánh cụ thể.
      */
-    @Operation(summary = "Bật/tắt trạng thái hoạt động của sản phẩm")
+    @Operation(summary = "Bật/tắt trạng thái hoạt động của sản phẩm tại một chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật trạng thái thành công"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
     })
-    @PatchMapping("/{productId}/toggle")
+    @PatchMapping("/shops/{shopId}/branches/{branchId}/products/{branchProductId}/toggle")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<ProductResponse>> toggleActive(
-            @Parameter(description = "ID cửa hàng", required = true)
-            @RequestParam String shopId,
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @Parameter(description = "ID cửa hàng", required = true) @PathVariable String shopId,
+            @Parameter(description = "ID chi nhánh", required = true) @PathVariable String branchId,
+            @Parameter(description = "ID sản phẩm (BranchProduct ID)", required = true) @PathVariable String branchProductId) {
 
-            @Parameter(description = "ID sản phẩm", required = true)
-            @PathVariable String productId) {
-
-        ProductResponse response = productService.toggleActive(shopId, productId);
+        ProductResponse response = productService.toggleActive(user.getId(), shopId, branchId, branchProductId);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_STATUS_UPDATED, response));
     }
 
     /**
-     * Lấy danh sách sản phẩm có tồn kho dưới ngưỡng cảnh báo.
+     * Lấy danh sách sản phẩm có tồn kho dưới ngưỡng cảnh báo cho một cửa hàng hoặc chi nhánh.
      */
-    @Operation(summary = "Lấy danh sách sản phẩm tồn kho thấp")
+    @Operation(summary = "Lấy danh sách sản phẩm tồn kho thấp cho một cửa hàng hoặc chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách sản phẩm được trả về thành công"),
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
-    @GetMapping("/low-stock")
+    @GetMapping("/shops/{shopId}/low-stock")
     @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<List<ProductResponse>>> getLowStock(
-            @Parameter(description = "ID cửa hàng", required = true)
-            @RequestParam String shopId,
-
+            @Parameter(description = "ID cửa hàng", required = true) @PathVariable String shopId,
+            @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
             @Parameter(description = "Ngưỡng tồn kho thấp. Mặc định là 10", example = "10")
             @RequestParam(defaultValue = "10") int threshold) {
 
-        List<ProductResponse> response = productService.getLowStockProducts(shopId, threshold);
+        List<ProductResponse> response = productService.getLowStockProducts(shopId, branchId, threshold);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LOW_STOCK, response));
     }
 }

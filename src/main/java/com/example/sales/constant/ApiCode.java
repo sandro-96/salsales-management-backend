@@ -76,7 +76,8 @@ public enum ApiCode {
     TABLE_NAME_EXISTS("4135", "Table name already exists"),
     TABLE_OCCUPIED("4136", "Table is occupied"),
     USER_ALREADY_IN_SHOP("4137", "User already in shop"),
-    CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop");
+    CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop"),
+    INSUFFICIENT_STOCK ("4139", "Insufficient stock for product");
 
     private final String code;
     private final String message;

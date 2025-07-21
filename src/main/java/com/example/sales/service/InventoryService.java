@@ -1,55 +1,67 @@
 // File: src/main/java/com/example/sales/service/InventoryService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.inventory.InventoryRequest;
-import com.example.sales.exception.BusinessException;
-import com.example.sales.model.InventoryTransaction;
-import com.example.sales.model.Product;
-import com.example.sales.repository.InventoryTransactionRepository;
-import com.example.sales.repository.ProductRepository;
-import lombok.RequiredArgsConstructor;
+import com.example.sales.dto.inventory.InventoryTransactionResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
 
-@Service
-@RequiredArgsConstructor
-public class InventoryService {
+public interface InventoryService {
 
-    private final ProductRepository productRepository;
-    private final InventoryTransactionRepository inventoryTransactionRepository;
+    /**
+     * Nhập thêm số lượng sản phẩm vào kho của chi nhánh.
+     * Tạo một InventoryTransaction loại IMPORT.
+     *
+     * @param userId ID của người dùng thực hiện.
+     * @param shopId ID của cửa hàng.
+     * @param branchProductId ID của BranchProduct cần nhập.
+     * @param quantity Số lượng nhập thêm.
+     * @param note Ghi chú cho giao dịch.
+     * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
+     */
+    int importProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note);
 
-    public InventoryTransaction createTransaction(String userId, String shopId, InventoryRequest request) {
-        Product product = productRepository.findByIdAndDeletedFalse(request.getProductId())
-                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+    /**
+     * Xuất bớt số lượng sản phẩm khỏi kho của chi nhánh.
+     * Tạo một InventoryTransaction loại EXPORT.
+     * Kiểm tra số lượng tồn kho trước khi xuất.
+     *
+     * @param userId ID của người dùng thực hiện.
+     * @param shopId ID của cửa hàng.
+     * @param branchProductId ID của BranchProduct cần xuất.
+     * @param quantity Số lượng xuất đi.
+     * @param note Ghi chú cho giao dịch.
+     * @param referenceId ID tham chiếu (ví dụ: ID đơn hàng).
+     * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
+     */
+    int exportProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note, String referenceId);
 
-        int change = switch (request.getType()) {
-            case IMPORT, ADJUSTMENT -> request.getQuantity();
-            case EXPORT -> -request.getQuantity();
-        };
+    /**
+     * Điều chỉnh số lượng tồn kho của sản phẩm tại chi nhánh.
+     * Có thể tăng hoặc giảm số lượng, tạo một InventoryTransaction loại ADJUSTMENT.
+     *
+     * @param userId ID của người dùng thực hiện.
+     * @param shopId ID của cửa hàng.
+     * @param branchProductId ID của BranchProduct cần điều chỉnh.
+     * @param newQuantity Số lượng tồn kho mong muốn sau điều chỉnh.
+     * @param note Ghi chú cho giao dịch.
+     * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
+     */
+    int adjustProductQuantity(String userId, String shopId, String branchId, String branchProductId, int newQuantity, String note);
 
-        int newQty = product.getQuantity() + change;
-        if (newQty < 0) {
-            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
-        }
+    /**
+     * Lấy lịch sử giao dịch tồn kho cho một sản phẩm cụ thể.
+     *
+     * @param productId ID của BranchProduct (sản phẩm chi nhánh).
+     * @param pageable Thông tin phân trang.
+     * @return Trang chứa danh sách các giao dịch tồn kho.
+     */
+    Page<InventoryTransactionResponse> getTransactionHistory(String branchProductId, Pageable pageable);
 
-        product.setQuantity(newQty);
-        productRepository.save(product);
-
-        InventoryTransaction tx = InventoryTransaction.builder()
-                .shopId(shopId)
-                .branchId(request.getBranchId())
-                .productId(product.getId())
-                .type(request.getType())
-                .quantity(change)
-                .note(request.getNote())
-                .build();
-
-        return inventoryTransactionRepository.save(tx);
-    }
-
-    public Page<InventoryTransaction> getHistory(String userId, String productId, Pageable pageable) {
-        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
-    }
+    /**
+     * Kiểm tra xem cửa hàng có yêu cầu quản lý tồn kho hay không.
+     *
+     * @param shopId ID của cửa hàng.
+     * @return true nếu cửa hàng yêu cầu quản lý tồn kho, ngược lại false.
+     */
+    boolean isInventoryManagementRequired(String shopId);
 }

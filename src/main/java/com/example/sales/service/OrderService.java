@@ -11,6 +11,7 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
 import com.example.sales.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // Thêm Log
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,18 +20,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects; // Thêm Objects
 
 @Service
 @RequiredArgsConstructor
+@Slf4j // Khởi tạo Log
 public class OrderService extends BaseService {
 
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
-    private final ProductRepository productRepository;
+    private final ProductRepository productRepository; // Vẫn cần để lấy thông tin Product master
+    private final BranchProductRepository branchProductRepository; // Thêm BranchProductRepository
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
     private final ShopRepository shopRepository;
-    private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final InventoryService inventoryService; // Thay thế InventoryTransactionRepository bằng InventoryService
     private final ShopUserService shopUserService;
 
     public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
@@ -49,22 +53,36 @@ public class OrderService extends BaseService {
         order.setPaid(false);
 
         String branchId = request.getBranchId();
-        if (branchId != null && !branchId.isBlank()) {
-            order.setBranchId(branchId);
+        if (branchId == null || branchId.isBlank()) {
+            log.error("Branch ID không được để trống");
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
+        order.setBranchId(branchId);
 
         double[] totals = {0, 0};
 
+        // Lấy thông tin shop để kiểm tra loại hình kinh doanh (có quản lý tồn kho không)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+
         List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
-            Product product = productRepository.findById(reqItem.getProductId())
+            // Lấy Product master
+            Product masterProduct = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
                     .filter(p -> p.getShopId().equals(shopId))
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+            // Lấy BranchProduct cho chi nhánh và sản phẩm cụ thể
+            BranchProduct branchProduct = branchProductRepository
+                    .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), branchId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
 
             double basePrice = reqItem.getPrice();
             double finalPrice = basePrice;
             String promoId = null;
 
-            Promotion promo = findApplicablePromotion(shopId, branchId, product.getId());
+            Promotion promo = findApplicablePromotion(shopId, branchId, masterProduct.getId()); // Áp dụng promo dựa trên masterProduct ID
             if (promo != null) {
                 promoId = promo.getId();
                 if (promo.getDiscountType() == DiscountType.PERCENT) {
@@ -74,13 +92,15 @@ public class OrderService extends BaseService {
                 }
             }
 
-            OrderItem item = new OrderItem();
-            item.setProductId(product.getId());
-            item.setProductName(product.getName());
-            item.setQuantity(reqItem.getQuantity());
-            item.setPrice(basePrice);
-            item.setPriceAfterDiscount(finalPrice);
-            item.setAppliedPromotionId(promoId);
+            OrderItem item = OrderItem.builder()
+                    .productId(masterProduct.getId()) // Lưu master product ID
+                    .branchProductId(branchProduct.getId()) // Lưu BranchProduct ID
+                    .productName(masterProduct.getName())
+                    .quantity(reqItem.getQuantity())
+                    .price(basePrice)
+                    .priceAfterDiscount(finalPrice)
+                    .appliedPromotionId(promoId)
+                    .build();
 
             totals[0] += reqItem.getQuantity();
             totals[1] += reqItem.getQuantity() * finalPrice;
@@ -93,19 +113,18 @@ public class OrderService extends BaseService {
         order.setTotalPrice(totals[1]);
 
         Order created = orderRepository.save(order);
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
 
+        // Điều chỉnh tồn kho sau khi tạo đơn hàng
         if (shop.getType().isTrackInventory()) {
             for (OrderItem item : created.getItems()) {
-                Product product = productRepository.findByIdAndDeletedFalse(item.getProductId())
-                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-                adjustInventory(product, shopId, created.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
-                        "Xuất kho theo đơn hàng " + created.getId(), created.getId());
+                // Sử dụng BranchProduct ID để điều chỉnh tồn kho
+                inventoryService.exportProductQuantity(
+                        userId, shopId, created.getBranchId(), item.getBranchProductId(),
+                        item.getQuantity(), "Xuất kho theo đơn hàng " + created.getId(), created.getId());
             }
         }
         occupyTable(created);
+        auditLogService.log(userId, shopId, created.getId(), "ORDER", "CREATED", "Tạo đơn hàng mới");
         return toResponse(created);
     }
 
@@ -118,6 +137,18 @@ public class OrderService extends BaseService {
 
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
+
+        // Hoàn kho khi hủy đơn hàng nếu shop có quản lý tồn kho
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+        if (inventoryService.isInventoryManagementRequired(shopId)) {
+            for (OrderItem item : order.getItems()) {
+                inventoryService.importProductQuantity(
+                        userId, shopId, order.getBranchId(), item.getBranchProductId(),
+                        item.getQuantity(), "Hoàn kho khi hủy đơn hàng " + orderId);
+            }
+        }
+
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
     }
 
@@ -135,7 +166,7 @@ public class OrderService extends BaseService {
         order.setStatus(OrderStatus.COMPLETED);
 
         Order updated = orderRepository.save(order);
-        releaseTable(updated);
+        releaseTable(updated); // Giải phóng bàn khi đơn hàng hoàn thành/thanh toán
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
                 "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
         return toResponse(updated);
@@ -144,17 +175,25 @@ public class OrderService extends BaseService {
     public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
         Order order = getOrderByShop(orderId, shopId);
 
-        if (order.getStatus() == OrderStatus.CANCELLED) {
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
+            log.error("Không thể cập nhật trạng thái đơn hàng đã hủy hoặc đã hoàn thành");
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (newStatus == OrderStatus.CANCELLED && order.isPaid()) {
+            log.error("Không thể hủy đơn hàng đã thanh toán");
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
+
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(newStatus);
 
         if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
+            // Nếu đơn hàng chuyển sang COMPLETED mà chưa thanh toán, coi như thanh toán bằng tiền mặt
             order.setPaid(true);
             order.setPaymentTime(LocalDateTime.now());
             order.setPaymentMethod("Cash");
+            releaseTable(order); // Giải phóng bàn
         }
 
         Order updated = orderRepository.save(order);
@@ -166,21 +205,16 @@ public class OrderService extends BaseService {
         return toResponse(updated);
     }
 
-    public List<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId) {
-        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status)
-                .stream().map(this::toResponse).toList();
-    }
-
     @Cacheable(value = "orders", key = "#orderId + '-' + #shopId")
-    public Order getOrderByShop(String orderId, String shopId) {
-        Order order = checkOrderExists(orderRepository, orderId, shopId);
-        shopUserService.requireAnyRole(shopId, order.getUserId(), ShopRole.OWNER, ShopRole.STAFF);
-        return order;
+    private Order getOrderByShop(String orderId, String shopId) {
+        return orderRepository.findByIdAndDeletedFalse(orderId)
+                .filter(o -> o.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
     }
 
     private void occupyTable(Order order) {
-        if (order.getTableId() != null) {
-            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+        if (order.getTableId() != null && !order.getTableId().isBlank()) { // Kiểm tra null và blank
+            tableRepository.findByIdAndDeletedFalse(order.getTableId()).ifPresent(table -> { // Tìm bàn không bị xóa
                 table.setStatus(TableStatus.OCCUPIED);
                 table.setCurrentOrderId(order.getId());
                 tableRepository.save(table);
@@ -189,8 +223,8 @@ public class OrderService extends BaseService {
     }
 
     private void releaseTable(Order order) {
-        if (order.getTableId() != null) {
-            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+        if (order.getTableId() != null && !order.getTableId().isBlank()) {
+            tableRepository.findByIdAndDeletedFalse(order.getTableId()).ifPresent(table -> {
                 table.setStatus(TableStatus.AVAILABLE);
                 table.setCurrentOrderId(null);
                 tableRepository.save(table);
@@ -202,46 +236,20 @@ public class OrderService extends BaseService {
         LocalDateTime now = LocalDateTime.now();
         return promotionRepository.findByShopIdAndDeletedFalse(shopId).stream()
                 .filter(Promotion::isActive)
-                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
+                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId)) // Khuyến mãi có thể áp dụng cho toàn bộ shop (branchId = null) hoặc riêng cho 1 branch
                 .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))
                 .filter(p -> p.getApplicableProductIds() == null
                         || p.getApplicableProductIds().isEmpty()
-                        || p.getApplicableProductIds().contains(productId))
+                        || p.getApplicableProductIds().contains(productId)) // Áp dụng cho masterProduct ID
                 .findFirst()
                 .orElse(null);
     }
 
-    private void adjustInventory(Product product, String shopId, String branchId, InventoryType type, int qty,
-                                 String note, String referenceId) {
-
-        int change = switch (type) {
-            case EXPORT -> -qty;
-            case IMPORT, ADJUSTMENT -> qty;
-        };
-
-        int newQty = product.getQuantity() + change;
-        if (newQty < 0) {
-            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
-        }
-
-        product.setQuantity(newQty);
-        productRepository.save(product);
-
-        InventoryTransaction tx = InventoryTransaction.builder()
-                .shopId(shopId)
-                .branchId(branchId)
-                .productId(product.getId())
-                .type(type)
-                .quantity(change)
-                .note(note)
-                .referenceId(referenceId)
-                .build();
-
-        inventoryTransactionRepository.save(tx);
-    }
+    // Phương thức adjustInventory đã được loại bỏ và thay bằng InventoryService
 
     // File: OrderService.java
     public Page<OrderResponse> getOrdersByUser(String userId, String shopId, Pageable pageable) {
+        // Có thể thêm filter theo branchId nếu người dùng chỉ có quyền ở một branch cụ thể
         return orderRepository.findByShopIdAndDeletedFalse(shopId, pageable)
                 .map(this::toResponse);
     }
@@ -264,6 +272,8 @@ public class OrderService extends BaseService {
             releaseTable(order);
             order.setTableId(request.getTableId());
             occupyTable(order);
+            auditLogService.log(userId, shopId, orderId, "ORDER", "TABLE_CHANGED",
+                    "Đổi bàn cho đơn hàng từ %s sang %s".formatted(order.getTableId(), request.getTableId()));
         }
 
         if (request.getNote() != null) {
@@ -274,26 +284,34 @@ public class OrderService extends BaseService {
             Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
 
+            // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ (nếu shop có quản lý tồn kho)
             if (shop.getType().isTrackInventory()) {
-                // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ
                 for (OrderItem oldItem : order.getItems()) {
-                    Product product = productRepository.findByIdAndDeletedFalse(oldItem.getProductId())
-                            .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.IMPORT, oldItem.getQuantity(),
-                            "Hoàn kho khi cập nhật đơn hàng " + orderId, orderId);
+                    inventoryService.importProductQuantity(
+                            userId, shopId, order.getBranchId(), oldItem.getBranchProductId(), // Sử dụng BranchProduct ID
+                            oldItem.getQuantity(), "Hoàn kho khi cập nhật đơn hàng " + orderId);
                 }
             }
 
-            // 🔁 2. Áp dụng lại tồn kho cho danh sách mới
+            // 🔁 2. Áp dụng lại tồn kho cho danh sách mới và tính toán lại tổng tiền
+            double[] totals = {0, 0};
+
             List<OrderItem> updatedItems = request.getItems().stream().map(reqItem -> {
-                Product product = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
+                // Lấy Product master
+                Product masterProduct = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
+                        .filter(p -> p.getShopId().equals(shopId))
                         .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                // Lấy BranchProduct cho chi nhánh và sản phẩm cụ thể
+                BranchProduct branchProduct = branchProductRepository
+                        .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), order.getBranchId()) // Lấy branchId từ order
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
                 double basePrice = reqItem.getPrice();
                 double finalPrice = basePrice;
                 String promoId = null;
 
-                Promotion promo = findApplicablePromotion(shopId, order.getBranchId(), product.getId());
+                Promotion promo = findApplicablePromotion(shopId, order.getBranchId(), masterProduct.getId());
                 if (promo != null) {
                     promoId = promo.getId();
                     if (promo.getDiscountType() == DiscountType.PERCENT) {
@@ -304,26 +322,30 @@ public class OrderService extends BaseService {
                 }
 
                 OrderItem item = OrderItem.builder()
-                        .productId(product.getId())
-                        .productName(product.getName())
+                        .productId(masterProduct.getId())
+                        .branchProductId(branchProduct.getId()) // Lưu BranchProduct ID
+                        .productName(masterProduct.getName())
                         .quantity(reqItem.getQuantity())
                         .price(basePrice)
                         .priceAfterDiscount(finalPrice)
                         .appliedPromotionId(promoId)
                         .build();
 
-                // Trừ kho mới
+                // Trừ kho mới (nếu shop có quản lý tồn kho)
                 if (shop.getType().isTrackInventory()) {
-                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
-                            "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
+                    inventoryService.exportProductQuantity(
+                            userId, shopId, order.getBranchId(), item.getBranchProductId(), // Sử dụng BranchProduct ID
+                            item.getQuantity(), "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
                 }
 
+                totals[0] += reqItem.getQuantity();
+                totals[1] += reqItem.getQuantity() * finalPrice;
                 return item;
             }).toList();
 
             order.setItems(updatedItems);
-            order.setTotalAmount(updatedItems.stream().mapToInt(OrderItem::getQuantity).sum());
-            order.setTotalPrice(updatedItems.stream().mapToDouble(i -> i.getQuantity() * i.getPriceAfterDiscount()).sum());
+            order.setTotalAmount(totals[0]);
+            order.setTotalPrice(totals[1]);
         }
 
         Order updated = orderRepository.save(order);
@@ -335,6 +357,7 @@ public class OrderService extends BaseService {
         return OrderResponse.builder()
                 .id(order.getId())
                 .tableId(order.getTableId())
+                .branchId(order.getBranchId()) // Thêm branchId vào response
                 .note(order.getNote())
                 .status(order.getStatus())
                 .paid(order.isPaid())
@@ -350,6 +373,7 @@ public class OrderService extends BaseService {
     private OrderItemResponse toItemResponse(OrderItem item) {
         return OrderItemResponse.builder()
                 .productId(item.getProductId())
+                .branchProductId(item.getBranchProductId()) // Thêm branchProductId vào response
                 .productName(item.getProductName())
                 .quantity(item.getQuantity())
                 .price(item.getPrice())

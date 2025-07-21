@@ -2,21 +2,29 @@
 package com.example.sales.repository;
 
 import com.example.sales.model.Product;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
+import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface ProductRepository extends MongoRepository<Product, String> {
     Optional<Product> findByIdAndDeletedFalse(String id);
+    // Tìm Product theo ID và ShopId
     Optional<Product> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
-    Page<Product> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
-    List<Product> findByShopIdAndQuantityLessThanAndDeletedFalse(String shopId, int threshold);
-    List<Product> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
-    List<Product> findByShopIdAndDeletedFalse(String shopId);
-    @Query("{ 'shopId': ?0, 'deleted': false, $or: [ { 'name': { $regex: ?1, $options: 'i' } }, { 'sku': { $regex: ?1, $options: 'i' } }, { 'description': { $regex: ?1, $options: 'i' } } ] }")
-    Page<Product> findByShopIdAndKeyword(String shopId, String keyword, Pageable pageable);
+
+    // Tìm Product theo ShopId và SKU
+    Optional<Product> findByShopIdAndSkuAndDeletedFalse(String shopId, String sku);
+
+    // Kiểm tra sự tồn tại của Product theo ShopId và SKU
+    boolean existsByShopIdAndSkuAndDeletedFalse(String shopId, String sku);
+
+    // Tìm kiếm các sản phẩm chung theo tên hoặc danh mục (trong Product)
+    // Lưu ý: Đây là tìm kiếm trên định nghĩa sản phẩm chung, không phải tồn kho cụ thể của chi nhánh
+    Optional<Product> findByShopIdAndNameContainingIgnoreCaseAndDeletedFalse(String shopId, String name);
+    Optional<Product> findByShopIdAndCategoryContainingIgnoreCaseAndDeletedFalse(String shopId, String category);
+
+
+    // Chúng ta sẽ cần thêm các phương thức tìm kiếm linh hoạt hơn
+    // Hoặc xây dựng query động trong ProductServiceImpl sử dụng MongoTemplate hoặc Aggregation
 }

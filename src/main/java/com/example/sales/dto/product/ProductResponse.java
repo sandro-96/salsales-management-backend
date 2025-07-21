@@ -1,84 +1,42 @@
 // File: src/main/java/com/example/sales/dto/product/ProductResponse.java
 package com.example.sales.dto.product;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 /**
- * DTO phản hồi thông tin sản phẩm.
+ * DTO dùng để trả về thông tin chi tiết của một sản phẩm tại một chi nhánh cụ thể.
+ * Kết hợp thông tin từ cả Product (định nghĩa chung) và BranchProduct (chi tiết chi nhánh).
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ProductResponse {
-    /**
-     * ID sản phẩm.
-     */
+    // ID của bản ghi BranchProduct
     private String id;
 
-    /**
-     * Tên sản phẩm.
-     */
+    // ID của định nghĩa sản phẩm chung (từ Product)
+    private String productId;
+
+    // Các trường từ Product (định nghĩa chung)
     private String name;
-
-    /**
-     * Giá sản phẩm.
-     */
-    private double price;
-
-    /**
-     * Số lượng tồn kho.
-     */
-    private int quantity;
-
-    /**
-     * Danh mục sản phẩm.
-     */
     private String category;
-
-    /**
-     * Mã sản phẩm.
-     */
     private String sku;
 
-    /**
-     * URL hình ảnh sản phẩm.
-     */
-    private String imageUrl;
-
-    /**
-     * Mô tả sản phẩm.
-     */
-    private String description;
-
-    /**
-     * Trạng thái sản phẩm (kích hoạt hay không).
-     */
-    private boolean active;
-
-    /**
-     * Đơn vị sản phẩm (ví dụ: kg, lít).
-     */
+    // Các trường từ BranchProduct (chi tiết tại chi nhánh)
+    private int quantity;
+    private double price;
     private String unit;
+    private String imageUrl;
+    private String description;
+    private String branchId;
+    private boolean activeInBranch; // Trạng thái kích hoạt tại chi nhánh này
 
-    /**
-     * Mã định danh sản phẩm.
-     */
-    private String productCode;
-
-    /**
-     * ID cửa hàng sở hữu sản phẩm.
-     */
-    private String shopId;
-
-    /**
-     * Thời gian tạo sản phẩm.
-     */
     private LocalDateTime createdAt;
-
-    /**
-     * Thời gian cập nhật sản phẩm.
-     */
     private LocalDateTime updatedAt;
 }

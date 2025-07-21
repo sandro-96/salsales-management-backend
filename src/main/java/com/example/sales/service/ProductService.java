@@ -9,79 +9,23 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface ProductService {
-
-    /**
-     * Creates a new product for a specific shop.
-     *
-     * @param shopId  the ID of the shop
-     * @param request the product details
-     * @return the created product's response
-     */
     ProductResponse createProduct(String shopId, ProductRequest request);
 
-    /**
-     * Updates an existing product.
-     *
-     * @param userId  the ID of the user performing the update
-     * @param shopId  the ID of the shop
-     * @param id      the ID of the product to update
-     * @param request the updated product details
-     * @return the updated product's response
-     */
-    ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request);
+    // id ở đây là id của BranchProduct
+    ProductResponse updateProduct(String userId, String shopId, String branchId, String id, ProductRequest request);
 
-    /**
-     * Soft deletes a product from the specified shop.
-     *
-     * @param shopId the ID of the shop
-     * @param id     the ID of the product to delete
-     */
-    void deleteProduct(String shopId, String id);
+    // id ở đây là id của BranchProduct
+    void deleteProduct(String userId, String shopId, String branchId, String id);
 
-    /**
-     * Retrieves details of a specific product.
-     *
-     * @param shopId the ID of the shop
-     * @param id     the ID of the product
-     * @return the product's response
-     */
-    ProductResponse getProduct(String shopId, String id);
+    // id ở đây là id của BranchProduct
+    ProductResponse getProduct(String shopId, String branchId, String id);
 
-    /**
-     * Retrieves a paginated list of products for a shop.
-     *
-     * @param shopId   the ID of the shop
-     * @param pageable the pagination information
-     * @return a paginated list of product responses
-     */
-    Page<ProductResponse> getAllByShop(String shopId, Pageable pageable);
+    Page<ProductResponse> getAllByShop(String shopId, String branchId, Pageable pageable);
 
-    /**
-     * Toggles the active status of a product.
-     *
-     * @param shopId    the ID of the shop
-     * @param productId the ID of the product
-     * @return the updated product's response
-     */
-    ProductResponse toggleActive(String shopId, String productId);
+    // productId ở đây là id của BranchProduct để toggle activeInBranch
+    ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId);
 
-    /**
-     * Retrieves a list of products with low stock levels.
-     *
-     * @param shopId   the ID of the shop
-     * @param threshold the low stock threshold
-     * @return a list of products with low stock
-     */
-    List<ProductResponse> getLowStockProducts(String shopId, int threshold);
+    List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold);
 
-    //searchProducts
-    /**
-     * Searches for products in a shop based on a keyword.
-     *
-     * @param shopId   the ID of the shop
-     * @param keyword  the search keyword
-     * @param pageable the pagination information
-     * @return a paginated list of product responses matching the search criteria
-     */
-    Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable);
+    Page<ProductResponse> searchProducts(String shopId, String branchId, String keyword, Pageable pageable);
 }

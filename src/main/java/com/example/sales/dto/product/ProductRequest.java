@@ -1,83 +1,52 @@
 // File: src/main/java/com/example/sales/dto/product/ProductRequest.java
 package com.example.sales.dto.product;
 
-import jakarta.validation.constraints.*;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * DTO yêu cầu tạo/cập nhật sản phẩm.
+ * DTO dùng để tạo hoặc cập nhật thông tin sản phẩm tại một chi nhánh cụ thể.
+ * Các trường như name, category, sku sẽ ảnh hưởng đến định nghĩa sản phẩm chung (Product).
+ * Các trường như price, quantity, unit, imageUrl, description, active sẽ ảnh hưởng đến BranchProduct.
  */
-@Getter
-@Setter
+@Data
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
 public class ProductRequest {
 
-    /**
-     * Tên sản phẩm, không được để trống.
-     */
+    // Các trường ảnh hưởng đến Product (định nghĩa chung)
     @NotBlank(message = "Tên sản phẩm không được để trống")
-    @Size(max = 100, message = "Tên sản phẩm không được vượt quá 100 ký tự")
     private String name;
 
-    /**
-     * Giá sản phẩm, phải là số dương.
-     */
-    @NotNull(message = "Giá sản phẩm là bắt buộc")
-    @Positive(message = "Giá sản phẩm phải lớn hơn 0")
-    private Double price;
-
-    /**
-     * Số lượng tồn kho, phải là số không âm.
-     */
-    @NotNull(message = "Số lượng tồn kho là bắt buộc")
-    @PositiveOrZero(message = "Số lượng tồn kho phải là số không âm")
-    private Integer quantity;
-
-    /**
-     * Danh mục sản phẩm, không được để trống.
-     */
-    @NotBlank(message = "Danh mục sản phẩm không được để trống")
-    @Size(max = 50, message = "Danh mục không được vượt quá 50 ký tự")
+    @NotBlank(message = "Danh mục không được để trống")
     private String category;
 
-    /**
-     * Mã sản phẩm, nếu có, phải tuân theo định dạng (ví dụ: SKU-123).
-     */
-    @Pattern(regexp = "^[A-Z0-9-]{0,20}$", message = "Mã sản phẩm không hợp lệ")
-    private String sku;
+    @NotBlank(message = "SKU không được để trống")
+    private String sku; // SKU là duy nhất trong phạm vi shop, dùng để tìm/tạo Product chính
 
-    /**
-     * URL hình ảnh sản phẩm, nếu có.
-     */
-    @Size(max = 255, message = "URL hình ảnh không được vượt quá 255 ký tự")
-    private String imageUrl;
+    // Các trường ảnh hưởng đến BranchProduct (chi tiết tại chi nhánh)
+    @Min(value = 0, message = "Số lượng không được âm")
+    private int quantity;
 
-    /**
-     * Mô tả sản phẩm, nếu có.
-     */
-    @Size(max = 500, message = "Mô tả không được vượt quá 500 ký tự")
-    private String description;
+    @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
+    private double price;
 
-    /**
-     * Đơn vị sản phẩm (ví dụ: kg, cái), nếu có.
-     */
-    @Size(max = 20, message = "Đơn vị không được vượt quá 20 ký tự")
+    @NotBlank(message = "Đơn vị tính không được để trống")
     private String unit;
 
-    /**
-     * Trạng thái sản phẩm (mặc định là true).
-     */
+    private String imageUrl;
+    private String description;
+
+    @NotBlank(message = "Branch ID không được để trống")
+    private String branchId; // Chi nhánh mà sản phẩm này thuộc về
+
+    // active sẽ được ánh xạ tới activeInBranch của BranchProduct
+    @Builder.Default
     private boolean active = true;
-
-    /**
-     * Mã định danh sản phẩm, nếu có.
-     */
-    @Size(max = 50, message = "Mã định danh sản phẩm không được vượt quá 50 ký tự")
-    private String productCode;
-
-    /**
-     * ID chi nhánh, có thể để null nếu không thuộc chi nhánh cụ thể.
-     */
-    @Size(max = 50, message = "ID chi nhánh không được vượt quá 50 ký tự")
-    private String branchId;
 }

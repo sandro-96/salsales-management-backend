@@ -6,8 +6,8 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
+
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Getter
@@ -15,28 +15,34 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @ToString
 @EqualsAndHashCode(callSuper = true)
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
-@Document("branch_products")
-@CompoundIndex(def = "{'productId':1, 'branchId':1}", unique = true) // Đảm bảo duy nhất mỗi sản phẩm trong mỗi chi nhánh
+@AllArgsConstructor
+@Document("branch_products") // <-- Collection mới cho BranchProduct
 public class BranchProduct extends BaseEntity {
+
     @Id
     private String id;
 
-    @NotBlank
-    private String productId; // ID của sản phẩm trong Product collection
+    @NotBlank(message = "Product ID không được để trống")
+    private String productId; // Liên kết với Product (định nghĩa chung)
 
-    @NotBlank
-    private String shopId; // ID của Shop (denormalized for query efficiency)
+    @NotBlank(message = "Shop ID không được để trống")
+    private String shopId;
 
-    @NotBlank
-    private String branchId; // ID của chi nhánh
+    @NotBlank(message = "Branch ID không được để trống")
+    private String branchId; // Chi nhánh mà sản phẩm này thuộc về
 
     @Min(value = 0, message = "Số lượng không được âm")
-    private int quantity; // Số lượng tồn kho tại chi nhánh này
+    private int quantity;
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
-    private double price; // Giá bán tại chi nhánh này
+    private double price;
+
+    @NotBlank(message = "Đơn vị không được để trống")
+    private String unit;
+
+    private String imageUrl;
+    private String description;
 
     @Builder.Default
     private boolean activeInBranch = true; // Trạng thái kích hoạt tại chi nhánh này

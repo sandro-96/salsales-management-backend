@@ -2,11 +2,10 @@
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Getter
@@ -17,6 +16,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @AllArgsConstructor
 @NoArgsConstructor
 @Document("products")
+// Đảm bảo SKU là duy nhất trong phạm vi mỗi shop
+@CompoundIndex(def = "{'shopId': 1, 'sku': 1}", unique = true)
 public class Product extends BaseEntity {
     @Id
     private String id;
@@ -27,21 +28,8 @@ public class Product extends BaseEntity {
     @NotBlank(message = "Danh mục không được để trống")
     private String category;
 
-    @Min(value = 0, message = "Số lượng không được âm")
-    private int quantity;
+    @NotBlank(message = "SKU không được để trống")
+    private String sku; // Mã sản phẩm SKU (duy nhất trong shop)
 
-    @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
-    private double price;
-
-    private String unit;
-    private String imageUrl;
-    private String description;
-    private String shopId;
-    private String branchId;
-
-    @Builder.Default
-    private boolean active = true;
-
-    private String productCode;
-    private String sku;
+    private String shopId; // Shop mà định nghĩa sản phẩm này thuộc về
 }

@@ -81,23 +81,31 @@ public interface OrderRepository extends MongoRepository<Order, String> {
 package com.example.sales.repository;
 
 import com.example.sales.model.Product;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
+import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface ProductRepository extends MongoRepository<Product, String> {
     Optional<Product> findByIdAndDeletedFalse(String id);
+    // Tìm Product theo ID và ShopId
     Optional<Product> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
-    Page<Product> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
-    List<Product> findByShopIdAndQuantityLessThanAndDeletedFalse(String shopId, int threshold);
-    List<Product> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
-    List<Product> findByShopIdAndDeletedFalse(String shopId);
-    @Query("{ 'shopId': ?0, 'deleted': false, $or: [ { 'name': { $regex: ?1, $options: 'i' } }, { 'sku': { $regex: ?1, $options: 'i' } }, { 'description': { $regex: ?1, $options: 'i' } } ] }")
-    Page<Product> findByShopIdAndKeyword(String shopId, String keyword, Pageable pageable);
+
+    // Tìm Product theo ShopId và SKU
+    Optional<Product> findByShopIdAndSkuAndDeletedFalse(String shopId, String sku);
+
+    // Kiểm tra sự tồn tại của Product theo ShopId và SKU
+    boolean existsByShopIdAndSkuAndDeletedFalse(String shopId, String sku);
+
+    // Tìm kiếm các sản phẩm chung theo tên hoặc danh mục (trong Product)
+    // Lưu ý: Đây là tìm kiếm trên định nghĩa sản phẩm chung, không phải tồn kho cụ thể của chi nhánh
+    Optional<Product> findByShopIdAndNameContainingIgnoreCaseAndDeletedFalse(String shopId, String name);
+    Optional<Product> findByShopIdAndCategoryContainingIgnoreCaseAndDeletedFalse(String shopId, String category);
+
+
+    // Chúng ta sẽ cần thêm các phương thức tìm kiếm linh hoạt hơn
+    // Hoặc xây dựng query động trong ProductServiceImpl sử dụng MongoTemplate hoặc Aggregation
 }
 
 // File: src/main/java/com/example/sales/repository/PromotionRepository.java
@@ -442,12 +450,7 @@ public class Order extends BaseEntity {
 // File: src/main/java/com/example/sales/model/OrderItem.java
 package com.example.sales.model;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import lombok.*;
 
 @Getter
 @Setter
@@ -456,23 +459,23 @@ import lombok.Builder;
 @AllArgsConstructor
 @Builder
 public class OrderItem {
-    private String productId;
+    private String productId;       // ID của Product (master product)
+    private String branchProductId; // ID của BranchProduct (sản phẩm cụ thể tại chi nhánh)
     private String productName;
     private int quantity;
-    private double price;
-    private double priceAfterDiscount;
-    private String appliedPromotionId;
+    private double price;             // Giá gốc tại thời điểm đặt hàng
+    private double priceAfterDiscount; // Giá sau khi áp dụng khuyến mãi
+    private String appliedPromotionId; // ID của khuyến mãi đã áp dụng
 }
 
 // File: src/main/java/com/example/sales/model/Product.java
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Getter
@@ -483,6 +486,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @AllArgsConstructor
 @NoArgsConstructor
 @Document("products")
+// Đảm bảo SKU là duy nhất trong phạm vi mỗi shop
+@CompoundIndex(def = "{'shopId': 1, 'sku': 1}", unique = true)
 public class Product extends BaseEntity {
     @Id
     private String id;
@@ -493,23 +498,10 @@ public class Product extends BaseEntity {
     @NotBlank(message = "Danh mục không được để trống")
     private String category;
 
-    @Min(value = 0, message = "Số lượng không được âm")
-    private int quantity;
+    @NotBlank(message = "SKU không được để trống")
+    private String sku; // Mã sản phẩm SKU (duy nhất trong shop)
 
-    @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
-    private double price;
-
-    private String unit;
-    private String imageUrl;
-    private String description;
-    private String shopId;
-    private String branchId;
-
-    @Builder.Default
-    private boolean active = true;
-
-    private String productCode;
-    private String sku;
+    private String shopId; // Shop mà định nghĩa sản phẩm này thuộc về
 }
 
 // File: src/main/java/com/example/sales/model/Promotion.java
@@ -791,8 +783,8 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
+
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Getter
@@ -800,30 +792,94 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @ToString
 @EqualsAndHashCode(callSuper = true)
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
-@Document("branch_products")
-@CompoundIndex(def = "{'productId':1, 'branchId':1}", unique = true) // Đảm bảo duy nhất mỗi sản phẩm trong mỗi chi nhánh
+@AllArgsConstructor
+@Document("branch_products") // <-- Collection mới cho BranchProduct
 public class BranchProduct extends BaseEntity {
+
     @Id
     private String id;
 
-    @NotBlank
-    private String productId; // ID của sản phẩm trong Product collection
+    @NotBlank(message = "Product ID không được để trống")
+    private String productId; // Liên kết với Product (định nghĩa chung)
 
-    @NotBlank
-    private String shopId; // ID của Shop (denormalized for query efficiency)
+    @NotBlank(message = "Shop ID không được để trống")
+    private String shopId;
 
-    @NotBlank
-    private String branchId; // ID của chi nhánh
+    @NotBlank(message = "Branch ID không được để trống")
+    private String branchId; // Chi nhánh mà sản phẩm này thuộc về
 
     @Min(value = 0, message = "Số lượng không được âm")
-    private int quantity; // Số lượng tồn kho tại chi nhánh này
+    private int quantity;
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
-    private double price; // Giá bán tại chi nhánh này
+    private double price;
+
+    @NotBlank(message = "Đơn vị không được để trống")
+    private String unit;
+
+    private String imageUrl;
+    private String description;
 
     @Builder.Default
     private boolean activeInBranch = true; // Trạng thái kích hoạt tại chi nhánh này
+}
+
+// File: src/main/java/com/example/sales/repository/BranchProductRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.BranchProduct;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+@Repository
+public interface BranchProductRepository extends MongoRepository<BranchProduct, String> {
+
+    // Tìm BranchProduct theo productId và branchId (đảm bảo duy nhất)
+    Optional<BranchProduct> findByProductIdAndBranchIdAndDeletedFalse(String productId, String branchId);
+
+    // Tìm BranchProduct theo ID của BranchProduct, shopId và branchId
+    Optional<BranchProduct> findByIdAndShopIdAndBranchIdAndDeletedFalse(String id, String shopId, String branchId);
+
+    // Tìm tất cả BranchProduct trong một shop và branch cụ thể
+    Page<BranchProduct> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId, Pageable pageable);
+
+    // Tìm tất cả BranchProduct trong một shop (không lọc theo branchId)
+    Page<BranchProduct> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+
+    // Tìm các sản phẩm tồn kho thấp trong một branch
+    List<BranchProduct> findByShopIdAndBranchIdAndQuantityLessThanAndDeletedFalse(String shopId, String branchId, int threshold);
+
+    // Tìm các sản phẩm tồn kho thấp trên toàn shop (không lọc theo branchId)
+    List<BranchProduct> findByShopIdAndQuantityLessThanAndDeletedFalse(String shopId, int threshold);
+
+    // Tìm kiếm sản phẩm theo keyword trong tên hoặc danh mục (từ Product) và branchId
+    // Đây sẽ là một query phức tạp hơn, cần join hoặc sử dụng aggregation.
+    // Vì MongoRepository không hỗ trợ join trực tiếp giữa các collection,
+    // chúng ta sẽ cần thực hiện lookup trong service hoặc dùng custom repository.
+    // Tạm thời, chúng ta sẽ viết query tìm kiếm trên BranchProduct và để service join với Product.
+    // Hoặc nếu muốn tìm kiếm trực tiếp, cần sử dụng @Query với Aggregation.
+    // Giả định chúng ta sẽ tìm kiếm theo productId và sau đó service sẽ lọc theo keyword từ Product.
+    // Hoặc tạo một query để tìm kiếm dựa trên name/category của master Product.
+
+    // Đối với tìm kiếm, chúng ta sẽ cần dùng aggregation trong service hoặc một custom repository
+    // để join BranchProduct với Product. Hoặc, nếu tên/danh mục có thể nằm trên BranchProduct (như mô hình cũ),
+    // thì query sẽ đơn giản hơn. Nhưng trong mô hình mới, name/category nằm ở Product.
+    // Để giữ các repository đơn giản, các hàm tìm kiếm phức tạp (liên quan đến join/lookup)
+    // sẽ được xây dựng trong Service hoặc một Custom Repository Impl.
+    // Vì vậy, tôi sẽ để các query đơn giản ở đây, và bổ sung logic join trong ProductServiceImpl.
+
+    // Tìm tất cả BranchProduct theo productId
+    List<BranchProduct> findByProductIdAndDeletedFalse(String productId);
+
+    Page<BranchProduct> findByProductIdInAndShopIdAndBranchIdAndDeletedFalse(Set<String> productIds, String shopId, String branchId, Pageable pageable);
+
+    Page<BranchProduct> findByProductIdInAndShopIdAndDeletedFalse(Set<String> productIds, String shopId, Pageable pageable);
 }
 [END]

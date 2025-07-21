@@ -424,32 +424,36 @@ public class CustomerService {
 // File: src/main/java/com/example/sales/service/ExcelExportService.java
 package com.example.sales.service;
 
+import com.example.sales.dto.product.ProductResponse; // Import ProductResponse
 import com.example.sales.export.GenericExcelExporter;
-import com.example.sales.model.Product;
-import com.example.sales.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-
+import java.io.ByteArrayOutputStream; // Thêm import này
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.function.Function;
-
 @Service
 @RequiredArgsConstructor
 public class ExcelExportService {
-    private final ProductRepository productRepository;
+    // Chúng ta sẽ không cần ProductRepository trực tiếp ở đây nữa,
+    // mà sẽ sử dụng ProductService để lấy dữ liệu đã được map sang ProductResponse
+    private final ProductService productService; // Tiêm ProductService
 
+    // Phương thức exportExcel tổng quát có thể giữ nguyên nếu bạn vẫn dùng nó ở nơi khác
     public <T> ResponseEntity<byte[]> exportExcel(String fileName,
                                                   String sheetName,
                                                   List<String> headers,
                                                   List<T> data,
                                                   Function<T, List<String>> rowMapper) {
-        try {
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) { // Sử dụng ByteArrayOutputStream
             GenericExcelExporter<T> exporter = new GenericExcelExporter<>();
-            InputStream excelStream = exporter.export(sheetName, headers, data, rowMapper);
-            byte[] content = excelStream.readAllBytes();
+            exporter.export(sheetName, headers, data, rowMapper, bos); // Ghi vào OutputStream
+
+            byte[] content = bos.toByteArray(); // Lấy byte array từ OutputStream
 
             HttpHeaders responseHeaders = new HttpHeaders();
             responseHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
@@ -461,18 +465,58 @@ public class ExcelExportService {
         }
     }
 
+    // ✅ Phương thức exportProducts được cập nhật để sử dụng ProductService và ProductResponse
     public ResponseEntity<byte[]> exportProducts(String shopId, String branchId) throws IOException {
-        List<Product> products = branchId != null
-                ? productRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
-                : productRepository.findByShopIdAndDeletedFalse(shopId);
-        List<String> headers = List.of("ID", "Name", "Price", "Quantity", "Category", "SKU");
-        GenericExcelExporter<Product> exporter = new GenericExcelExporter<>();
-        InputStream stream = exporter.export("Products", headers, products, p -> List.of(
-                p.getId(), p.getName(), String.valueOf(p.getPrice()), String.valueOf(p.getQuantity()),
-                p.getCategory(), p.getSku()));
-        return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=products.xlsx")
-                .body(stream.readAllBytes());
+        // Lấy dữ liệu ProductResponse từ ProductService
+        // Sử dụng phân trang để tránh load quá nhiều dữ liệu cùng lúc
+        Pageable pageable = PageRequest.of(0, 1000); // Lấy 1000 sản phẩm mỗi lần
+        Page<ProductResponse> productPage;
+        List<ProductResponse> allProducts = new java.util.ArrayList<>();
+
+        do {
+            productPage = productService.getAllByShop(shopId, branchId, pageable);
+            allProducts.addAll(productPage.getContent());
+            if (productPage.hasNext()) {
+                pageable = productPage.nextPageable();
+            } else {
+                break;
+            }
+        } while (true);
+
+
+        // Định nghĩa headers cho file Excel
+        List<String> headers = List.of(
+                "SKU", "Tên sản phẩm", "Danh mục", "Chi nhánh ID",
+                "Số lượng", "Giá", "Đơn vị", "URL Hình ảnh", "Mô tả", "Trạng thái hoạt động"
+        );
+
+        // Định nghĩa cách map ProductResponse thành các dòng dữ liệu
+        Function<ProductResponse, List<String>> rowMapper = p -> List.of(
+                p.getSku(),
+                p.getName(),
+                p.getCategory(),
+                p.getBranchId(),
+                String.valueOf(p.getQuantity()),
+                String.valueOf(p.getPrice()),
+                p.getUnit(),
+                p.getImageUrl() != null ? p.getImageUrl() : "",
+                p.getDescription() != null ? p.getDescription() : "",
+                p.isActiveInBranch() ? "Có" : "Không"
+        );
+
+        // Sử dụng GenericExcelExporter để tạo file Excel
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            GenericExcelExporter<ProductResponse> exporter = new GenericExcelExporter<>();
+            exporter.export("Products", headers, allProducts, rowMapper, bos);
+            byte[] content = bos.toByteArray();
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("products.xlsx").build().toString())
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(content);
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể export file Excel sản phẩm", e);
+        }
     }
 }
 
@@ -592,57 +636,69 @@ public class FileUploadService {
 // File: src/main/java/com/example/sales/service/InventoryService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.ApiCode;
-import com.example.sales.dto.inventory.InventoryRequest;
-import com.example.sales.exception.BusinessException;
-import com.example.sales.model.InventoryTransaction;
-import com.example.sales.model.Product;
-import com.example.sales.repository.InventoryTransactionRepository;
-import com.example.sales.repository.ProductRepository;
-import lombok.RequiredArgsConstructor;
+import com.example.sales.dto.inventory.InventoryTransactionResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
 
-@Service
-@RequiredArgsConstructor
-public class InventoryService {
+public interface InventoryService {
 
-    private final ProductRepository productRepository;
-    private final InventoryTransactionRepository inventoryTransactionRepository;
+    /**
+     * Nhập thêm số lượng sản phẩm vào kho của chi nhánh.
+     * Tạo một InventoryTransaction loại IMPORT.
+     *
+     * @param userId ID của người dùng thực hiện.
+     * @param shopId ID của cửa hàng.
+     * @param branchProductId ID của BranchProduct cần nhập.
+     * @param quantity Số lượng nhập thêm.
+     * @param note Ghi chú cho giao dịch.
+     * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
+     */
+    int importProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note);
 
-    public InventoryTransaction createTransaction(String userId, String shopId, InventoryRequest request) {
-        Product product = productRepository.findByIdAndDeletedFalse(request.getProductId())
-                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+    /**
+     * Xuất bớt số lượng sản phẩm khỏi kho của chi nhánh.
+     * Tạo một InventoryTransaction loại EXPORT.
+     * Kiểm tra số lượng tồn kho trước khi xuất.
+     *
+     * @param userId ID của người dùng thực hiện.
+     * @param shopId ID của cửa hàng.
+     * @param branchProductId ID của BranchProduct cần xuất.
+     * @param quantity Số lượng xuất đi.
+     * @param note Ghi chú cho giao dịch.
+     * @param referenceId ID tham chiếu (ví dụ: ID đơn hàng).
+     * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
+     */
+    int exportProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note, String referenceId);
 
-        int change = switch (request.getType()) {
-            case IMPORT, ADJUSTMENT -> request.getQuantity();
-            case EXPORT -> -request.getQuantity();
-        };
+    /**
+     * Điều chỉnh số lượng tồn kho của sản phẩm tại chi nhánh.
+     * Có thể tăng hoặc giảm số lượng, tạo một InventoryTransaction loại ADJUSTMENT.
+     *
+     * @param userId ID của người dùng thực hiện.
+     * @param shopId ID của cửa hàng.
+     * @param branchProductId ID của BranchProduct cần điều chỉnh.
+     * @param newQuantity Số lượng tồn kho mong muốn sau điều chỉnh.
+     * @param note Ghi chú cho giao dịch.
+     * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
+     */
+    int adjustProductQuantity(String userId, String shopId, String branchId, String branchProductId, int newQuantity, String note);
 
-        int newQty = product.getQuantity() + change;
-        if (newQty < 0) {
-            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
-        }
+    /**
+     * Lấy lịch sử giao dịch tồn kho cho một sản phẩm cụ thể.
+     *
+     * @param productId ID của BranchProduct (sản phẩm chi nhánh).
+     * @param pageable Thông tin phân trang.
+     * @return Trang chứa danh sách các giao dịch tồn kho.
+     */
+    Page<InventoryTransactionResponse> getTransactionHistory(String branchProductId, Pageable pageable);
 
-        product.setQuantity(newQty);
-        productRepository.save(product);
-
-        InventoryTransaction tx = InventoryTransaction.builder()
-                .shopId(shopId)
-                .branchId(request.getBranchId())
-                .productId(product.getId())
-                .type(request.getType())
-                .quantity(change)
-                .note(request.getNote())
-                .build();
-
-        return inventoryTransactionRepository.save(tx);
-    }
-
-    public Page<InventoryTransaction> getHistory(String userId, String productId, Pageable pageable) {
-        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
-    }
+    /**
+     * Kiểm tra xem cửa hàng có yêu cầu quản lý tồn kho hay không.
+     *
+     * @param shopId ID của cửa hàng.
+     * @return true nếu cửa hàng yêu cầu quản lý tồn kho, ngược lại false.
+     */
+    boolean isInventoryManagementRequired(String shopId);
 }
 
 // File: src/main/java/com/example/sales/service/MailService.java
@@ -722,6 +778,7 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
 import com.example.sales.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // Thêm Log
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -730,18 +787,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects; // Thêm Objects
 
 @Service
 @RequiredArgsConstructor
+@Slf4j // Khởi tạo Log
 public class OrderService extends BaseService {
 
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
-    private final ProductRepository productRepository;
+    private final ProductRepository productRepository; // Vẫn cần để lấy thông tin Product master
+    private final BranchProductRepository branchProductRepository; // Thêm BranchProductRepository
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
     private final ShopRepository shopRepository;
-    private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final InventoryService inventoryService; // Thay thế InventoryTransactionRepository bằng InventoryService
     private final ShopUserService shopUserService;
 
     public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
@@ -760,22 +820,36 @@ public class OrderService extends BaseService {
         order.setPaid(false);
 
         String branchId = request.getBranchId();
-        if (branchId != null && !branchId.isBlank()) {
-            order.setBranchId(branchId);
+        if (branchId == null || branchId.isBlank()) {
+            log.error("Branch ID không được để trống");
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
+        order.setBranchId(branchId);
 
         double[] totals = {0, 0};
 
+        // Lấy thông tin shop để kiểm tra loại hình kinh doanh (có quản lý tồn kho không)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+
         List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
-            Product product = productRepository.findById(reqItem.getProductId())
+            // Lấy Product master
+            Product masterProduct = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
                     .filter(p -> p.getShopId().equals(shopId))
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+            // Lấy BranchProduct cho chi nhánh và sản phẩm cụ thể
+            BranchProduct branchProduct = branchProductRepository
+                    .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), branchId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
 
             double basePrice = reqItem.getPrice();
             double finalPrice = basePrice;
             String promoId = null;
 
-            Promotion promo = findApplicablePromotion(shopId, branchId, product.getId());
+            Promotion promo = findApplicablePromotion(shopId, branchId, masterProduct.getId()); // Áp dụng promo dựa trên masterProduct ID
             if (promo != null) {
                 promoId = promo.getId();
                 if (promo.getDiscountType() == DiscountType.PERCENT) {
@@ -785,13 +859,15 @@ public class OrderService extends BaseService {
                 }
             }
 
-            OrderItem item = new OrderItem();
-            item.setProductId(product.getId());
-            item.setProductName(product.getName());
-            item.setQuantity(reqItem.getQuantity());
-            item.setPrice(basePrice);
-            item.setPriceAfterDiscount(finalPrice);
-            item.setAppliedPromotionId(promoId);
+            OrderItem item = OrderItem.builder()
+                    .productId(masterProduct.getId()) // Lưu master product ID
+                    .branchProductId(branchProduct.getId()) // Lưu BranchProduct ID
+                    .productName(masterProduct.getName())
+                    .quantity(reqItem.getQuantity())
+                    .price(basePrice)
+                    .priceAfterDiscount(finalPrice)
+                    .appliedPromotionId(promoId)
+                    .build();
 
             totals[0] += reqItem.getQuantity();
             totals[1] += reqItem.getQuantity() * finalPrice;
@@ -804,19 +880,18 @@ public class OrderService extends BaseService {
         order.setTotalPrice(totals[1]);
 
         Order created = orderRepository.save(order);
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
 
+        // Điều chỉnh tồn kho sau khi tạo đơn hàng
         if (shop.getType().isTrackInventory()) {
             for (OrderItem item : created.getItems()) {
-                Product product = productRepository.findByIdAndDeletedFalse(item.getProductId())
-                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-                adjustInventory(product, shopId, created.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
-                        "Xuất kho theo đơn hàng " + created.getId(), created.getId());
+                // Sử dụng BranchProduct ID để điều chỉnh tồn kho
+                inventoryService.exportProductQuantity(
+                        userId, shopId, created.getBranchId(), item.getBranchProductId(),
+                        item.getQuantity(), "Xuất kho theo đơn hàng " + created.getId(), created.getId());
             }
         }
         occupyTable(created);
+        auditLogService.log(userId, shopId, created.getId(), "ORDER", "CREATED", "Tạo đơn hàng mới");
         return toResponse(created);
     }
 
@@ -829,6 +904,18 @@ public class OrderService extends BaseService {
 
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
+
+        // Hoàn kho khi hủy đơn hàng nếu shop có quản lý tồn kho
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+        if (inventoryService.isInventoryManagementRequired(shopId)) {
+            for (OrderItem item : order.getItems()) {
+                inventoryService.importProductQuantity(
+                        userId, shopId, order.getBranchId(), item.getBranchProductId(),
+                        item.getQuantity(), "Hoàn kho khi hủy đơn hàng " + orderId);
+            }
+        }
+
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
     }
 
@@ -846,7 +933,7 @@ public class OrderService extends BaseService {
         order.setStatus(OrderStatus.COMPLETED);
 
         Order updated = orderRepository.save(order);
-        releaseTable(updated);
+        releaseTable(updated); // Giải phóng bàn khi đơn hàng hoàn thành/thanh toán
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
                 "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
         return toResponse(updated);
@@ -855,17 +942,25 @@ public class OrderService extends BaseService {
     public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
         Order order = getOrderByShop(orderId, shopId);
 
-        if (order.getStatus() == OrderStatus.CANCELLED) {
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
+            log.error("Không thể cập nhật trạng thái đơn hàng đã hủy hoặc đã hoàn thành");
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (newStatus == OrderStatus.CANCELLED && order.isPaid()) {
+            log.error("Không thể hủy đơn hàng đã thanh toán");
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
+
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(newStatus);
 
         if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
+            // Nếu đơn hàng chuyển sang COMPLETED mà chưa thanh toán, coi như thanh toán bằng tiền mặt
             order.setPaid(true);
             order.setPaymentTime(LocalDateTime.now());
             order.setPaymentMethod("Cash");
+            releaseTable(order); // Giải phóng bàn
         }
 
         Order updated = orderRepository.save(order);
@@ -877,21 +972,16 @@ public class OrderService extends BaseService {
         return toResponse(updated);
     }
 
-    public List<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId) {
-        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status)
-                .stream().map(this::toResponse).toList();
-    }
-
     @Cacheable(value = "orders", key = "#orderId + '-' + #shopId")
-    public Order getOrderByShop(String orderId, String shopId) {
-        Order order = checkOrderExists(orderRepository, orderId, shopId);
-        shopUserService.requireAnyRole(shopId, order.getUserId(), ShopRole.OWNER, ShopRole.STAFF);
-        return order;
+    private Order getOrderByShop(String orderId, String shopId) {
+        return orderRepository.findByIdAndDeletedFalse(orderId)
+                .filter(o -> o.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
     }
 
     private void occupyTable(Order order) {
-        if (order.getTableId() != null) {
-            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+        if (order.getTableId() != null && !order.getTableId().isBlank()) { // Kiểm tra null và blank
+            tableRepository.findByIdAndDeletedFalse(order.getTableId()).ifPresent(table -> { // Tìm bàn không bị xóa
                 table.setStatus(TableStatus.OCCUPIED);
                 table.setCurrentOrderId(order.getId());
                 tableRepository.save(table);
@@ -900,8 +990,8 @@ public class OrderService extends BaseService {
     }
 
     private void releaseTable(Order order) {
-        if (order.getTableId() != null) {
-            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+        if (order.getTableId() != null && !order.getTableId().isBlank()) {
+            tableRepository.findByIdAndDeletedFalse(order.getTableId()).ifPresent(table -> {
                 table.setStatus(TableStatus.AVAILABLE);
                 table.setCurrentOrderId(null);
                 tableRepository.save(table);
@@ -913,46 +1003,20 @@ public class OrderService extends BaseService {
         LocalDateTime now = LocalDateTime.now();
         return promotionRepository.findByShopIdAndDeletedFalse(shopId).stream()
                 .filter(Promotion::isActive)
-                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
+                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId)) // Khuyến mãi có thể áp dụng cho toàn bộ shop (branchId = null) hoặc riêng cho 1 branch
                 .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))
                 .filter(p -> p.getApplicableProductIds() == null
                         || p.getApplicableProductIds().isEmpty()
-                        || p.getApplicableProductIds().contains(productId))
+                        || p.getApplicableProductIds().contains(productId)) // Áp dụng cho masterProduct ID
                 .findFirst()
                 .orElse(null);
     }
 
-    private void adjustInventory(Product product, String shopId, String branchId, InventoryType type, int qty,
-                                 String note, String referenceId) {
-
-        int change = switch (type) {
-            case EXPORT -> -qty;
-            case IMPORT, ADJUSTMENT -> qty;
-        };
-
-        int newQty = product.getQuantity() + change;
-        if (newQty < 0) {
-            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
-        }
-
-        product.setQuantity(newQty);
-        productRepository.save(product);
-
-        InventoryTransaction tx = InventoryTransaction.builder()
-                .shopId(shopId)
-                .branchId(branchId)
-                .productId(product.getId())
-                .type(type)
-                .quantity(change)
-                .note(note)
-                .referenceId(referenceId)
-                .build();
-
-        inventoryTransactionRepository.save(tx);
-    }
+    // Phương thức adjustInventory đã được loại bỏ và thay bằng InventoryService
 
     // File: OrderService.java
     public Page<OrderResponse> getOrdersByUser(String userId, String shopId, Pageable pageable) {
+        // Có thể thêm filter theo branchId nếu người dùng chỉ có quyền ở một branch cụ thể
         return orderRepository.findByShopIdAndDeletedFalse(shopId, pageable)
                 .map(this::toResponse);
     }
@@ -975,6 +1039,8 @@ public class OrderService extends BaseService {
             releaseTable(order);
             order.setTableId(request.getTableId());
             occupyTable(order);
+            auditLogService.log(userId, shopId, orderId, "ORDER", "TABLE_CHANGED",
+                    "Đổi bàn cho đơn hàng từ %s sang %s".formatted(order.getTableId(), request.getTableId()));
         }
 
         if (request.getNote() != null) {
@@ -985,26 +1051,34 @@ public class OrderService extends BaseService {
             Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
 
+            // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ (nếu shop có quản lý tồn kho)
             if (shop.getType().isTrackInventory()) {
-                // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ
                 for (OrderItem oldItem : order.getItems()) {
-                    Product product = productRepository.findByIdAndDeletedFalse(oldItem.getProductId())
-                            .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
-
-                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.IMPORT, oldItem.getQuantity(),
-                            "Hoàn kho khi cập nhật đơn hàng " + orderId, orderId);
+                    inventoryService.importProductQuantity(
+                            userId, shopId, order.getBranchId(), oldItem.getBranchProductId(), // Sử dụng BranchProduct ID
+                            oldItem.getQuantity(), "Hoàn kho khi cập nhật đơn hàng " + orderId);
                 }
             }
 
-            // 🔁 2. Áp dụng lại tồn kho cho danh sách mới
+            // 🔁 2. Áp dụng lại tồn kho cho danh sách mới và tính toán lại tổng tiền
+            double[] totals = {0, 0};
+
             List<OrderItem> updatedItems = request.getItems().stream().map(reqItem -> {
-                Product product = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
+                // Lấy Product master
+                Product masterProduct = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
+                        .filter(p -> p.getShopId().equals(shopId))
                         .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                // Lấy BranchProduct cho chi nhánh và sản phẩm cụ thể
+                BranchProduct branchProduct = branchProductRepository
+                        .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), order.getBranchId()) // Lấy branchId từ order
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
                 double basePrice = reqItem.getPrice();
                 double finalPrice = basePrice;
                 String promoId = null;
 
-                Promotion promo = findApplicablePromotion(shopId, order.getBranchId(), product.getId());
+                Promotion promo = findApplicablePromotion(shopId, order.getBranchId(), masterProduct.getId());
                 if (promo != null) {
                     promoId = promo.getId();
                     if (promo.getDiscountType() == DiscountType.PERCENT) {
@@ -1015,26 +1089,30 @@ public class OrderService extends BaseService {
                 }
 
                 OrderItem item = OrderItem.builder()
-                        .productId(product.getId())
-                        .productName(product.getName())
+                        .productId(masterProduct.getId())
+                        .branchProductId(branchProduct.getId()) // Lưu BranchProduct ID
+                        .productName(masterProduct.getName())
                         .quantity(reqItem.getQuantity())
                         .price(basePrice)
                         .priceAfterDiscount(finalPrice)
                         .appliedPromotionId(promoId)
                         .build();
 
-                // Trừ kho mới
+                // Trừ kho mới (nếu shop có quản lý tồn kho)
                 if (shop.getType().isTrackInventory()) {
-                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
-                            "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
+                    inventoryService.exportProductQuantity(
+                            userId, shopId, order.getBranchId(), item.getBranchProductId(), // Sử dụng BranchProduct ID
+                            item.getQuantity(), "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
                 }
 
+                totals[0] += reqItem.getQuantity();
+                totals[1] += reqItem.getQuantity() * finalPrice;
                 return item;
             }).toList();
 
             order.setItems(updatedItems);
-            order.setTotalAmount(updatedItems.stream().mapToInt(OrderItem::getQuantity).sum());
-            order.setTotalPrice(updatedItems.stream().mapToDouble(i -> i.getQuantity() * i.getPriceAfterDiscount()).sum());
+            order.setTotalAmount(totals[0]);
+            order.setTotalPrice(totals[1]);
         }
 
         Order updated = orderRepository.save(order);
@@ -1046,6 +1124,7 @@ public class OrderService extends BaseService {
         return OrderResponse.builder()
                 .id(order.getId())
                 .tableId(order.getTableId())
+                .branchId(order.getBranchId()) // Thêm branchId vào response
                 .note(order.getNote())
                 .status(order.getStatus())
                 .paid(order.isPaid())
@@ -1061,6 +1140,7 @@ public class OrderService extends BaseService {
     private OrderItemResponse toItemResponse(OrderItem item) {
         return OrderItemResponse.builder()
                 .productId(item.getProductId())
+                .branchProductId(item.getBranchProductId()) // Thêm branchProductId vào response
                 .productName(item.getProductName())
                 .quantity(item.getQuantity())
                 .price(item.getPrice())
@@ -1134,101 +1214,6 @@ public class PaymentService {
     }
 }
 
-// File: src/main/java/com/example/sales/service/ProductImportService.java
-package com.example.sales.service;
-
-import com.example.sales.dto.product.ProductRequest;
-import lombok.RequiredArgsConstructor;
-import org.apache.poi.ss.usermodel.*;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.InputStream;
-import java.util.*;
-
-@Service
-@RequiredArgsConstructor
-public class ProductImportService {
-
-    private final ProductService productService;
-    private final AuditLogService auditLogService;
-
-    public Map<String, Object> importExcel(String shopId, String branchId, MultipartFile file) {
-        int successCount = 0;
-        int failCount = 0;
-        List<String> errors = new ArrayList<>();
-
-        try (InputStream inputStream = file.getInputStream();
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
-
-            Sheet sheet = workbook.getSheetAt(0);
-            int rows = sheet.getPhysicalNumberOfRows();
-
-            for (int i = 1; i < rows; i++) {
-                Row row = sheet.getRow(i);
-                try {
-                    ProductRequest req = parseRow(row);
-                    req.setBranchId(branchId);
-                    var product = productService.createProduct(shopId, req);
-                    auditLogService.log(null, shopId, product.getId(), "PRODUCT", "IMPORTED",
-                            String.format("Nhập sản phẩm từ Excel: %s (Mã: %s)", product.getName(), product.getProductCode()));
-                    successCount++;
-                } catch (Exception ex) {
-                    failCount++;
-                    errors.add("Dòng " + (i + 1) + ": " + ex.getMessage());
-                }
-            }
-
-        } catch (Exception e) {
-            throw new RuntimeException("Không thể đọc file Excel", e);
-        }
-
-        return Map.of(
-                "success", successCount,
-                "failed", failCount,
-                "errors", errors
-        );
-    }
-
-    private ProductRequest parseRow(Row row) {
-        ProductRequest req = new ProductRequest();
-        req.setName(getString(row, 0));
-        req.setProductCode(getString(row, 1));
-        req.setCategory(getString(row, 2));
-        req.setQuantity(getInt(row, 3));
-        req.setPrice(getDouble(row, 4));
-        req.setUnit(getString(row, 5));
-        req.setImageUrl(getString(row, 6));
-        req.setDescription(getString(row, 7));
-
-        String status = getString(row, 8).toLowerCase();
-        req.setActive(!status.contains("ngưng"));
-
-        return req;
-    }
-
-    private String getString(Row row, int i) {
-        Cell cell = row.getCell(i, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
-        return cell.toString().trim();
-    }
-
-    private int getInt(Row row, int i) {
-        try {
-            return (int) Double.parseDouble(getString(row, i));
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    private double getDouble(Row row, int i) {
-        try {
-            return Double.parseDouble(getString(row, i));
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-}
-
 // File: src/main/java/com/example/sales/service/ProductService.java
 package com.example.sales.service;
 
@@ -1240,289 +1225,25 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface ProductService {
-
-    /**
-     * Creates a new product for a specific shop.
-     *
-     * @param shopId  the ID of the shop
-     * @param request the product details
-     * @return the created product's response
-     */
     ProductResponse createProduct(String shopId, ProductRequest request);
 
-    /**
-     * Updates an existing product.
-     *
-     * @param userId  the ID of the user performing the update
-     * @param shopId  the ID of the shop
-     * @param id      the ID of the product to update
-     * @param request the updated product details
-     * @return the updated product's response
-     */
-    ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request);
+    // id ở đây là id của BranchProduct
+    ProductResponse updateProduct(String userId, String shopId, String branchId, String id, ProductRequest request);
 
-    /**
-     * Soft deletes a product from the specified shop.
-     *
-     * @param shopId the ID of the shop
-     * @param id     the ID of the product to delete
-     */
-    void deleteProduct(String shopId, String id);
+    // id ở đây là id của BranchProduct
+    void deleteProduct(String userId, String shopId, String branchId, String id);
 
-    /**
-     * Retrieves details of a specific product.
-     *
-     * @param shopId the ID of the shop
-     * @param id     the ID of the product
-     * @return the product's response
-     */
-    ProductResponse getProduct(String shopId, String id);
+    // id ở đây là id của BranchProduct
+    ProductResponse getProduct(String shopId, String branchId, String id);
 
-    /**
-     * Retrieves a paginated list of products for a shop.
-     *
-     * @param shopId   the ID of the shop
-     * @param pageable the pagination information
-     * @return a paginated list of product responses
-     */
-    Page<ProductResponse> getAllByShop(String shopId, Pageable pageable);
+    Page<ProductResponse> getAllByShop(String shopId, String branchId, Pageable pageable);
 
-    /**
-     * Toggles the active status of a product.
-     *
-     * @param shopId    the ID of the shop
-     * @param productId the ID of the product
-     * @return the updated product's response
-     */
-    ProductResponse toggleActive(String shopId, String productId);
+    // productId ở đây là id của BranchProduct để toggle activeInBranch
+    ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId);
 
-    /**
-     * Retrieves a list of products with low stock levels.
-     *
-     * @param shopId   the ID of the shop
-     * @param threshold the low stock threshold
-     * @return a list of products with low stock
-     */
-    List<ProductResponse> getLowStockProducts(String shopId, int threshold);
+    List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold);
 
-    //searchProducts
-    /**
-     * Searches for products in a shop based on a keyword.
-     *
-     * @param shopId   the ID of the shop
-     * @param keyword  the search keyword
-     * @param pageable the pagination information
-     * @return a paginated list of product responses matching the search criteria
-     */
-    Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable);
-}
-
-// File: src/main/java/com/example/sales/service/ProductServiceImpl.java
-package com.example.sales.service;
-
-import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopType;
-import com.example.sales.dto.product.ProductRequest;
-import com.example.sales.dto.product.ProductResponse;
-import com.example.sales.exception.BusinessException;
-import com.example.sales.model.Product;
-import com.example.sales.model.Shop;
-import com.example.sales.repository.ProductRepository;
-import com.example.sales.repository.ShopRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-/**
- * Triển khai dịch vụ quản lý sản phẩm.
- */
-@Service
-@RequiredArgsConstructor
-public class ProductServiceImpl extends BaseService implements ProductService {
-    private final ProductRepository productRepository;
-    private final ShopRepository shopRepository;
-    private final AuditLogService auditLogService;
-
-    @Override
-    public ProductResponse createProduct(String shopId, ProductRequest request) {
-        // Kiểm tra sự tồn tại của cửa hàng
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
-
-        // Kiểm tra branchId nếu có
-        if (!StringUtils.hasText(request.getBranchId())) {
-            throw new BusinessException(ApiCode.BRANCH_NOT_FOUND);
-        }
-
-        // Tạo sku nếu không được cung cấp
-        String sku = request.getSku() != null && !request.getSku().isBlank()
-                ? request.getSku()
-                : UUID.randomUUID().toString();
-
-        // Tạo sản phẩm sử dụng builder pattern
-        Product product = Product.builder()
-                .shopId(shopId)
-                .name(request.getName())
-                .price(request.getPrice())
-                .quantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0)
-                .category(request.getCategory())
-                .sku(sku)
-                .imageUrl(request.getImageUrl())
-                .description(request.getDescription())
-                .active(true)
-                .unit(request.getUnit())
-                .branchId(request.getBranchId())
-                .build();
-
-        product = productRepository.save(product);
-
-        // Ghi log kiểm tra
-        auditLogService.log(null, shopId, product.getId(), "PRODUCT", "CREATED",
-                String.format("Tạo sản phẩm: %s (Mã: %s)", product.getName(), product.getSku()));
-
-        return toResponse(product);
-    }
-
-    @Override
-    public ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request) {
-        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(id, shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
-
-        // Lưu các giá trị cũ để ghi log
-        double oldPrice = product.getPrice();
-        String oldCategory = product.getCategory();
-        int oldQuantity = product.getQuantity();
-
-        // Lấy thông tin cửa hàng để kiểm tra ShopType
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
-
-        // Cập nhật các trường
-        product.setName(request.getName());
-        product.setPrice(request.getPrice());
-        product.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
-        product.setCategory(request.getCategory());
-        product.setImageUrl(request.getImageUrl());
-        product.setDescription(request.getDescription());
-        product.setUnit(request.getUnit());
-
-        product = productRepository.save(product);
-
-        // Ghi log kiểm tra cho các thay đổi
-        if (oldPrice != request.getPrice()) {
-            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "PRICE_CHANGED",
-                    String.format("Thay đổi giá từ %.2f → %.2f", oldPrice, request.getPrice()));
-        }
-        if (!oldCategory.equals(request.getCategory())) {
-            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "CATEGORY_CHANGED",
-                    String.format("Chuyển danh mục từ %s → %s", oldCategory, request.getCategory()));
-        }
-        if (oldQuantity != request.getQuantity()) {
-            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "QUANTITY_CHANGED",
-                    String.format("Thay đổi tồn kho từ %d → %d", oldQuantity, request.getQuantity()));
-        }
-
-        return toResponse(product);
-    }
-
-    @Override
-    public void deleteProduct(String shopId, String id) {
-        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(id, shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
-        product.setDeleted(true);
-        product.setUpdatedAt(LocalDateTime.now());
-        productRepository.save(product);
-
-        // Ghi log kiểm tra
-        auditLogService.log(null, shopId, product.getId(), "PRODUCT", "DELETED",
-                String.format("Xoá sản phẩm: %s (Mã: %s)", product.getName(), product.getSku()));
-    }
-
-    @Override
-    public ProductResponse getProduct(String shopId, String id) {
-        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(id, shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
-        return toResponse(product);
-    }
-
-    @Cacheable(value = "products", key = "#shopId")
-    @Override
-    public Page<ProductResponse> getAllByShop(String shopId, Pageable pageable) {
-        return productRepository.findByShopIdAndDeletedFalse(shopId, pageable)
-                .map(this::toResponse);
-    }
-
-    @Override
-    public ProductResponse toggleActive(String shopId, String productId) {
-        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(productId, shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
-        product.setActive(!product.isActive());
-        product.setUpdatedAt(LocalDateTime.now());
-        product = productRepository.save(product);
-
-        // Ghi log kiểm tra
-        String action = product.isActive() ? "ACTIVATED" : "DEACTIVATED";
-        auditLogService.log(null, shopId, product.getId(), "PRODUCT", action,
-                String.format("%s sản phẩm: %s (Mã: %s)",
-                        product.isActive() ? "Kích hoạt" : "Ngưng bán",
-                        product.getName(), product.getSku()));
-
-        return toResponse(product);
-    }
-
-    @Override
-    public List<ProductResponse> getLowStockProducts(String shopId, int threshold) {
-        // Kiểm tra loại cửa hàng
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
-
-        if (!requiresInventory(shop.getType())) {
-            return List.of();
-        }
-
-        return productRepository.findByShopIdAndQuantityLessThanAndDeletedFalse(shopId, threshold)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable) {
-        return productRepository.findByShopIdAndKeyword(shopId, keyword, pageable)
-                .map(this::toResponse);
-    }
-
-    private ProductResponse toResponse(Product product) {
-        return ProductResponse.builder()
-                .id(product.getId())
-                .name(product.getName())
-                .price(product.getPrice())
-                .quantity(product.getQuantity())
-                .category(product.getCategory())
-                .sku(product.getSku())
-                .imageUrl(product.getImageUrl())
-                .description(product.getDescription())
-                .active(product.isActive())
-                .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
-                .unit(product.getUnit())
-                .build();
-    }
-
-    private boolean requiresInventory(ShopType type) {
-        return switch (type) {
-            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
-            case RESTAURANT, CAFE, BAR, OTHER -> false;
-        };
-    }
+    Page<ProductResponse> searchProducts(String shopId, String branchId, String keyword, Pageable pageable);
 }
 
 // File: src/main/java/com/example/sales/service/PromotionService.java
@@ -2498,4 +2219,746 @@ public class ProductSearchHelper {
     }
 }
 
+// File: src/main/java/com/example/sales/service/impl/ProductServiceImpl.java
+package com.example.sales.service.impl;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopType;
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.BranchProduct;
+import com.example.sales.model.Product;
+import com.example.sales.model.Shop;
+import com.example.sales.repository.BranchProductRepository;
+import com.example.sales.repository.ProductRepository;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.service.AuditLogService;
+import com.example.sales.service.BaseService;
+import com.example.sales.service.ProductService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * Triển khai dịch vụ quản lý sản phẩm với mô hình Product và BranchProduct.
+ */
+@Service
+@RequiredArgsConstructor
+public class ProductServiceImpl extends BaseService implements ProductService {
+    private final ProductRepository productRepository;
+    private final BranchProductRepository branchProductRepository; // New repository
+    private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
+
+    @Override
+    public ProductResponse createProduct(String shopId, ProductRequest request) {
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // 1. Find or Create Master Product
+        // Generate SKU if not provided or if it's blank
+        String sku = StringUtils.hasText(request.getSku())
+                ? request.getSku()
+                : UUID.randomUUID().toString();
+
+        Optional<Product> existingProduct = productRepository.findByShopIdAndSkuAndDeletedFalse(shopId, sku);
+        Product product;
+        if (existingProduct.isPresent()) {
+            product = existingProduct.get();
+            // Update master product details if provided in request
+            product.setName(request.getName());
+            product.setCategory(request.getCategory());
+            productRepository.save(product);
+        } else {
+            // Create a new master product definition
+            product = Product.builder()
+                    .shopId(shopId)
+                    .name(request.getName())
+                    .category(request.getCategory())
+                    .sku(sku)
+                    .build();
+            product = productRepository.save(product);
+        }
+
+        // 2. Create BranchProduct
+        // Check if BranchProduct already exists for this productId and branchId
+        if (branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), request.getBranchId()).isPresent()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        BranchProduct branchProduct = BranchProduct.builder()
+                .productId(product.getId())
+                .shopId(shopId)
+                .branchId(request.getBranchId())
+                .quantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0)
+                .price(request.getPrice())
+                .unit(request.getUnit())
+                .imageUrl(request.getImageUrl())
+                .description(request.getDescription())
+                .activeInBranch(request.isActive()) // Map active from request to activeInBranch
+                .build();
+
+        branchProduct = branchProductRepository.save(branchProduct);
+
+        auditLogService.log(null, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "CREATED",
+                String.format("Tạo sản phẩm '%s' (SKU: %s) tại chi nhánh %s. ID BranchProduct: %s",
+                        product.getName(), product.getSku(), branchProduct.getBranchId(), branchProduct.getId()));
+
+        return toResponse(branchProduct, product);
+    }
+
+    @Override
+    public ProductResponse updateProduct(String userId, String shopId, String branchId, String id, ProductRequest request) {
+        // id ở đây là id của BranchProduct
+        BranchProduct branchProduct = branchProductRepository.findByIdAndShopIdAndBranchIdAndDeletedFalse(id, shopId, branchId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(branchProduct.getProductId(), shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND)); // Should not happen if data is consistent
+
+        // Save old values for audit log from BranchProduct
+        double oldPrice = branchProduct.getPrice();
+        int oldQuantity = branchProduct.getQuantity();
+        boolean oldActiveInBranch = branchProduct.isActiveInBranch();
+
+        // Save old values for audit log from Product
+        String oldName = product.getName();
+        String oldCategory = product.getCategory();
+
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // Update Master Product fields (if changed via this request)
+        if (!product.getName().equals(request.getName())) {
+            product.setName(request.getName());
+        }
+        if (!product.getCategory().equals(request.getCategory())) {
+            product.setCategory(request.getCategory());
+        }
+        // SKU is usually not updated via product request
+        product = productRepository.save(product); // Save master product changes
+
+        // Update BranchProduct fields
+        branchProduct.setPrice(request.getPrice());
+        branchProduct.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
+        branchProduct.setUnit(request.getUnit());
+        branchProduct.setImageUrl(request.getImageUrl());
+        branchProduct.setDescription(request.getDescription());
+        branchProduct.setActiveInBranch(request.isActive()); // Update active status for this branch
+        branchProduct.setUpdatedAt(LocalDateTime.now());
+
+        branchProduct = branchProductRepository.save(branchProduct);
+
+        // Audit logs for changes
+        if (!oldName.equals(request.getName())) {
+            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "NAME_CHANGED",
+                    String.format("Thay đổi tên sản phẩm chung từ '%s' → '%s'", oldName, request.getName()));
+        }
+        if (!oldCategory.equals(request.getCategory())) {
+            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "CATEGORY_CHANGED",
+                    String.format("Thay đổi danh mục sản phẩm chung từ '%s' → '%s'", oldCategory, request.getCategory()));
+        }
+        if (oldPrice != request.getPrice()) {
+            auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "PRICE_CHANGED",
+                    String.format("Thay đổi giá sản phẩm '%s' từ %.2f → %.2f tại chi nhánh %s", product.getName(), oldPrice, request.getPrice(), branchProduct.getBranchId()));
+        }
+        if (requiresInventory(shop.getType()) && oldQuantity != request.getQuantity()) {
+            auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "QUANTITY_CHANGED",
+                    String.format("Thay đổi tồn kho sản phẩm '%s' từ %d → %d tại chi nhánh %s", product.getName(), oldQuantity, request.getQuantity(), branchProduct.getBranchId()));
+        }
+        if (oldActiveInBranch != request.isActive()) {
+            String action = request.isActive() ? "ACTIVATED" : "DEACTIVATED";
+            auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", action,
+                    String.format("%s sản phẩm '%s' tại chi nhánh %s",
+                            request.isActive() ? "Kích hoạt bán" : "Ngưng bán", product.getName(), branchProduct.getBranchId()));
+        }
+
+        return toResponse(branchProduct, product);
+    }
+
+    @Override
+    public void deleteProduct(String userId, String shopId, String branchId, String id) {
+        BranchProduct branchProduct = branchProductRepository.findByIdAndShopIdAndBranchIdAndDeletedFalse(id, shopId, branchId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        branchProduct.setDeleted(true);
+        branchProduct.setUpdatedAt(LocalDateTime.now());
+        branchProductRepository.save(branchProduct);
+
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(branchProduct.getProductId(), shopId)
+                .orElse(null); // Master product might already be deleted or not found for some reason
+
+        String productName = (product != null) ? product.getName() : "Unknown Product";
+        String productSku = (product != null) ? product.getSku() : "Unknown SKU";
+
+        auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "DELETED",
+                String.format("Xoá sản phẩm '%s' (SKU: %s) tại chi nhánh %s. ID BranchProduct: %s",
+                        productName, productSku, branchProduct.getBranchId(), branchProduct.getId()));
+    }
+
+    @Override
+    public ProductResponse getProduct(String shopId, String branchId, String id) {
+        BranchProduct branchProduct = branchProductRepository.findByIdAndShopIdAndBranchIdAndDeletedFalse(id, shopId, branchId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(branchProduct.getProductId(), shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        return toResponse(branchProduct, product);
+    }
+
+    @Cacheable(value = "branch_products_by_shop_branch", key = "#shopId + ':' + #branchId")
+    @Override
+    public Page<ProductResponse> getAllByShop(String shopId, String branchId, Pageable pageable) {
+        Page<BranchProduct> branchProductsPage;
+        if (StringUtils.hasText(branchId)) {
+            branchProductsPage = branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
+        } else {
+            branchProductsPage = branchProductRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+        }
+
+        Set<String> productIds = branchProductsPage.getContent().stream()
+                .map(BranchProduct::getProductId)
+                .collect(Collectors.toSet());
+
+        Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        List<ProductResponse> productResponses = branchProductsPage.getContent().stream()
+                .map(bp -> toResponse(bp, productsMap.get(bp.getProductId())))
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(productResponses, pageable, branchProductsPage.getTotalElements());
+    }
+
+    @Override
+    public ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId) {
+        BranchProduct branchProduct = branchProductRepository.findByIdAndShopIdAndBranchIdAndDeletedFalse(branchProductId, shopId, branchId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        branchProduct.setActiveInBranch(!branchProduct.isActiveInBranch());
+        branchProduct.setUpdatedAt(LocalDateTime.now());
+        branchProduct = branchProductRepository.save(branchProduct);
+
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(branchProduct.getProductId(), shopId)
+                .orElse(null);
+
+        String productName = (product != null) ? product.getName() : "Unknown Product";
+        String productSku = (product != null) ? product.getSku() : "Unknown SKU";
+
+        String action = branchProduct.isActiveInBranch() ? "ACTIVATED" : "DEACTIVATED";
+        auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", action,
+                String.format("%s sản phẩm '%s' (SKU: %s) tại chi nhánh %s. ID BranchProduct: %s",
+                        branchProduct.isActiveInBranch() ? "Kích hoạt bán" : "Ngưng bán",
+                        productName, productSku, branchProduct.getBranchId(), branchProduct.getId()));
+
+        return toResponse(branchProduct, product);
+    }
+
+    @Override
+    public List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold) {
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        if (!requiresInventory(shop.getType())) {
+            return List.of();
+        }
+
+        List<BranchProduct> lowStockBranchProducts;
+        if (StringUtils.hasText(branchId)) {
+            lowStockBranchProducts = branchProductRepository.findByShopIdAndBranchIdAndQuantityLessThanAndDeletedFalse(shopId, branchId, threshold);
+        } else {
+            lowStockBranchProducts = branchProductRepository.findByShopIdAndQuantityLessThanAndDeletedFalse(shopId, threshold);
+        }
+
+        Set<String> productIds = lowStockBranchProducts.stream()
+                .map(BranchProduct::getProductId)
+                .collect(Collectors.toSet());
+
+        Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        return lowStockBranchProducts.stream()
+                .map(bp -> toResponse(bp, productsMap.get(bp.getProductId())))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ProductResponse> searchProducts(String shopId, String branchId, String keyword, Pageable pageable) {
+        if (!StringUtils.hasText(keyword)) {
+            // If no keyword, return all products by shop/branch
+            return getAllByShop(shopId, branchId, pageable);
+        }
+
+        // 1. Search for matching master Products by keyword
+        List<Product> matchedProductsByName = productRepository.findByShopIdAndNameContainingIgnoreCaseAndDeletedFalse(shopId, keyword).stream().toList();
+        List<Product> matchedProductsByCategory = productRepository.findByShopIdAndCategoryContainingIgnoreCaseAndDeletedFalse(shopId, keyword).stream().toList();
+
+        // Combine unique product IDs
+        Set<String> productIdsFromKeyword = matchedProductsByName.stream()
+                .map(Product::getId)
+                .collect(Collectors.toSet());
+        matchedProductsByCategory.forEach(p -> productIdsFromKeyword.add(p.getId()));
+
+        if (productIdsFromKeyword.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0); // No master products matched
+        }
+
+        // 2. Fetch BranchProducts associated with these master Product IDs, filtering by branchId
+        Page<BranchProduct> branchProductsPage;
+        if (StringUtils.hasText(branchId)) {
+            branchProductsPage = branchProductRepository.findByProductIdInAndShopIdAndBranchIdAndDeletedFalse(productIdsFromKeyword, shopId, branchId, pageable);
+        } else {
+            branchProductsPage = branchProductRepository.findByProductIdInAndShopIdAndDeletedFalse(productIdsFromKeyword, shopId, pageable);
+        }
+
+        // 3. Re-fetch all master Products for the current page of BranchProducts
+        // This ensures we have the master product details for response mapping
+        Set<String> currentPageProductIds = branchProductsPage.getContent().stream()
+                .map(BranchProduct::getProductId)
+                .collect(Collectors.toSet());
+        Map<String, Product> productsMap = productRepository.findAllById(currentPageProductIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        // 4. Map to ProductResponse
+        List<ProductResponse> productResponses = branchProductsPage.getContent().stream()
+                .map(bp -> toResponse(bp, productsMap.get(bp.getProductId())))
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(productResponses, pageable, branchProductsPage.getTotalElements());
+    }
+
+    private ProductResponse toResponse(BranchProduct branchProduct, Product product) {
+        if (branchProduct == null || product == null) {
+            return null; // Handle cases where product might be null (e.g., deleted master product)
+        }
+        return ProductResponse.builder()
+                .id(branchProduct.getId()) // ID của BranchProduct
+                .productId(product.getId()) // ID của Master Product
+                .name(product.getName())
+                .category(product.getCategory())
+                .sku(product.getSku())
+                .quantity(branchProduct.getQuantity())
+                .price(branchProduct.getPrice())
+                .unit(branchProduct.getUnit())
+                .imageUrl(branchProduct.getImageUrl())
+                .description(branchProduct.getDescription())
+                .branchId(branchProduct.getBranchId())
+                .activeInBranch(branchProduct.isActiveInBranch())
+                .createdAt(branchProduct.getCreatedAt()) // createdAt/updatedAt của BranchProduct
+                .updatedAt(branchProduct.getUpdatedAt())
+                .build();
+    }
+
+    private boolean requiresInventory(ShopType type) {
+        return switch (type) {
+            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
+            case RESTAURANT, CAFE, BAR, OTHER -> false;
+        };
+    }
+}
+
+// File: src/main/java/com/example/sales/service/ExcelImportService.java
+package com.example.sales.service;
+
+import java.io.InputStream;
+
+public interface ExcelImportService {
+    /**
+     * Nhập sản phẩm từ file Excel vào một chi nhánh cụ thể của một cửa hàng.
+     * Mỗi dòng trong file Excel sẽ tạo/cập nhật một BranchProduct và định nghĩa Product chung nếu cần.
+     *
+     * @param shopId ID của cửa hàng.
+     * @param branchId ID của chi nhánh mà sản phẩm sẽ được nhập vào.
+     * @param inputStream InputStream của file Excel.
+     * @return Số lượng sản phẩm (BranchProduct) được nhập/cập nhật thành công.
+     */
+    int importProducts(String shopId, String branchId, InputStream inputStream);
+}
+
+// File: src/main/java/com/example/sales/service/impl/ExcelImportServiceImpl.java
+package com.example.sales.service.impl;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.BranchProduct;
+import com.example.sales.model.Product;
+import com.example.sales.repository.BranchProductRepository;
+import com.example.sales.repository.ProductRepository;
+import com.example.sales.service.ExcelImportService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ExcelImportServiceImpl implements ExcelImportService {
+
+    private final ProductRepository productRepository;
+    private final BranchProductRepository branchProductRepository;
+
+    @Override
+    @Transactional
+    public int importProducts(String shopId, String branchId, InputStream inputStream) {
+        int importedCount = 0;
+        try (Workbook workbook = WorkbookFactory.create(inputStream)) {
+            Sheet sheet = workbook.getSheetAt(0); // Lấy sheet đầu tiên
+
+            // Bỏ qua hàng tiêu đề
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                try {
+                    // Đọc dữ liệu từ các cột
+                    String sku = getCellValue(row.getCell(0)); // Giả định SKU ở cột 0
+                    String name = getCellValue(row.getCell(1)); // Giả định Tên ở cột 1
+                    String category = getCellValue(row.getCell(2)); // Giả định Danh mục ở cột 2
+                    String unit = getCellValue(row.getCell(3)); // Giả định Đơn vị ở cột 3
+                    double price = getNumericCellValue(row.getCell(4)); // Giả định Giá ở cột 4
+                    int quantity = (int) getNumericCellValue(row.getCell(5)); // Giả định Số lượng ở cột 5
+                    String imageUrl = getCellValue(row.getCell(6)); // Giả định Ảnh ở cột 6
+                    String description = getCellValue(row.getCell(7)); // Giả định Mô tả ở cột 7
+
+                    if (!StringUtils.hasText(sku) || !StringUtils.hasText(name) || !StringUtils.hasText(category) || !StringUtils.hasText(unit)) {
+                        log.warn("Bỏ qua dòng {}: Thiếu SKU, tên, danh mục hoặc đơn vị.", i + 1);
+                        continue;
+                    }
+
+                    // 1. Tìm hoặc tạo Product (định nghĩa chung)
+                    Optional<Product> existingProduct = productRepository.findByShopIdAndSkuAndDeletedFalse(shopId, sku);
+                    Product product;
+                    if (existingProduct.isPresent()) {
+                        product = existingProduct.get();
+                        // Cập nhật thông tin chung nếu có thay đổi
+                        product.setName(name);
+                        product.setCategory(category);
+                        productRepository.save(product);
+                    } else {
+                        product = Product.builder()
+                                .shopId(shopId)
+                                .name(name)
+                                .category(category)
+                                .sku(sku)
+                                .build();
+                        product = productRepository.save(product);
+                    }
+
+                    // 2. Tạo hoặc cập nhật BranchProduct
+                    Optional<BranchProduct> existingBranchProduct = branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), branchId);
+                    BranchProduct branchProduct;
+                    if (existingBranchProduct.isPresent()) {
+                        branchProduct = existingBranchProduct.get();
+                        branchProduct.setQuantity(quantity);
+                        branchProduct.setPrice(price);
+                        branchProduct.setUnit(unit);
+                        branchProduct.setImageUrl(imageUrl);
+                        branchProduct.setDescription(description);
+                        branchProduct.setActiveInBranch(true); // Mặc định kích hoạt khi nhập
+                        branchProductRepository.save(branchProduct);
+                        log.info("Cập nhật BranchProduct cho SKU '{}' tại chi nhánh '{}'", sku, branchId);
+                    } else {
+                        branchProduct = BranchProduct.builder()
+                                .productId(product.getId())
+                                .shopId(shopId)
+                                .branchId(branchId)
+                                .quantity(quantity)
+                                .price(price)
+                                .unit(unit)
+                                .imageUrl(imageUrl)
+                                .description(description)
+                                .activeInBranch(true) // Mặc định kích hoạt khi nhập
+                                .build();
+                        branchProductRepository.save(branchProduct);
+                        log.info("Tạo mới BranchProduct cho SKU '{}' tại chi nhánh '{}'", sku, branchId);
+                    }
+                    importedCount++;
+                } catch (Exception e) {
+                    log.error("Lỗi khi xử lý dòng {}: {}", i + 1, e.getMessage());
+                    // Có thể throw BusinessException hoặc thu thập các lỗi để trả về thông báo chi tiết
+                }
+            }
+        } catch (IOException e) {
+            log.error("Lỗi đọc file Excel: {}", e.getMessage());
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        return importedCount;
+    }
+
+    private String getCellValue(Cell cell) {
+        if (cell == null) {
+            return null;
+        }
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue();
+            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue()); // For numeric cells that should be string (e.g., SKU if it's numeric)
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            case FORMULA -> cell.getCellFormula();
+            case BLANK -> null;
+            default -> null;
+        };
+    }
+
+    private double getNumericCellValue(Cell cell) {
+        if (cell == null || cell.getCellType() == CellType.BLANK) {
+            return 0.0;
+        }
+        if (cell.getCellType() == CellType.NUMERIC) {
+            return cell.getNumericCellValue();
+        }
+        if (cell.getCellType() == CellType.STRING) {
+            try {
+                return Double.parseDouble(cell.getStringCellValue());
+            } catch (NumberFormatException e) {
+                return 0.0; // Hoặc throw exception nếu giá trị không hợp lệ
+            }
+        }
+        return 0.0;
+    }
+}
+
+// File: src/main/java/com/example/sales/service/impl/InventoryServiceImpl.java
+package com.example.sales.service.impl;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.InventoryType;
+import com.example.sales.dto.inventory.InventoryTransactionResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.BranchProduct;
+import com.example.sales.model.InventoryTransaction;
+import com.example.sales.model.Product;
+import com.example.sales.model.Shop;
+import com.example.sales.repository.BranchProductRepository;
+import com.example.sales.repository.InventoryTransactionRepository;
+import com.example.sales.repository.ProductRepository;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.service.AuditLogService;
+import com.example.sales.service.InventoryService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class InventoryServiceImpl implements InventoryService {
+
+    private final BranchProductRepository branchProductRepository;
+    private final ProductRepository productRepository; // Để lấy tên sản phẩm cho audit/log
+    private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
+
+    @Override
+    @Transactional
+    public int importProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note) {
+        if (quantity <= 0) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        if (!isInventoryManagementRequired(shopId)) {
+            log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác nhập.", shopId);
+            return -1; // Hoặc trả về số lượng hiện tại nếu muốn
+        }
+
+        BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
+        int oldQuantity = branchProduct.getQuantity();
+        branchProduct.setQuantity(oldQuantity + quantity);
+        branchProductRepository.save(branchProduct);
+
+        Product masterProduct = getMasterProduct(branchProduct.getProductId(), shopId);
+
+        saveInventoryTransaction(
+                userId, shopId, branchId, branchProduct.getId(),
+                masterProduct.getName(), InventoryType.IMPORT, quantity, branchProduct.getQuantity(),
+                note, null
+        );
+
+        auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "INVENTORY_IMPORT",
+                String.format("Nhập thêm %d đơn vị sản phẩm '%s' (SKU: %s) vào chi nhánh %s. Tồn kho cũ: %d, Tồn kho mới: %d.",
+                        quantity, masterProduct.getName(), masterProduct.getSku(), branchId, oldQuantity, branchProduct.getQuantity()));
+
+        log.info("Nhập thành công {} sản phẩm '{}' cho chi nhánh {}. Số lượng mới: {}",
+                quantity, masterProduct.getName(), branchId, branchProduct.getQuantity());
+
+        return branchProduct.getQuantity();
+    }
+
+    @Override
+    @Transactional
+    public int exportProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note, String referenceId) {
+        if (quantity <= 0) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        if (!isInventoryManagementRequired(shopId)) {
+            log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác xuất.", shopId);
+            return -1;
+        }
+
+        BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
+        int oldQuantity = branchProduct.getQuantity();
+
+        if (oldQuantity < quantity) {
+            log.warn("Không đủ tồn kho để xuất. Số lượng hiện tại: {}, Số lượng yêu cầu: {}", oldQuantity, quantity);
+            throw new BusinessException(ApiCode.INSUFFICIENT_STOCK);
+        }
+
+        branchProduct.setQuantity(oldQuantity - quantity);
+        branchProductRepository.save(branchProduct);
+
+        Product masterProduct = getMasterProduct(branchProduct.getProductId(), shopId);
+
+        saveInventoryTransaction(
+                userId, shopId, branchId, branchProduct.getId(),
+                masterProduct.getName(), InventoryType.EXPORT, quantity, branchProduct.getQuantity(),
+                note, referenceId
+        );
+
+        auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "INVENTORY_EXPORT",
+                String.format("Xuất %d đơn vị sản phẩm '%s' (SKU: %s) khỏi chi nhánh %s. Tồn kho cũ: %d, Tồn kho mới: %d. Tham chiếu: %s.",
+                        quantity, masterProduct.getName(), masterProduct.getSku(), branchId, oldQuantity, branchProduct.getQuantity(), referenceId));
+
+        log.info("Xuất thành công {} sản phẩm '{}' cho chi nhánh {}. Số lượng mới: {}",
+                quantity, masterProduct.getName(), branchId, branchProduct.getQuantity());
+
+        return branchProduct.getQuantity();
+    }
+
+    @Override
+    @Transactional
+    public int adjustProductQuantity(String userId, String shopId, String branchId, String branchProductId, int newQuantity, String note) {
+        if (newQuantity < 0) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        if (!isInventoryManagementRequired(shopId)) {
+            log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác điều chỉnh.", shopId);
+            return -1;
+        }
+
+        BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
+        int oldQuantity = branchProduct.getQuantity();
+        int quantityChange = newQuantity - oldQuantity; // Số lượng thay đổi (có thể âm hoặc dương)
+
+        branchProduct.setQuantity(newQuantity);
+        branchProductRepository.save(branchProduct);
+
+        Product masterProduct = getMasterProduct(branchProduct.getProductId(), shopId);
+
+        saveInventoryTransaction(
+                userId, shopId, branchId, branchProduct.getId(),
+                masterProduct.getName(), InventoryType.ADJUSTMENT, quantityChange, branchProduct.getQuantity(),
+                note, null
+        );
+
+        auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "INVENTORY_ADJUSTMENT",
+                String.format("Điều chỉnh tồn kho sản phẩm '%s' (SKU: %s) tại chi nhánh %s từ %d thành %d. Thay đổi: %s%d.",
+                        masterProduct.getName(), masterProduct.getSku(), branchId, oldQuantity, newQuantity, quantityChange > 0 ? "+" : "", quantityChange));
+
+        log.info("Điều chỉnh tồn kho sản phẩm '{}' cho chi nhánh {}. Số lượng cũ: {}, Số lượng mới: {}",
+                masterProduct.getName(), branchId, oldQuantity, newQuantity);
+
+        return branchProduct.getQuantity();
+    }
+
+    @Override
+    public Page<InventoryTransactionResponse> getTransactionHistory(String branchProductId, Pageable pageable) {
+        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(branchProductId, pageable)
+                .map(this::mapToInventoryTransactionResponse);
+    }
+
+    @Override
+    public boolean isInventoryManagementRequired(String shopId) {
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+        return !shop.getType().isTrackInventory(); // Ví dụ: Cửa hàng dịch vụ không quản lý tồn kho
+    }
+
+    private BranchProduct findBranchProduct(String shopId, String branchId, String branchProductId) {
+        return branchProductRepository.findByIdAndShopIdAndBranchIdAndDeletedFalse(branchProductId, shopId, branchId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+    }
+
+    private Product getMasterProduct(String productId, String shopId) {
+        return productRepository.findByIdAndShopIdAndDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+    }
+
+    private void saveInventoryTransaction(
+            String userId, String shopId, String branchId, String branchProductId,
+            String productName, InventoryType type, int quantity, int currentStock, String note, String referenceId) {
+
+        InventoryTransaction transaction = InventoryTransaction.builder()
+                .shopId(shopId)
+                .branchId(branchId)
+                .productId(branchProductId)
+                .type(type)
+                .quantity(quantity)
+                .note(note)
+                .referenceId(referenceId)
+                .build();
+        inventoryTransactionRepository.save(transaction);
+    }
+
+    private InventoryTransactionResponse mapToInventoryTransactionResponse(InventoryTransaction transaction) {
+        // Tùy thuộc vào cách bạn muốn hiển thị Product name trong response,
+        // có thể cần fetch Product master ở đây hoặc Product name đã được lưu trong transaction
+        // Hiện tại, giả định InventoryTransaction chỉ lưu productId, cần fetch Product.name
+        String productName = "Unknown Product";
+        try {
+            // Lấy ID của Product master từ BranchProduct ID trong transaction
+            BranchProduct branchProduct = branchProductRepository.findById(transaction.getProductId()).orElse(null);
+            if (branchProduct != null) {
+                Product masterProduct = productRepository.findById(branchProduct.getProductId()).orElse(null);
+                if (masterProduct != null) {
+                    productName = masterProduct.getName();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve product name for transaction: {}", transaction.getId(), e);
+        }
+
+        return InventoryTransactionResponse.builder()
+                .id(transaction.getId())
+                .shopId(transaction.getShopId())
+                .branchId(transaction.getBranchId())
+                .branchProductId(transaction.getProductId()) // Đây là branchProductId
+                .productName(productName)
+                .type(transaction.getType())
+                .quantity(transaction.getQuantity())
+                .note(transaction.getNote())
+                .referenceId(transaction.getReferenceId())
+                .createdAt(transaction.getCreatedAt())
+                .createdBy(transaction.getCreatedBy())
+                .build();
+    }
+}
 [END]
