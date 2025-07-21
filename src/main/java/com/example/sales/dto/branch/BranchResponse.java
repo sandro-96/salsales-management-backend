@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/dto/branch/BranchResponse.java
-
 package com.example.sales.dto.branch;
 
 import lombok.Builder;

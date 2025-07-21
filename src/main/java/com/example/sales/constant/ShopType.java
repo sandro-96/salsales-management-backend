@@ -1,5 +1,4 @@
-// File: ShopType.java
-
+// File: src/main/java/com/example/sales/constant/ShopType.java
 package com.example.sales.constant;
 
 import lombok.Getter;

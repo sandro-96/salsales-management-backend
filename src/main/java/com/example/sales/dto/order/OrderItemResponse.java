@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/dto/order/OrderItemResponse.java
-
 package com.example.sales.dto.order;
 import lombok.Builder;
 import lombok.Data;

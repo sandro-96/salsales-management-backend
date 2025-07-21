@@ -1,4 +1,4 @@
-// File: com/example/sales/security/RequirePlan.java
+// File: src/main/java/com/example/sales/security/RequirePlan.java
 package com.example.sales.security;
 
 import com.example.sales.constant.SubscriptionPlan;

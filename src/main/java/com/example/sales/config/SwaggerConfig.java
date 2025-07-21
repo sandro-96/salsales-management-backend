@@ -1,4 +1,4 @@
-// File: com/example/sales/config/SwaggerConfig.java
+// File: src/main/java/com/example/sales/config/SwaggerConfig.java
 package com.example.sales.config;
 
 import io.swagger.v3.oas.models.OpenAPI;

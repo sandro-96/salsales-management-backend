@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/dto/inventory/InventoryRequest.java
-
 package com.example.sales.dto.inventory;
 
 import com.example.sales.constant.InventoryType;

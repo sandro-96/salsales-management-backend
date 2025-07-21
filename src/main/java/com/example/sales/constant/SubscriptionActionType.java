@@ -1,4 +1,4 @@
-// File: com/example/sales/constant/SubscriptionActionType.java
+// File: src/main/java/com/example/sales/constant/SubscriptionActionType.java
 package com.example.sales.constant;
 
 public enum SubscriptionActionType {

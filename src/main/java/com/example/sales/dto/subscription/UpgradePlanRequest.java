@@ -1,4 +1,4 @@
-// File: com/example/sales/dto/subscription/UpgradePlanRequest.java
+// File: src/main/java/com/example/sales/dto/subscription/UpgradePlanRequest.java
 package com.example.sales.dto.subscription;
 
 import com.example.sales.constant.SubscriptionPlan;

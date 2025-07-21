@@ -1,4 +1,4 @@
-// File: main/java/com/example/sales/service/ProductServiceImpl.java
+// File: src/main/java/com/example/sales/service/ProductServiceImpl.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;

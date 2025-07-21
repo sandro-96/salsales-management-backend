@@ -1,4 +1,4 @@
-// File: main/java/com/example/sales/dto/table/TableUpdateRequest.java
+// File: src/main/java/com/example/sales/dto/table/TableUpdateRequest.java
 package com.example.sales.dto.table;
 
 import com.example.sales.constant.TableStatus;

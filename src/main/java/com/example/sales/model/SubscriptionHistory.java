@@ -1,4 +1,4 @@
-// File: com/example/sales/model/SubscriptionHistory.java
+// File: src/main/java/com/example/sales/model/SubscriptionHistory.java
 package com.example.sales.model;
 
 import com.example.sales.constant.SubscriptionActionType;

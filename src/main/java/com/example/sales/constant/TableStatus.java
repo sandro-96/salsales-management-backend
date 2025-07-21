@@ -1,5 +1,4 @@
-// File: TableStatus.java
-
+// File: src/main/java/com/example/sales/constant/TableStatus.java
 package com.example.sales.constant;
 
 public enum TableStatus {

@@ -1,4 +1,4 @@
-// File: com/example/sales/scheduler/PlanExpiryScheduler.java
+// File: src/main/java/com/example/sales/scheduler/PlanExpiryScheduler.java
 package com.example.sales.scheduler;
 
 import com.example.sales.constant.SubscriptionActionType;

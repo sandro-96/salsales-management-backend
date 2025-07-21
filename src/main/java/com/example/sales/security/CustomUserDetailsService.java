@@ -1,4 +1,4 @@
-// File: com/example/sales/security/CustomUserDetailsService.java
+// File: src/main/java/com/example/sales/security/CustomUserDetailsService.java
 package com.example.sales.security;
 
 import com.example.sales.model.User;

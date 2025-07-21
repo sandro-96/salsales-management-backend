@@ -1,4 +1,4 @@
-// File: com/example/sales/config/WebConfig.java
+// File: src/main/java/com/example/sales/config/WebConfig.java
 package com.example.sales.config;
 
 import com.example.sales.security.PlanInterceptor;

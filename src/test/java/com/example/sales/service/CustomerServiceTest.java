@@ -1,4 +1,4 @@
-// File: test/java/com/example/sales/service/CustomerServiceTest.java
+// File: src/test/java/com/example/sales/service/CustomerServiceTest.java
 package com.example.sales.service;
 
 import com.example.sales.dto.customer.CustomerRequest;

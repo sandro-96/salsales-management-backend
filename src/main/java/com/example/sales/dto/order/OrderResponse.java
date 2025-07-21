@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/dto/order/OrderResponse.java
-
 package com.example.sales.dto.order;
 
 import com.example.sales.constant.OrderStatus;

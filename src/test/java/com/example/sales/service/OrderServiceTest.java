@@ -1,4 +1,4 @@
-// File: test/java/com/example/sales/service/OrderServiceTest.java
+// File: src/test/java/com/example/sales/service/OrderServiceTest.java
 package com.example.sales.service;
 
 import com.example.sales.constant.*;

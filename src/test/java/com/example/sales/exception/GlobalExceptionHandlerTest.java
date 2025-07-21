@@ -1,4 +1,4 @@
-// File: test/java/com/example/sales/exception/GlobalExceptionHandlerTest.java
+// File: src/test/java/com/example/sales/exception/GlobalExceptionHandlerTest.java
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;

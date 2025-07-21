@@ -1,5 +1,4 @@
-// File: AuditorAwareImpl.java
-
+// File: src/main/java/com/example/sales/config/AuditorAwareImpl.java
 package com.example.sales.config;
 
 import com.example.sales.security.CustomUserDetails;

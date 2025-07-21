@@ -1,4 +1,4 @@
-// File: com/example/sales/controller/InventoryController.java
+// File: src/main/java/com/example/sales/controller/InventoryController.java
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;

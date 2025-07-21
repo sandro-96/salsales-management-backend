@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/dto/customer/CustomerResponse.java
-
 package com.example.sales.dto.customer;
 
 import lombok.Builder;

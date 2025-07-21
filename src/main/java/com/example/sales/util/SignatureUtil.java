@@ -1,4 +1,4 @@
-// File: com/example/sales/util/SignatureUtil.java
+// File: src/main/java/com/example/sales/util/SignatureUtil.java
 package com.example.sales.util;
 
 import javax.crypto.Mac;

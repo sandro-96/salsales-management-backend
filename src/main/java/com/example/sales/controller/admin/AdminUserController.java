@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/controller/admin/AdminUserController.java
-
 package com.example.sales.controller.admin;
 
 import com.example.sales.constant.ApiCode;

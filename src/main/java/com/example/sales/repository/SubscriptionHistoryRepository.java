@@ -1,4 +1,4 @@
-// File: com/example/sales/repository/SubscriptionHistoryRepository.java
+// File: src/main/java/com/example/sales/repository/SubscriptionHistoryRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.SubscriptionHistory;

@@ -1,6 +1,6 @@
 [START]
-// File: AuditorAwareImpl.java
 
+// File: src/main/java/com/example/sales/config/AuditorAwareImpl.java
 package com.example.sales.config;
 
 import com.example.sales.security.CustomUserDetails;
@@ -27,7 +27,7 @@ public class AuditorAwareImpl implements AuditorAware<String> {
     }
 }
 
-// File: com/example/sales/config/SecurityConfig.java
+// File: src/main/java/com/example/sales/config/SecurityConfig.java
 package com.example.sales.config;
 
 import com.example.sales.security.CustomUserDetailsService;
@@ -111,7 +111,7 @@ public class SecurityConfig {
     }
 }
 
-// File: com/example/sales/config/WebConfig.java
+// File: src/main/java/com/example/sales/config/WebConfig.java
 package com.example.sales.config;
 
 import com.example.sales.security.PlanInterceptor;
@@ -154,16 +154,15 @@ public class WebConfig implements WebMvcConfigurer {
     }
 }
 
-// File: DiscountType.java
-
+// File: src/main/java/com/example/sales/constant/DiscountType.java
 package com.example.sales.constant;
 
 public enum DiscountType {
     PERCENT, // Giảm theo %
     AMOUNT   // Giảm cố định số tiền
 }
-// File: OrderStatus.java
 
+// File: src/main/java/com/example/sales/constant/OrderStatus.java
 package com.example.sales.constant;
 
 public enum OrderStatus {
@@ -173,8 +172,8 @@ public enum OrderStatus {
     COMPLETED,     // Hoàn tất
     CANCELLED      // Đã huỷ
 }
-// File: ShopRole.java
 
+// File: src/main/java/com/example/sales/constant/ShopRole.java
 package com.example.sales.constant;
 
 public enum ShopRole {
@@ -184,8 +183,7 @@ public enum ShopRole {
     CASHIER
 }
 
-// File: ShopType.java
-
+// File: src/main/java/com/example/sales/constant/ShopType.java
 package com.example.sales.constant;
 
 import lombok.Getter;
@@ -209,8 +207,7 @@ public enum ShopType {
 
 }
 
-// File: TableStatus.java
-
+// File: src/main/java/com/example/sales/constant/TableStatus.java
 package com.example.sales.constant;
 
 public enum TableStatus {
@@ -219,8 +216,7 @@ public enum TableStatus {
     CLOSED      // Không hoạt động / Khoá
 }
 
-// File: UserRole.java
-
+// File: src/main/java/com/example/sales/constant/UserRole.java
 package com.example.sales.constant;
 
 public enum UserRole {
@@ -229,7 +225,6 @@ public enum UserRole {
 }
 
 // File: src/main/java/com/example/sales/controller/admin/AdminUserController.java
-
 package com.example.sales.controller.admin;
 
 import com.example.sales.constant.ApiCode;
@@ -308,7 +303,6 @@ public class AdminUserController {
 }
 
 // File: src/main/java/com/example/sales/controller/AuditLogController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -460,7 +454,6 @@ public class AuthController {
 }
 
 // File: src/main/java/com/example/sales/controller/BranchController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -566,7 +559,6 @@ public class BranchController {
 }
 
 // File: src/main/java/com/example/sales/controller/CustomerController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -1200,7 +1192,6 @@ public class ShopUserController {
 }
 
 // File: src/main/java/com/example/sales/controller/TableController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -1318,7 +1309,6 @@ public class TableController {
 }
 
 // File: src/main/java/com/example/sales/controller/UserController.java
-
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -1387,7 +1377,6 @@ public class UserController {
 }
 
 // File: src/main/java/com/example/sales/dto/branch/BranchRequest.java
-
 package com.example.sales.dto.branch;
 
 import jakarta.validation.constraints.NotBlank;
@@ -1407,8 +1396,8 @@ public class BranchRequest {
 
     private boolean active = true;
 }
-// File: src/main/java/com/example/sales/dto/branch/BranchResponse.java
 
+// File: src/main/java/com/example/sales/dto/branch/BranchResponse.java
 package com.example.sales.dto.branch;
 
 import lombok.Builder;
@@ -1424,8 +1413,8 @@ public class BranchResponse {
     private boolean active;
     private String createdAt;
 }
-// File: src/main/java/com/example/sales/dto/customer/CustomerRequest.java
 
+// File: src/main/java/com/example/sales/dto/customer/CustomerRequest.java
 package com.example.sales.dto.customer;
 
 import jakarta.validation.constraints.Email;
@@ -1447,8 +1436,8 @@ public class CustomerRequest {
     private String note;
     private String branchId; // Có thể null nếu không phân biệt chi nhánh
 }
-// File: src/main/java/com/example/sales/dto/customer/CustomerResponse.java
 
+// File: src/main/java/com/example/sales/dto/customer/CustomerResponse.java
 package com.example.sales.dto.customer;
 
 import lombok.Builder;
@@ -1464,8 +1453,8 @@ public class CustomerResponse {
     private String address;
     private String note;
 }
-// File: src/main/java/com/example/sales/dto/customer/CustomerSearchRequest.java
 
+// File: src/main/java/com/example/sales/dto/customer/CustomerSearchRequest.java
 package com.example.sales.dto.customer;
 
 import lombok.Data;
@@ -1484,7 +1473,6 @@ public class CustomerSearchRequest {
 }
 
 // File: src/main/java/com/example/sales/dto/order/OrderItemRequest.java
-
 package com.example.sales.dto.order;
 
 import jakarta.validation.constraints.Min;
@@ -1508,7 +1496,6 @@ public class OrderItemRequest {
 }
 
 // File: src/main/java/com/example/sales/dto/order/OrderItemResponse.java
-
 package com.example.sales.dto.order;
 import lombok.Builder;
 import lombok.Data;
@@ -1523,8 +1510,8 @@ public class OrderItemResponse {
     private double priceAfterDiscount; // giá sau khi đã áp dụng khuyến mãi
     private String appliedPromotionId; // id khuyến mãi được áp dụng (nếu có)
 }
-// File: src/main/java/com/example/sales/dto/order/OrderRequest.java
 
+// File: src/main/java/com/example/sales/dto/order/OrderRequest.java
 package com.example.sales.dto.order;
 
 import jakarta.validation.Valid;
@@ -1543,8 +1530,8 @@ public class OrderRequest {
     private String note;
     private String branchId;
 }
-// File: src/main/java/com/example/sales/dto/order/OrderResponse.java
 
+// File: src/main/java/com/example/sales/dto/order/OrderResponse.java
 package com.example.sales.dto.order;
 
 import com.example.sales.constant.OrderStatus;
@@ -2098,7 +2085,7 @@ public class BusinessException extends RuntimeException {
     }
 }
 
-// File: main/java/com/example/sales/exception/GlobalExceptionHandler.java
+// File: src/main/java/com/example/sales/exception/GlobalExceptionHandler.java
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;
@@ -2502,7 +2489,6 @@ public class ImageCleanupJob {
 }
 
 // File: src/main/java/com/example/sales/model/base/BaseEntity.java
-
 package com.example.sales.model.base;
 
 import lombok.Getter;
@@ -5660,7 +5646,6 @@ public class RequireRoleAspect {
 }
 
 // File: src/main/java/com/example/sales/dto/inventory/InventoryRequest.java
-
 package com.example.sales.dto.inventory;
 
 import com.example.sales.constant.InventoryType;
@@ -5687,7 +5672,6 @@ public class InventoryRequest {
 }
 
 // File: src/main/java/com/example/sales/model/InventoryTransaction.java
-
 package com.example.sales.model;
 
 import com.example.sales.constant.InventoryType;
@@ -5735,7 +5719,6 @@ public interface InventoryTransactionRepository extends MongoRepository<Inventor
 }
 
 // File: src/main/java/com/example/sales/constant/InventoryType.java
-
 package com.example.sales.constant;
 
 public enum InventoryType {
@@ -5744,7 +5727,7 @@ public enum InventoryType {
     ADJUSTMENT
 }
 
-// File: com/example/sales/controller/InventoryController.java
+// File: src/main/java/com/example/sales/controller/InventoryController.java
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -5809,7 +5792,7 @@ public class InventoryController {
     }
 }
 
-// File: com/example/sales/service/InventoryService.java
+// File: src/main/java/com/example/sales/service/InventoryService.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
@@ -5865,7 +5848,7 @@ public class InventoryService {
     }
 }
 
-// File: com/example/sales/config/SwaggerConfig.java
+// File: src/main/java/com/example/sales/config/SwaggerConfig.java
 package com.example.sales.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
@@ -5913,7 +5896,7 @@ import org.springframework.context.annotation.Import;
 public abstract class BaseSpringTest {
 }
 
-// File: test/java/com/example/sales/service/UserServiceTest.java
+// File: src/test/java/com/example/sales/service/UserServiceTest.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
@@ -6064,7 +6047,7 @@ class ShopServiceTest {
     }
 }
 
-// File: test/java/com/example/sales/service/ProductServiceTest.java
+// File: src/test/java/com/example/sales/service/ProductServiceTest.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ShopType;
@@ -6171,7 +6154,7 @@ class ProductServiceTest {
     }
 }
 
-// File: test/java/com/example/sales/service/OrderServiceTest.java
+// File: src/test/java/com/example/sales/service/OrderServiceTest.java
 package com.example.sales.service;
 
 import com.example.sales.constant.*;
@@ -6291,7 +6274,7 @@ class OrderServiceTest {
     }
 }
 
-// File: test/java/com/example/sales/service/CustomerServiceTest.java
+// File: src/test/java/com/example/sales/service/CustomerServiceTest.java
 package com.example.sales.service;
 
 import com.example.sales.dto.customer.CustomerRequest;
@@ -6338,7 +6321,7 @@ class CustomerServiceTest {
     }
 }
 
-// File: com/example/sales/service/PaymentService.java
+// File: src/main/java/com/example/sales/service/PaymentService.java
 package com.example.sales.service;
 
 import com.example.sales.constant.SubscriptionActionType;
@@ -6402,7 +6385,7 @@ public class PaymentService {
     }
 }
 
-// File: com/example/sales/scheduler/PlanExpiryScheduler.java
+// File: src/main/java/com/example/sales/scheduler/PlanExpiryScheduler.java
 package com.example.sales.scheduler;
 
 import com.example.sales.constant.SubscriptionActionType;
@@ -6480,7 +6463,7 @@ public class PlanExpiryScheduler {
     }
 }
 
-// File: com/example/sales/security/PlanInterceptor.java
+// File: src/main/java/com/example/sales/security/PlanInterceptor.java
 package com.example.sales.security;
 
 import com.example.sales.constant.ApiCode;
@@ -6529,7 +6512,7 @@ public class PlanInterceptor implements HandlerInterceptor {
     }
 }
 
-// File: com/example/sales/scheduler/PlanReminderScheduler.java
+// File: src/main/java/com/example/sales/scheduler/PlanReminderScheduler.java
 package com.example.sales.scheduler;
 
 import com.example.sales.model.Shop;
@@ -6605,7 +6588,7 @@ public @interface RequirePlan {
     SubscriptionPlan[] value() default {};
 }
 
-// File: com/example/sales/util/SignatureUtil.java
+// File: src/main/java/com/example/sales/util/SignatureUtil.java
 package com.example.sales.util;
 
 import javax.crypto.Mac;
@@ -6628,7 +6611,7 @@ public class SignatureUtil {
     }
 }
 
-// File: com/example/sales/constant/SubscriptionActionType.java
+// File: src/main/java/com/example/sales/constant/SubscriptionActionType.java
 package com.example.sales.constant;
 
 public enum SubscriptionActionType {
@@ -6638,7 +6621,7 @@ public enum SubscriptionActionType {
     TRIAL_EXPIRED     // Gói thử nghiệm kết thúc
 }
 
-// File: com/example/sales/controller/SubscriptionController.java
+// File: src/main/java/com/example/sales/controller/SubscriptionController.java
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
@@ -6717,7 +6700,7 @@ public class SubscriptionController {
     }
 }
 
-// File: com/example/sales/model/SubscriptionHistory.java
+// File: src/main/java/com/example/sales/model/SubscriptionHistory.java
 package com.example.sales.model;
 
 import com.example.sales.constant.SubscriptionActionType;
@@ -6752,7 +6735,7 @@ public class SubscriptionHistory extends BaseEntity {
     private SubscriptionActionType actionType;
 }
 
-// File: com/example/sales/repository/SubscriptionHistoryRepository.java
+// File: src/main/java/com/example/sales/repository/SubscriptionHistoryRepository.java
 package com.example.sales.repository;
 
 import com.example.sales.model.SubscriptionHistory;
@@ -6764,14 +6747,14 @@ public interface SubscriptionHistoryRepository extends MongoRepository<Subscript
     List<SubscriptionHistory> findByShopIdOrderByCreatedAtDesc(String shopId);
 }
 
-// File: com/example/sales/constant/SubscriptionPlan.java
+// File: src/main/java/com/example/sales/constant/SubscriptionPlan.java
 package com.example.sales.constant;
 
 public enum SubscriptionPlan {
     FREE, PRO, ENTERPRISE
 }
 
-// File: com/example/sales/dto/subscription/UpgradePlanRequest.java
+// File: src/main/java/com/example/sales/dto/subscription/UpgradePlanRequest.java
 package com.example.sales.dto.subscription;
 
 import com.example.sales.constant.SubscriptionPlan;
@@ -6785,7 +6768,7 @@ public class UpgradePlanRequest {
     private int months = 1; // số tháng đăng ký (default = 1)
 }
 
-// File: com/example/sales/controller/WebhookController.java
+// File: src/main/java/com/example/sales/controller/WebhookController.java
 package com.example.sales.controller;
 
 import com.example.sales.constant.SubscriptionPlan;
@@ -6851,7 +6834,7 @@ public class WebhookController {
     }
 }
 
-// File: com/example/sales/security/CustomUserDetailsService.java
+// File: src/main/java/com/example/sales/security/CustomUserDetailsService.java
 package com.example.sales.security;
 
 import com.example.sales.model.User;
@@ -6968,7 +6951,7 @@ public class ShopSimpleResponse {
     private ShopRole role; // 👈 vai trò của user trong shop
 }
 
-// File: test/java/com/example/sales/exception/GlobalExceptionHandlerTest.java
+// File: src/test/java/com/example/sales/exception/GlobalExceptionHandlerTest.java
 package com.example.sales.exception;
 
 import com.example.sales.constant.ApiCode;
@@ -7098,7 +7081,7 @@ class GlobalExceptionHandlerTest {
     }
 }
 
-// File: main/java/com/example/sales/controller/product/ProductCrudController.java
+// File: src/main/java/com/example/sales/controller/product/ProductCrudController.java
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
@@ -7219,7 +7202,7 @@ public class ProductCrudController {
     }
 }
 
-// File: main/java/com/example/sales/controller/product/ProductImportExportController.java
+// File: src/main/java/com/example/sales/controller/product/ProductImportExportController.java
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
@@ -7367,7 +7350,7 @@ public class ProductStatusController {
     }
 }
 
-// File: main/java/com/example/sales/service/ProductServiceImpl.java
+// File: src/main/java/com/example/sales/service/ProductServiceImpl.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
@@ -7791,7 +7774,7 @@ class ShopUserServiceTest {
     }
 }
 
-// File: main/java/com/example/sales/dto/table/TableUpdateRequest.java
+// File: src/main/java/com/example/sales/dto/table/TableUpdateRequest.java
 package com.example.sales.dto.table;
 
 import com.example.sales.constant.TableStatus;

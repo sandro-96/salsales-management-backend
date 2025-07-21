@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/dto/branch/BranchRequest.java
-
 package com.example.sales.dto.branch;
 
 import jakarta.validation.constraints.NotBlank;

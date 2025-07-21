@@ -1,5 +1,4 @@
 // File: src/main/java/com/example/sales/model/InventoryTransaction.java
-
 package com.example.sales.model;
 
 import com.example.sales.constant.InventoryType;

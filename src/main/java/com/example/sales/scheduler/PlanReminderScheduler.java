@@ -1,4 +1,4 @@
-// File: com/example/sales/scheduler/PlanReminderScheduler.java
+// File: src/main/java/com/example/sales/scheduler/PlanReminderScheduler.java
 package com.example.sales.scheduler;
 
 import com.example.sales.model.Shop;
