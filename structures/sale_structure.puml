@@ -1,0 +1,429 @@
+@startuml Sales Management System
+
+' Packages
+package "model" {
+  abstract class BaseEntity {
+    -id: String
+    -createdAt: LocalDateTime
+    -updatedAt: LocalDateTime
+    -createdBy: String
+    -updatedBy: String
+    -deleted: boolean
+  }
+
+  class User {
+    -email: String
+    -password: String
+    -fullName: String
+    -phone: String
+    -businessType: String
+    -role: UserRole
+  }
+
+  class Shop {
+    -name: String
+    -type: ShopType
+    -address: String
+    -phone: String
+    -logoUrl: String
+    -active: boolean
+    -plan: SubscriptionPlan
+    -currency: String
+    -ownerId: String
+    -planExpiry: LocalDateTime
+  }
+
+  class Branch {
+    -name: String
+    -address: String
+    -phone: String
+    -active: boolean
+    -shopId: String
+  }
+
+  class Customer {
+    -name: String
+    -phone: String
+    -email: String
+    -address: String
+    -note: String
+    -shopId: String
+    -branchId: String
+  }
+
+  class Product {
+    -name: String
+    -price: double
+    -quantity: int
+    -category: String
+    -sku: String
+    -imageUrl: String
+    -description: String
+    -unit: String
+    -active: boolean
+    -productCode: String
+    -shopId: String
+    -branchId: String
+  }
+
+  class Order {
+    -tableId: String
+    -note: String
+    -status: OrderStatus
+    -paid: boolean
+    -paymentMethod: String
+    -paymentId: String
+    -paymentTime: LocalDateTime
+    -totalAmount: double
+    -totalPrice: double
+    -shopId: String
+    -userId: String
+    -items: List<OrderItem>
+  }
+
+  class OrderItem {
+    -productId: String
+    -productName: String
+    -quantity: int
+    -price: double
+    -priceAfterDiscount: double
+    -appliedPromotionId: String
+  }
+
+  class Promotion {
+    -name: String
+    -discountType: DiscountType
+    -discountValue: double
+    -applicableProductIds: List<String>
+    -startDate: LocalDateTime
+    -endDate: LocalDateTime
+    -active: boolean
+    -shopId: String
+    -branchId: String
+  }
+
+  class ShopUser {
+    -shopId: String
+    -userId: String
+    -role: ShopRole
+  }
+
+  class InventoryTransaction {
+    -productId: String
+    -branchId: String
+    -type: InventoryType
+    -quantity: int
+    -note: String
+    -shopId: String
+  }
+
+  class SubscriptionHistory {
+    -shopId: String
+    -userId: String
+    -oldPlan: SubscriptionPlan
+    -newPlan: SubscriptionPlan
+    -durationMonths: int
+    -paymentMethod: String
+    -actionType: SubscriptionActionType
+  }
+
+  class Table {
+    -name: String
+    -status: TableStatus
+    -shopId: String
+    -capacity: Integer
+    -note: String
+    -currentOrderId: String
+    -branchId: String
+  }
+
+  class AuditLog {
+    -userId: String
+    -shopId: String
+    -resourceId: String
+    -resourceType: String
+    -action: String
+    -description: String
+  }
+
+  class RefreshToken {
+    -userId: String
+    -token: String
+    -expiryDate: LocalDateTime
+  }
+}
+
+package "dto" {
+  class ApiResponseDto<T> {
+    -success: boolean
+    -code: String
+    -message: String
+    -data: T
+    -timestamp: String
+  }
+
+  class ProductRequest {
+    -name: String
+    -price: Double
+    -quantity: Integer
+    -category: String
+    -sku: String
+    -imageUrl: String
+    -description: String
+    -unit: String
+    -active: boolean
+    -productCode: String
+    -branchId: String
+  }
+
+  class ProductResponse {
+    -id: String
+    -name: String
+    -price: double
+    -quantity: int
+    -category: String
+    -sku: String
+    -imageUrl: String
+    -description: String
+    -active: boolean
+    -unit: String
+    -productCode: String
+    -shopId: String
+    -createdAt: LocalDateTime
+    -updatedAt: LocalDateTime
+  }
+
+  class OrderRequest {
+    -items: List<OrderItemRequest>
+    -tableId: String
+    -note: String
+    -branchId: String
+  }
+
+  class OrderResponse {
+    -id: String
+    -tableId: String
+    -note: String
+    -status: OrderStatus
+    -paid: boolean
+    -paymentMethod: String
+    -paymentId: String
+    -paymentTime: LocalDateTime
+    -totalAmount: double
+    -totalPrice: double
+    -items: List<OrderItemResponse>
+  }
+
+  class CustomerRequest {
+    -name: String
+    -phone: String
+    -email: String
+    -address: String
+    -note: String
+    -branchId: String
+  }
+
+  class CustomerResponse {
+    -id: String
+    -name: String
+    -phone: String
+    -email: String
+    -address: String
+    -note: String
+  }
+}
+
+package "repository" {
+  interface UserRepository {
+    +findByEmailAndDeletedFalse(email: String): Optional<User>
+    +findById(id: String): Optional<User>
+  }
+
+  interface ShopRepository {
+    +findByIdAndDeletedFalse(id: String): Optional<Shop>
+    +findByOwnerIdAndDeletedFalse(ownerId: String): Optional<Shop>
+    +findByPlanExpiryBeforeAndPlanNot(date: LocalDateTime, plan: SubscriptionPlan): List<Shop>
+  }
+
+  interface ProductRepository {
+    +findByIdAndShopIdAndDeletedFalse(id: String, shopId: String): Optional<Product>
+    +save(product: Product): Product
+  }
+
+  interface OrderRepository {
+    +findByIdAndDeletedFalse(id: String): Optional<Order>
+    +save(order: Order): Order
+  }
+
+  interface CustomerRepository {
+    +save(customer: Customer): Customer
+  }
+
+  interface ShopUserRepository {
+    +findByShopIdAndUserIdAndDeletedFalse(shopId: String, userId: String): Optional<ShopUser>
+    +findByUserIdAndDeletedFalse(userId: String, pageable: Pageable): Page<ShopUser>
+  }
+}
+
+package "service" {
+  interface ProductService {
+    +createProduct(shopId: String, request: ProductRequest): ProductResponse
+    +updateProduct(userId: String, shopId: String, productId: String, request: ProductRequest): ProductResponse
+  }
+
+  interface OrderService {
+    +createOrder(userId: String, shopId: String, request: OrderRequest): OrderResponse
+    +cancelOrder(userId: String, shopId: String, orderId: String): void
+  }
+
+  interface CustomerService {
+    +createCustomer(shopId: String, userId: String, request: CustomerRequest): CustomerResponse
+  }
+
+  interface ShopService {
+    +createShop(userId: String, request: ShopRequest, logoUrl: String): Shop
+    +getShopById(id: String): Shop
+  }
+
+  interface ShopUserService {
+    +addUser(shopId: String, userId: String, role: ShopRole, branchId: String): void
+    +removeUser(shopId: String, userId: String): void
+    +getShopsForUser(userId: String, pageable: Pageable): Page<ShopSimpleResponse>
+    +getUserRoleInShop(shopId: String, userId: String): ShopRole
+  }
+
+  interface AuditLogService {
+    +log(userId: String, shopId: String, resourceId: String, resourceType: String, action: String, description: String): void
+  }
+}
+
+package "security" {
+  class CustomUserDetails {
+    -id: String
+    -email: String
+    -password: String
+    -role: UserRole
+    -authorities: Collection<GrantedAuthority>
+    +getUsername(): String
+  }
+
+  class JwtUtil {
+    -jwtSecret: String
+    -key: Key
+    +generateToken(user: User): String
+    +extractUserId(token: String): String
+    +extractRole(token: String): String
+    +extractEmail(token: String): String
+    +isTokenValid(token: String): boolean
+  }
+
+  class PermissionChecker {
+    +isOwner(shopId: String, userId: String): boolean
+    +isStaff(shopId: String, userId: String): boolean
+    +isOwnerOrStaff(shopId: String, userId: String): boolean
+    +isAdmin(shopId: String, userId: String): boolean
+    +hasRole(shopId: String, userId: String, roles: ShopRole...): boolean
+    +hasBranchRole(branchId: String, userId: String, roles: ShopRole...): boolean
+  }
+}
+
+package "exception" {
+  class BusinessException {
+    -error: ApiCode
+  }
+
+  class ResourceNotFoundException {
+    -error: ApiCode
+  }
+}
+
+package "util" {
+  class SignatureUtil {
+    +isValidHmac(payload: String, signature: String, secret: String): boolean
+  }
+}
+
+package "validation" {
+  class ValidDateRange {
+    -message: String
+  }
+
+  class DateRangeValidator {
+    +isValid(req: ReportRequest, context: ConstraintValidatorContext): boolean
+  }
+}
+
+' Relationships
+BaseEntity <|.. User
+BaseEntity <|.. Shop
+BaseEntity <|.. Branch
+BaseEntity <|.. Customer
+BaseEntity <|.. Product
+BaseEntity <|.. Order
+BaseEntity <|.. OrderItem
+BaseEntity <|.. Promotion
+BaseEntity <|.. ShopUser
+BaseEntity <|.. InventoryTransaction
+BaseEntity <|.. SubscriptionHistory
+BaseEntity <|.. Table
+BaseEntity <|.. AuditLog
+BaseEntity <|.. RefreshToken
+
+Order o--> "many" OrderItem
+Shop o--> "many" Branch
+Shop o--> "many" Product
+Shop o--> "many" Customer
+Shop o--> "many" Order
+Shop o--> "many" ShopUser
+Shop o--> "many" Promotion
+Shop o--> "many" Table
+Shop o--> "many" SubscriptionHistory
+Branch o--> "many" Product
+Branch o--> "many" Customer
+Branch o--> "many" Order
+Branch o--> "many" Promotion
+Branch o--> "many" Table
+User o--> "many" ShopUser
+User o--> "many" Order
+User o--> "many" SubscriptionHistory
+User o--> "many" AuditLog
+Product o--> "many" OrderItem
+Product o--> "many" InventoryTransaction
+Promotion o--> "many" OrderItem
+Table o--> "many" Order
+RefreshToken o--> User
+
+UserRepository --> User
+ShopRepository --> Shop
+ProductRepository --> Product
+OrderRepository --> Order
+CustomerRepository --> Customer
+ShopUserRepository --> ShopUser
+ProductService --> ProductRepository
+OrderService --> OrderRepository
+OrderService --> ProductRepository
+CustomerService --> CustomerRepository
+ShopService --> ShopRepository
+ShopUserService --> ShopUserRepository
+ShopUserService --> ShopRepository
+AuditLogService --> AuditLog
+ProductService --> ProductRequest
+ProductService --> ProductResponse
+OrderService --> OrderRequest
+OrderService --> OrderResponse
+CustomerService --> CustomerRequest
+CustomerService --> CustomerResponse
+ShopService --> ShopRequest
+ShopService --> ShopResponse
+ShopUserService --> ShopSimpleResponse
+CustomUserDetails --> User
+JwtUtil --> User
+PermissionChecker --> ShopUserRepository
+PermissionChecker --> BranchRepository
+BusinessException --> ApiCode
+ResourceNotFoundException --> ApiCode
+ValidDateRange --> ReportRequest
+DateRangeValidator --> ReportRequest
+SignatureUtil --> WebhookController
+
+@enduml
