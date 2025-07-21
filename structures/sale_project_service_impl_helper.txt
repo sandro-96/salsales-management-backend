@@ -1,0 +1,2451 @@
+[START]
+// File: src/main/java/com/example/sales/service/AdminUserService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class AdminUserService {
+
+    private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    public User getUserById(String id) {
+        return userRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
+    }
+
+    public User updateUser(String id, User update) {
+        User user = getUserById(id);
+        user.setEmail(update.getEmail());
+        user.setFullName(update.getFullName());
+        user.setPhone(update.getPhone());
+        user.setBusinessType(update.getBusinessType());
+        user.setVerified(update.isVerified());
+        user.setRole(update.getRole());
+        return userRepository.save(user);
+    }
+
+    public void deleteUser(String userId) {
+        User user = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
+        user.setDeleted(true);
+        userRepository.save(user);
+        auditLogService.log(null, user.getId(), user.getId(), "USER", "DELETED", "Xoá mềm tài khoản người dùng");
+    }
+}
+
+// File: src/main/java/com/example/sales/service/AuditLogService.java
+package com.example.sales.service;
+
+import com.example.sales.model.AuditLog;
+import com.example.sales.repository.AuditLogRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class AuditLogService {
+
+    private final AuditLogRepository auditLogRepository;
+
+    public void log(String userId, String shopId, String targetId, String targetType, String action, String description) {
+        AuditLog log = AuditLog.builder()
+                .userId(userId)
+                .shopId(shopId)
+                .targetId(targetId)
+                .targetType(targetType)
+                .action(action)
+                .description(description)
+                .build();
+
+        auditLogRepository.save(log);
+    }
+}
+
+// File: src/main/java/com/example/sales/service/AuthService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.JwtResponse;
+import com.example.sales.dto.LoginRequest;
+import com.example.sales.dto.RegisterRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import com.example.sales.security.JwtUtil;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final MailService mailService;
+    private final TokenService tokenService;
+
+    @Value("${app.frontend.verify-url}")
+    private String verifyUrl;
+
+    public void register(RegisterRequest request) {
+        if (userRepository.findByEmailAndDeletedFalse(request.getEmail()).isPresent()) {
+            throw new BusinessException(ApiCode.EMAIL_EXISTS);
+        }
+
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        String token = UUID.randomUUID().toString();
+        user.setVerificationToken(token);
+        user.setVerificationExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000));
+        user.setVerified(false);
+
+        userRepository.save(user);
+
+        String verifyLink = verifyUrl + "?token=" + token;
+        String html = "<p>Xin chào,</p>" +
+                "<p>Vui lòng xác thực tài khoản của bạn bằng cách nhấn vào liên kết bên dưới:</p>" +
+                "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
+                "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
+
+        mailService.send(user.getEmail(), "Xác thực tài khoản - Sandro Sales", html);
+    }
+
+
+    public JwtResponse login(LoginRequest request) {
+        // 1. Xác thực tài khoản và mật khẩu
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+        // 2. Lấy user từ DB
+        User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
+        // 3. Kiểm tra đã xác thực chưa
+        if (!user.isVerified()) {
+            throw new BusinessException(ApiCode.EMAIL_NOT_VERIFIED);
+        }
+        String accessToken = jwtUtil.generateToken(user);
+        String refreshToken = tokenService.createRefreshToken(user).getToken();
+        return new JwtResponse(accessToken, refreshToken);
+    }
+
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
+
+        String token = UUID.randomUUID().toString();
+        user.setResetToken(token);
+        user.setResetTokenExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000)); // 15 phút
+        userRepository.save(user);
+
+        System.out.println("Gửi email tới " + email + ": Token đặt lại mật khẩu: " + token);
+    }
+
+    public void resendVerification(String email) {
+        User user = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
+
+        if (user.isVerified()) {
+            throw new BusinessException(ApiCode.ALREADY_VERIFIED);
+        }
+
+        // Tạo token mới và cập nhật expiry
+        String newToken = UUID.randomUUID().toString();
+        user.setVerificationToken(newToken);
+        user.setVerificationExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000));
+
+        userRepository.save(user);
+
+        String verifyLink = verifyUrl + "?token=" + newToken;
+
+        String html = "<p>Xin chào,</p>" +
+                "<p>Bạn đã yêu cầu gửi lại email xác thực tài khoản.</p>" +
+                "<p>Vui lòng xác thực tài khoản của bạn bằng cách nhấn vào liên kết bên dưới:</p>" +
+                "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
+                "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
+
+        mailService.send(user.getEmail(), "Gửi lại xác thực tài khoản - Sandro Sales", html);
+    }
+
+    public void verifyEmail(String token) {
+        User user = userRepository.findByVerificationTokenAndDeletedFalse(token)
+                .orElseThrow(() -> new BusinessException(ApiCode.INVALID_TOKEN));
+
+        if (user.isVerified()) {
+            throw new BusinessException(ApiCode.ALREADY_VERIFIED);
+        }
+
+        if (user.getVerificationExpiry().before(new Date())) {
+            throw new BusinessException(ApiCode.TOKEN_EXPIRED);
+        }
+
+        user.setVerified(true);
+        user.setVerificationToken(null);
+        user.setVerificationExpiry(null);
+        userRepository.save(user);
+    }
+
+}
+
+// File: src/main/java/com/example/sales/service/BaseService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Order;
+import com.example.sales.model.Shop;
+import com.example.sales.model.ShopUser;
+import com.example.sales.repository.OrderRepository;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.ShopUserRepository;
+
+public abstract class BaseService {
+    protected Shop checkShopExists(ShopRepository shopRepository, String shopId) {
+        return shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
+    protected ShopUser checkShopUserExists(ShopUserRepository shopUserRepository, String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
+    }
+    protected Order checkOrderExists(OrderRepository orderRepository, String orderId, String shopId) {
+        return orderRepository.findByIdAndDeletedFalse(orderId)
+                .filter(o -> o.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
+    }
+}
+
+// File: src/main/java/com/example/sales/service/BranchService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.branch.BranchRequest;
+import com.example.sales.dto.branch.BranchResponse;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Branch;
+import com.example.sales.repository.BranchRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class BranchService {
+
+    private final BranchRepository branchRepository;
+    private final AuditLogService auditLogService;
+
+    public Page<BranchResponse> getAll(String userId, String shopId, Pageable pageable) {
+        return branchRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+                .map(this::toResponse);
+    }
+
+    public BranchResponse create(String userId, String shopId, BranchRequest req) {
+        Branch branch = Branch.builder()
+                .shopId(shopId)
+                .name(req.getName())
+                .address(req.getAddress())
+                .phone(req.getPhone())
+                .active(req.isActive())
+                .build();
+
+        Branch saved = branchRepository.save(branch);
+        auditLogService.log(userId, shopId, saved.getId(), "BRANCH", "CREATED",
+                String.format("Tạo chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
+        return toResponse(saved);
+    }
+
+    public BranchResponse update(String userId, String shopId, String id, BranchRequest req) {
+        Branch branch = branchRepository.findByIdAndDeletedFalse(id)
+                .filter(b -> b.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
+
+        branch.setName(req.getName());
+        branch.setAddress(req.getAddress());
+        branch.setPhone(req.getPhone());
+        branch.setActive(req.isActive());
+
+        Branch saved = branchRepository.save(branch);
+        auditLogService.log(userId, shopId, saved.getId(), "BRANCH", "UPDATED",
+                String.format("Cập nhật chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
+        return toResponse(saved);
+    }
+
+    public void delete(String userId, String shopId, String id) {
+        Branch branch = branchRepository.findByIdAndDeletedFalse(id)
+                .filter(b -> b.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
+
+        branch.setDeleted(true);
+        branchRepository.save(branch);
+        auditLogService.log(userId, shopId, branch.getId(), "BRANCH", "DELETED",
+                String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
+
+    }
+
+    private BranchResponse toResponse(Branch branch) {
+        return BranchResponse.builder()
+                .id(branch.getId())
+                .name(branch.getName())
+                .address(branch.getAddress())
+                .phone(branch.getPhone())
+                .active(branch.isActive())
+                .createdAt(branch.getCreatedAt() != null ? branch.getCreatedAt().toString() : null)
+                .build();
+    }
+}
+
+// File: src/main/java/com/example/sales/service/CustomerService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.customer.CustomerRequest;
+import com.example.sales.dto.customer.CustomerResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Customer;
+import com.example.sales.repository.CustomerRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class CustomerService {
+
+    private final CustomerRepository customerRepository;
+    private final AuditLogService auditLogService;
+
+    public List<CustomerResponse> getCustomers(String shopId, String branchId) {
+        return customerRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public CustomerResponse createCustomer(String shopId, String userId, CustomerRequest request) {
+        Customer customer = new Customer();
+        customer.setShopId(shopId);
+        customer.setUserId(userId);
+        customer.setName(request.getName());
+        customer.setPhone(request.getPhone());
+        customer.setEmail(request.getEmail());
+        customer.setAddress(request.getAddress());
+        customer.setNote(request.getNote());
+        customer.setBranchId(request.getBranchId());
+
+        Customer saved = customerRepository.save(customer);
+        auditLogService.log(userId, shopId, saved.getId(), "CUSTOMER", "CREATED",
+                String.format("Tạo khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
+        return toResponse(saved);
+    }
+
+    public CustomerResponse updateCustomer(String shopId, String id, CustomerRequest request) {
+        Customer existing = customerRepository.findByIdAndDeletedFalse(id)
+                .filter(c -> c.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+
+        if (!existing.getBranchId().equals(request.getBranchId())) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        existing.setName(request.getName());
+        existing.setPhone(request.getPhone());
+        existing.setEmail(request.getEmail());
+        existing.setAddress(request.getAddress());
+        existing.setNote(request.getNote());
+
+        Customer saved = customerRepository.save(existing);
+        auditLogService.log(null, shopId, saved.getId(), "CUSTOMER", "UPDATED",
+                String.format("Cập nhật khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
+        return toResponse(saved);
+    }
+
+    public void deleteCustomer(String shopId, String branchId, String id) {
+        Customer customer = customerRepository.findByIdAndDeletedFalse(id)
+                .filter(c -> c.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+
+        if (!customer.getBranchId().equals(branchId)) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        customer.setDeleted(true);
+        customerRepository.save(customer);
+        auditLogService.log(null, shopId, customer.getId(), "CUSTOMER", "DELETED",
+                String.format("Xoá mềm khách hàng: %s (%s)", customer.getName(), customer.getPhone()));
+    }
+
+    private CustomerResponse toResponse(Customer c) {
+        return CustomerResponse.builder()
+                .id(c.getId())
+                .name(c.getName())
+                .phone(c.getPhone())
+                .email(c.getEmail())
+                .address(c.getAddress())
+                .note(c.getNote())
+                .build();
+    }
+}
+
+// File: src/main/java/com/example/sales/service/ExcelExportService.java
+package com.example.sales.service;
+
+import com.example.sales.export.GenericExcelExporter;
+import com.example.sales.model.Product;
+import com.example.sales.repository.ProductRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.function.Function;
+
+@Service
+@RequiredArgsConstructor
+public class ExcelExportService {
+    private final ProductRepository productRepository;
+
+    public <T> ResponseEntity<byte[]> exportExcel(String fileName,
+                                                  String sheetName,
+                                                  List<String> headers,
+                                                  List<T> data,
+                                                  Function<T, List<String>> rowMapper) {
+        try {
+            GenericExcelExporter<T> exporter = new GenericExcelExporter<>();
+            InputStream excelStream = exporter.export(sheetName, headers, data, rowMapper);
+            byte[] content = excelStream.readAllBytes();
+
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            responseHeaders.setContentDisposition(ContentDisposition.attachment().filename(fileName).build());
+
+            return new ResponseEntity<>(content, responseHeaders, HttpStatus.OK);
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể export file Excel", e);
+        }
+    }
+
+    public ResponseEntity<byte[]> exportProducts(String shopId, String branchId) throws IOException {
+        List<Product> products = branchId != null
+                ? productRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
+                : productRepository.findByShopIdAndDeletedFalse(shopId);
+        List<String> headers = List.of("ID", "Name", "Price", "Quantity", "Category", "SKU");
+        GenericExcelExporter<Product> exporter = new GenericExcelExporter<>();
+        InputStream stream = exporter.export("Products", headers, products, p -> List.of(
+                p.getId(), p.getName(), String.valueOf(p.getPrice()), String.valueOf(p.getQuantity()),
+                p.getCategory(), p.getSku()));
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=products.xlsx")
+                .body(stream.readAllBytes());
+    }
+}
+
+// File: src/main/java/com/example/sales/service/FileUploadService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.BusinessException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class FileUploadService {
+
+    @Value("${app.upload.temp-dir:uploads/temp/}")
+    private String tempDir;
+
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final List<String> ALLOWED_MIME_TYPES = List.of(
+            "image/jpeg",
+            "image/png",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    public String upload(MultipartFile file) {
+        try {
+            log.info("Bắt đầu upload file: tên gốc = {}", file.getOriginalFilename());
+
+            if (file.isEmpty()) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+
+            if (file.getSize() > MAX_FILE_SIZE) {
+                throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
+            }
+
+            String contentType = file.getContentType();
+            if (!ALLOWED_MIME_TYPES.contains(contentType)) {
+                throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
+            }
+
+            // Tạo tên file ngẫu nhiên
+            String filename = UUID.randomUUID() + "_" + sanitize(file.getOriginalFilename());
+
+            // Đường dẫn thư mục uploads/temp/
+            Path uploadPath = Path.of(tempDir).toAbsolutePath();
+            Files.createDirectories(uploadPath);
+            log.debug("Thư mục upload: {}", uploadPath);
+
+            // Ghi file vào disk
+            Path filePath = uploadPath.resolve(filename);
+            file.transferTo(filePath);
+            log.info("File đã được lưu tại: {}", filePath);
+
+            // Trả về URL public
+            return "/uploads/temp/" + filename;
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi khi upload file", e);
+            throw new RuntimeException("Không thể upload file", e);
+        }
+    }
+
+    // Dọn tên file cho an toàn
+    private String sanitize(String original) {
+        String sanitized = original.replaceAll("[^a-zA-Z0-9._-]", "_");
+        log.debug("Sanitize tên file: {} -> {}", original, sanitized);
+        return sanitized;
+    }
+
+    public String moveToProduct(String imageUrl) {
+        try {
+            log.info("Di chuyển file từ temp sang product: {}", imageUrl);
+
+            // Chỉ xử lý nếu là ảnh trong uploads/temp
+            if (imageUrl == null || !imageUrl.startsWith("/uploads/temp/")) {
+                log.warn("Bỏ qua file không thuộc temp: {}", imageUrl);
+                return imageUrl; // đã là ảnh final hoặc ảnh CDN thì bỏ qua
+            }
+
+            String filename = Path.of(imageUrl).getFileName().toString();
+
+            Path tempPath = Path.of(tempDir).resolve(filename).toAbsolutePath();
+            Path productDir = Path.of("uploads/product").toAbsolutePath();
+            Files.createDirectories(productDir);
+            Path targetPath = productDir.resolve(filename);
+
+            if (Files.exists(tempPath)) {
+                Files.move(tempPath, targetPath);
+                log.info("Đã chuyển file: {} -> {}", tempPath, targetPath);
+            } else {
+                log.warn("File không tồn tại tại tempPath: {}", tempPath);
+            }
+
+            return "/uploads/product/" + filename;
+
+        } catch (Exception e) {
+            log.error("Lỗi khi di chuyển ảnh từ temp sang product", e);
+            throw new RuntimeException("Không thể chuyển ảnh từ temp sang product", e);
+        }
+    }
+
+}
+
+// File: src/main/java/com/example/sales/service/InventoryService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.inventory.InventoryRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.InventoryTransaction;
+import com.example.sales.model.Product;
+import com.example.sales.repository.InventoryTransactionRepository;
+import com.example.sales.repository.ProductRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class InventoryService {
+
+    private final ProductRepository productRepository;
+    private final InventoryTransactionRepository inventoryTransactionRepository;
+
+    public InventoryTransaction createTransaction(String userId, String shopId, InventoryRequest request) {
+        Product product = productRepository.findByIdAndDeletedFalse(request.getProductId())
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        int change = switch (request.getType()) {
+            case IMPORT, ADJUSTMENT -> request.getQuantity();
+            case EXPORT -> -request.getQuantity();
+        };
+
+        int newQty = product.getQuantity() + change;
+        if (newQty < 0) {
+            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
+        }
+
+        product.setQuantity(newQty);
+        productRepository.save(product);
+
+        InventoryTransaction tx = InventoryTransaction.builder()
+                .shopId(shopId)
+                .branchId(request.getBranchId())
+                .productId(product.getId())
+                .type(request.getType())
+                .quantity(change)
+                .note(request.getNote())
+                .build();
+
+        return inventoryTransactionRepository.save(tx);
+    }
+
+    public Page<InventoryTransaction> getHistory(String userId, String productId, Pageable pageable) {
+        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
+    }
+}
+
+// File: src/main/java/com/example/sales/service/MailService.java
+package com.example.sales.service;
+
+import jakarta.mail.MessagingException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Service;
+
+import jakarta.mail.internet.MimeMessage;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+public class MailService {
+
+    private final JavaMailSender mailSender;
+    private final TemplateEngine templateEngine;
+
+    @Value("${spring.mail.username}")
+    private String from;
+
+    public void send(String to, String subject, String htmlContent) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, "utf-8");
+
+            helper.setText(htmlContent, true); // true = html
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setFrom(from);
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("Không gửi được email", e);
+        }
+    }
+
+    public void sendHtmlTemplate(String to, String subject, String templateName, Map<String, Object> model) {
+        try {
+            Context context = new Context();
+            context.setVariables(model);
+
+            String htmlContent = templateEngine.process(templateName, context);
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, "utf-8");
+
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setFrom(from);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            throw new RuntimeException("Không gửi được email", e);
+        }
+    }
+}
+
+// File: src/main/java/com/example/sales/service/OrderService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.*;
+import com.example.sales.dto.order.OrderItemResponse;
+import com.example.sales.dto.order.OrderRequest;
+import com.example.sales.dto.order.OrderResponse;
+import com.example.sales.dto.order.OrderUpdateRequest;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.*;
+import com.example.sales.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class OrderService extends BaseService {
+
+    private final OrderRepository orderRepository;
+    private final TableRepository tableRepository;
+    private final ProductRepository productRepository;
+    private final PromotionRepository promotionRepository;
+    private final AuditLogService auditLogService;
+    private final ShopRepository shopRepository;
+    private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final ShopUserService shopUserService;
+
+    public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
+        return orderRepository.findByShopIdAndDeletedFalse(shopId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public OrderResponse createOrder(String userId, String shopId, OrderRequest request) {
+        Order order = new Order();
+        order.setShopId(shopId);
+        order.setTableId(request.getTableId());
+        order.setUserId(userId);
+        order.setNote(request.getNote());
+        order.setStatus(OrderStatus.PENDING);
+        order.setPaid(false);
+
+        String branchId = request.getBranchId();
+        if (branchId != null && !branchId.isBlank()) {
+            order.setBranchId(branchId);
+        }
+
+        double[] totals = {0, 0};
+
+        List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
+            Product product = productRepository.findById(reqItem.getProductId())
+                    .filter(p -> p.getShopId().equals(shopId))
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+            double basePrice = reqItem.getPrice();
+            double finalPrice = basePrice;
+            String promoId = null;
+
+            Promotion promo = findApplicablePromotion(shopId, branchId, product.getId());
+            if (promo != null) {
+                promoId = promo.getId();
+                if (promo.getDiscountType() == DiscountType.PERCENT) {
+                    finalPrice = basePrice * (1 - promo.getDiscountValue() / 100.0);
+                } else if (promo.getDiscountType() == DiscountType.AMOUNT) {
+                    finalPrice = Math.max(0, basePrice - promo.getDiscountValue());
+                }
+            }
+
+            OrderItem item = new OrderItem();
+            item.setProductId(product.getId());
+            item.setProductName(product.getName());
+            item.setQuantity(reqItem.getQuantity());
+            item.setPrice(basePrice);
+            item.setPriceAfterDiscount(finalPrice);
+            item.setAppliedPromotionId(promoId);
+
+            totals[0] += reqItem.getQuantity();
+            totals[1] += reqItem.getQuantity() * finalPrice;
+
+            return item;
+        }).toList();
+
+        order.setItems(orderItems);
+        order.setTotalAmount(totals[0]);
+        order.setTotalPrice(totals[1]);
+
+        Order created = orderRepository.save(order);
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        if (shop.getType().isTrackInventory()) {
+            for (OrderItem item : created.getItems()) {
+                Product product = productRepository.findByIdAndDeletedFalse(item.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                adjustInventory(product, shopId, created.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
+                        "Xuất kho theo đơn hàng " + created.getId(), created.getId());
+            }
+        }
+        occupyTable(created);
+        return toResponse(created);
+    }
+
+    public void cancelOrder(String userId, String shopId, String orderId) {
+        Order order = getOrderByShop(orderId, shopId);
+
+        if (order.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+        auditLogService.log(userId, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
+    }
+
+    public OrderResponse confirmPayment(String userId, String shopId, String orderId, String paymentId, String paymentMethod) {
+        Order order = getOrderByShop(orderId, shopId);
+
+        if (order.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+
+        order.setPaid(true);
+        order.setPaymentId(paymentId);
+        order.setPaymentMethod(paymentMethod);
+        order.setPaymentTime(LocalDateTime.now());
+        order.setStatus(OrderStatus.COMPLETED);
+
+        Order updated = orderRepository.save(order);
+        releaseTable(updated);
+        auditLogService.log(userId, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
+                "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
+        return toResponse(updated);
+    }
+
+    public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
+        Order order = getOrderByShop(orderId, shopId);
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+
+        OrderStatus oldStatus = order.getStatus();
+        order.setStatus(newStatus);
+
+        if (newStatus == OrderStatus.COMPLETED && !order.isPaid()) {
+            order.setPaid(true);
+            order.setPaymentTime(LocalDateTime.now());
+            order.setPaymentMethod("Cash");
+        }
+
+        Order updated = orderRepository.save(order);
+        if (!oldStatus.equals(newStatus)) {
+            auditLogService.log(userId, shopId, order.getId(), "ORDER", "STATUS_UPDATED",
+                    "Cập nhật trạng thái từ %s → %s".formatted(oldStatus, newStatus));
+        }
+
+        return toResponse(updated);
+    }
+
+    public List<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId) {
+        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Cacheable(value = "orders", key = "#orderId + '-' + #shopId")
+    public Order getOrderByShop(String orderId, String shopId) {
+        Order order = checkOrderExists(orderRepository, orderId, shopId);
+        shopUserService.requireAnyRole(shopId, order.getUserId(), ShopRole.OWNER, ShopRole.STAFF);
+        return order;
+    }
+
+    private void occupyTable(Order order) {
+        if (order.getTableId() != null) {
+            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+                table.setStatus(TableStatus.OCCUPIED);
+                table.setCurrentOrderId(order.getId());
+                tableRepository.save(table);
+            });
+        }
+    }
+
+    private void releaseTable(Order order) {
+        if (order.getTableId() != null) {
+            tableRepository.findById(order.getTableId()).ifPresent(table -> {
+                table.setStatus(TableStatus.AVAILABLE);
+                table.setCurrentOrderId(null);
+                tableRepository.save(table);
+            });
+        }
+    }
+
+    private Promotion findApplicablePromotion(String shopId, String branchId, String productId) {
+        LocalDateTime now = LocalDateTime.now();
+        return promotionRepository.findByShopIdAndDeletedFalse(shopId).stream()
+                .filter(Promotion::isActive)
+                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
+                .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))
+                .filter(p -> p.getApplicableProductIds() == null
+                        || p.getApplicableProductIds().isEmpty()
+                        || p.getApplicableProductIds().contains(productId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void adjustInventory(Product product, String shopId, String branchId, InventoryType type, int qty,
+                                 String note, String referenceId) {
+
+        int change = switch (type) {
+            case EXPORT -> -qty;
+            case IMPORT, ADJUSTMENT -> qty;
+        };
+
+        int newQty = product.getQuantity() + change;
+        if (newQty < 0) {
+            throw new BusinessException(ApiCode.PRODUCT_OUT_OF_STOCK);
+        }
+
+        product.setQuantity(newQty);
+        productRepository.save(product);
+
+        InventoryTransaction tx = InventoryTransaction.builder()
+                .shopId(shopId)
+                .branchId(branchId)
+                .productId(product.getId())
+                .type(type)
+                .quantity(change)
+                .note(note)
+                .referenceId(referenceId)
+                .build();
+
+        inventoryTransactionRepository.save(tx);
+    }
+
+    // File: OrderService.java
+    public Page<OrderResponse> getOrdersByUser(String userId, String shopId, Pageable pageable) {
+        return orderRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+                .map(this::toResponse);
+    }
+
+    public Page<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId, Pageable pageable) {
+        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public OrderResponse updateOrder(String userId, String shopId, String orderId, OrderUpdateRequest request) {
+        Order order = getOrderByShop(orderId, shopId);
+
+        if (order.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+
+        // Gỡ bàn cũ nếu đổi bàn
+        if (request.getTableId() != null && !request.getTableId().equals(order.getTableId())) {
+            releaseTable(order);
+            order.setTableId(request.getTableId());
+            occupyTable(order);
+        }
+
+        if (request.getNote() != null) {
+            order.setNote(request.getNote());
+        }
+
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+            if (shop.getType().isTrackInventory()) {
+                // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ
+                for (OrderItem oldItem : order.getItems()) {
+                    Product product = productRepository.findByIdAndDeletedFalse(oldItem.getProductId())
+                            .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+
+                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.IMPORT, oldItem.getQuantity(),
+                            "Hoàn kho khi cập nhật đơn hàng " + orderId, orderId);
+                }
+            }
+
+            // 🔁 2. Áp dụng lại tồn kho cho danh sách mới
+            List<OrderItem> updatedItems = request.getItems().stream().map(reqItem -> {
+                Product product = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+                double basePrice = reqItem.getPrice();
+                double finalPrice = basePrice;
+                String promoId = null;
+
+                Promotion promo = findApplicablePromotion(shopId, order.getBranchId(), product.getId());
+                if (promo != null) {
+                    promoId = promo.getId();
+                    if (promo.getDiscountType() == DiscountType.PERCENT) {
+                        finalPrice = basePrice * (1 - promo.getDiscountValue() / 100.0);
+                    } else if (promo.getDiscountType() == DiscountType.AMOUNT) {
+                        finalPrice = Math.max(0, basePrice - promo.getDiscountValue());
+                    }
+                }
+
+                OrderItem item = OrderItem.builder()
+                        .productId(product.getId())
+                        .productName(product.getName())
+                        .quantity(reqItem.getQuantity())
+                        .price(basePrice)
+                        .priceAfterDiscount(finalPrice)
+                        .appliedPromotionId(promoId)
+                        .build();
+
+                // Trừ kho mới
+                if (shop.getType().isTrackInventory()) {
+                    adjustInventory(product, shopId, order.getBranchId(), InventoryType.EXPORT, item.getQuantity(),
+                            "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
+                }
+
+                return item;
+            }).toList();
+
+            order.setItems(updatedItems);
+            order.setTotalAmount(updatedItems.stream().mapToInt(OrderItem::getQuantity).sum());
+            order.setTotalPrice(updatedItems.stream().mapToDouble(i -> i.getQuantity() * i.getPriceAfterDiscount()).sum());
+        }
+
+        Order updated = orderRepository.save(order);
+        auditLogService.log(userId, shopId, orderId, "ORDER", "UPDATED", "Cập nhật đơn hàng");
+        return toResponse(updated);
+    }
+
+    private OrderResponse toResponse(Order order) {
+        return OrderResponse.builder()
+                .id(order.getId())
+                .tableId(order.getTableId())
+                .note(order.getNote())
+                .status(order.getStatus())
+                .paid(order.isPaid())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentId(order.getPaymentId())
+                .paymentTime(order.getPaymentTime())
+                .totalAmount(order.getTotalAmount())
+                .totalPrice(order.getTotalPrice())
+                .items(order.getItems().stream().map(this::toItemResponse).toList())
+                .build();
+    }
+
+    private OrderItemResponse toItemResponse(OrderItem item) {
+        return OrderItemResponse.builder()
+                .productId(item.getProductId())
+                .productName(item.getProductName())
+                .quantity(item.getQuantity())
+                .price(item.getPrice())
+                .priceAfterDiscount(item.getPriceAfterDiscount())
+                .appliedPromotionId(item.getAppliedPromotionId())
+                .build();
+    }
+}
+
+// File: src/main/java/com/example/sales/service/PaymentService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.SubscriptionActionType;
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.Shop;
+import com.example.sales.model.SubscriptionHistory;
+import com.example.sales.model.User;
+import com.example.sales.repository.SubscriptionHistoryRepository;
+import com.example.sales.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+public class PaymentService {
+
+    private final SubscriptionHistoryRepository historyRepository;
+    private final UserRepository userRepository; // Giả sử bạn có repository để lấy thông tin người dùng
+    private final MailService mailService; // Giả sử bạn có service gửi email
+
+    public void upgradeShopPlan(Shop shop, SubscriptionPlan newPlan, int months) {
+        SubscriptionPlan oldPlan = shop.getPlan();
+
+        shop.setPlan(newPlan);
+        shop.setPlanExpiry(LocalDateTime.now().plusMonths(months));
+
+        // Lưu lịch sử nâng cấp
+        SubscriptionHistory history = SubscriptionHistory.builder()
+                .shopId(shop.getId())
+                .userId(shop.getOwnerId())
+                .oldPlan(oldPlan)
+                .newPlan(newPlan)
+                .durationMonths(months)
+                .paymentMethod("MANUAL") // hoặc "WEBHOOK", "STRIPE", "VNPAY", ...
+                .transactionId(null) // có thể set từ webhook
+                .actionType(SubscriptionActionType.UPGRADE)
+                .build();
+
+        historyRepository.save(history);
+
+        // Gửi mail thông báo nâng cấp
+        User owner = userRepository.findById(shop.getOwnerId()).orElse(null);
+        if (owner != null && owner.getEmail() != null) {
+            Map<String, Object> model = Map.of(
+                    "fullName", owner.getFullName(),
+                    "newPlan", newPlan.name(),
+                    "shopName", shop.getName(),
+                    "duration", months + " tháng"
+            );
+
+            mailService.sendHtmlTemplate(
+                    owner.getEmail(),
+                    "🎉 Gói " + newPlan.name() + " đã được kích hoạt",
+                    "emails/plan-upgraded",
+                    model
+            );
+        }
+    }
+}
+
+// File: src/main/java/com/example/sales/service/ProductImportService.java
+package com.example.sales.service;
+
+import com.example.sales.dto.product.ProductRequest;
+import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
+import java.util.*;
+
+@Service
+@RequiredArgsConstructor
+public class ProductImportService {
+
+    private final ProductService productService;
+    private final AuditLogService auditLogService;
+
+    public Map<String, Object> importExcel(String shopId, String branchId, MultipartFile file) {
+        int successCount = 0;
+        int failCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        try (InputStream inputStream = file.getInputStream();
+             Workbook workbook = WorkbookFactory.create(inputStream)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            int rows = sheet.getPhysicalNumberOfRows();
+
+            for (int i = 1; i < rows; i++) {
+                Row row = sheet.getRow(i);
+                try {
+                    ProductRequest req = parseRow(row);
+                    req.setBranchId(branchId);
+                    var product = productService.createProduct(shopId, req);
+                    auditLogService.log(null, shopId, product.getId(), "PRODUCT", "IMPORTED",
+                            String.format("Nhập sản phẩm từ Excel: %s (Mã: %s)", product.getName(), product.getProductCode()));
+                    successCount++;
+                } catch (Exception ex) {
+                    failCount++;
+                    errors.add("Dòng " + (i + 1) + ": " + ex.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể đọc file Excel", e);
+        }
+
+        return Map.of(
+                "success", successCount,
+                "failed", failCount,
+                "errors", errors
+        );
+    }
+
+    private ProductRequest parseRow(Row row) {
+        ProductRequest req = new ProductRequest();
+        req.setName(getString(row, 0));
+        req.setProductCode(getString(row, 1));
+        req.setCategory(getString(row, 2));
+        req.setQuantity(getInt(row, 3));
+        req.setPrice(getDouble(row, 4));
+        req.setUnit(getString(row, 5));
+        req.setImageUrl(getString(row, 6));
+        req.setDescription(getString(row, 7));
+
+        String status = getString(row, 8).toLowerCase();
+        req.setActive(!status.contains("ngưng"));
+
+        return req;
+    }
+
+    private String getString(Row row, int i) {
+        Cell cell = row.getCell(i, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        return cell.toString().trim();
+    }
+
+    private int getInt(Row row, int i) {
+        try {
+            return (int) Double.parseDouble(getString(row, i));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private double getDouble(Row row, int i) {
+        try {
+            return Double.parseDouble(getString(row, i));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+}
+
+// File: src/main/java/com/example/sales/service/ProductService.java
+package com.example.sales.service;
+
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
+
+public interface ProductService {
+
+    /**
+     * Creates a new product for a specific shop.
+     *
+     * @param shopId  the ID of the shop
+     * @param request the product details
+     * @return the created product's response
+     */
+    ProductResponse createProduct(String shopId, ProductRequest request);
+
+    /**
+     * Updates an existing product.
+     *
+     * @param userId  the ID of the user performing the update
+     * @param shopId  the ID of the shop
+     * @param id      the ID of the product to update
+     * @param request the updated product details
+     * @return the updated product's response
+     */
+    ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request);
+
+    /**
+     * Soft deletes a product from the specified shop.
+     *
+     * @param shopId the ID of the shop
+     * @param id     the ID of the product to delete
+     */
+    void deleteProduct(String shopId, String id);
+
+    /**
+     * Retrieves details of a specific product.
+     *
+     * @param shopId the ID of the shop
+     * @param id     the ID of the product
+     * @return the product's response
+     */
+    ProductResponse getProduct(String shopId, String id);
+
+    /**
+     * Retrieves a paginated list of products for a shop.
+     *
+     * @param shopId   the ID of the shop
+     * @param pageable the pagination information
+     * @return a paginated list of product responses
+     */
+    Page<ProductResponse> getAllByShop(String shopId, Pageable pageable);
+
+    /**
+     * Toggles the active status of a product.
+     *
+     * @param shopId    the ID of the shop
+     * @param productId the ID of the product
+     * @return the updated product's response
+     */
+    ProductResponse toggleActive(String shopId, String productId);
+
+    /**
+     * Retrieves a list of products with low stock levels.
+     *
+     * @param shopId   the ID of the shop
+     * @param threshold the low stock threshold
+     * @return a list of products with low stock
+     */
+    List<ProductResponse> getLowStockProducts(String shopId, int threshold);
+
+    //searchProducts
+    /**
+     * Searches for products in a shop based on a keyword.
+     *
+     * @param shopId   the ID of the shop
+     * @param keyword  the search keyword
+     * @param pageable the pagination information
+     * @return a paginated list of product responses matching the search criteria
+     */
+    Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable);
+}
+
+// File: src/main/java/com/example/sales/service/ProductServiceImpl.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopType;
+import com.example.sales.dto.product.ProductRequest;
+import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Product;
+import com.example.sales.model.Shop;
+import com.example.sales.repository.ProductRepository;
+import com.example.sales.repository.ShopRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * Triển khai dịch vụ quản lý sản phẩm.
+ */
+@Service
+@RequiredArgsConstructor
+public class ProductServiceImpl extends BaseService implements ProductService {
+    private final ProductRepository productRepository;
+    private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
+
+    @Override
+    public ProductResponse createProduct(String shopId, ProductRequest request) {
+        // Kiểm tra sự tồn tại của cửa hàng
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // Tạo productCode nếu không được cung cấp
+        String productCode = request.getSku() != null && !request.getSku().isBlank()
+                ? request.getSku()
+                : UUID.randomUUID().toString();
+
+        // Tạo sản phẩm sử dụng builder pattern
+        Product product = Product.builder()
+                .shopId(shopId)
+                .name(request.getName())
+                .price(request.getPrice())
+                .quantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0)
+                .category(request.getCategory())
+                .sku(productCode)
+                .imageUrl(request.getImageUrl())
+                .description(request.getDescription())
+                .active(true)
+                .unit(request.getUnit())
+                .build();
+
+        product = productRepository.save(product);
+
+        // Ghi log kiểm tra
+        auditLogService.log(null, shopId, product.getId(), "PRODUCT", "CREATED",
+                String.format("Tạo sản phẩm: %s (Mã: %s)", product.getName(), product.getSku()));
+
+        return toResponse(product);
+    }
+
+    @Override
+    public ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request) {
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(id, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        // Lưu các giá trị cũ để ghi log
+        double oldPrice = product.getPrice();
+        String oldCategory = product.getCategory();
+        int oldQuantity = product.getQuantity();
+
+        // Lấy thông tin cửa hàng để kiểm tra ShopType
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // Cập nhật các trường
+        product.setName(request.getName());
+        product.setPrice(request.getPrice());
+        product.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
+        product.setCategory(request.getCategory());
+        product.setSku(request.getSku());
+        product.setImageUrl(request.getImageUrl());
+        product.setDescription(request.getDescription());
+        product.setUnit(request.getUnit());
+        product.setUpdatedAt(LocalDateTime.now());
+
+        product = productRepository.save(product);
+
+        // Ghi log kiểm tra cho các thay đổi
+        if (oldPrice != request.getPrice()) {
+            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "PRICE_CHANGED",
+                    String.format("Thay đổi giá từ %.2f → %.2f", oldPrice, request.getPrice()));
+        }
+        if (!oldCategory.equals(request.getCategory())) {
+            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "CATEGORY_CHANGED",
+                    String.format("Chuyển danh mục từ %s → %s", oldCategory, request.getCategory()));
+        }
+        if (oldQuantity != request.getQuantity()) {
+            auditLogService.log(userId, shopId, product.getId(), "PRODUCT", "QUANTITY_CHANGED",
+                    String.format("Thay đổi tồn kho từ %d → %d", oldQuantity, request.getQuantity()));
+        }
+
+        return toResponse(product);
+    }
+
+    @Override
+    public void deleteProduct(String shopId, String id) {
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(id, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+        product.setDeleted(true);
+        product.setUpdatedAt(LocalDateTime.now());
+        productRepository.save(product);
+
+        // Ghi log kiểm tra
+        auditLogService.log(null, shopId, product.getId(), "PRODUCT", "DELETED",
+                String.format("Xoá sản phẩm: %s (Mã: %s)", product.getName(), product.getSku()));
+    }
+
+    @Override
+    public ProductResponse getProduct(String shopId, String id) {
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(id, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+        return toResponse(product);
+    }
+
+    @Cacheable(value = "products", key = "#shopId")
+    @Override
+    public Page<ProductResponse> getAllByShop(String shopId, Pageable pageable) {
+        return productRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+                .map(this::toResponse);
+    }
+
+    @Override
+    public ProductResponse toggleActive(String shopId, String productId) {
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+        product.setActive(!product.isActive());
+        product.setUpdatedAt(LocalDateTime.now());
+        product = productRepository.save(product);
+
+        // Ghi log kiểm tra
+        String action = product.isActive() ? "ACTIVATED" : "DEACTIVATED";
+        auditLogService.log(null, shopId, product.getId(), "PRODUCT", action,
+                String.format("%s sản phẩm: %s (Mã: %s)",
+                        product.isActive() ? "Kích hoạt" : "Ngưng bán",
+                        product.getName(), product.getSku()));
+
+        return toResponse(product);
+    }
+
+    @Override
+    public List<ProductResponse> getLowStockProducts(String shopId, int threshold) {
+        // Kiểm tra loại cửa hàng
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        if (!requiresInventory(shop.getType())) {
+            return List.of();
+        }
+
+        return productRepository.findByShopIdAndQuantityLessThanAndDeletedFalse(shopId, threshold)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ProductResponse> searchProducts(String shopId, String keyword, Pageable pageable) {
+        return productRepository.findByShopIdAndKeyword(shopId, keyword, pageable)
+                .map(this::toResponse);
+    }
+
+    private ProductResponse toResponse(Product product) {
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .price(product.getPrice())
+                .quantity(product.getQuantity())
+                .category(product.getCategory())
+                .sku(product.getSku())
+                .imageUrl(product.getImageUrl())
+                .description(product.getDescription())
+                .active(product.isActive())
+                .createdAt(product.getCreatedAt())
+                .updatedAt(product.getUpdatedAt())
+                .unit(product.getUnit())
+                .build();
+    }
+
+    private boolean requiresInventory(ShopType type) {
+        return switch (type) {
+            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
+            case RESTAURANT, CAFE, BAR, OTHER -> false;
+        };
+    }
+}
+
+// File: src/main/java/com/example/sales/service/PromotionService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.promotion.PromotionRequest;
+import com.example.sales.dto.promotion.PromotionResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Promotion;
+import com.example.sales.repository.PromotionRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class PromotionService {
+
+    private final PromotionRepository promotionRepository;
+    private final AuditLogService auditLogService;
+
+    public Page<PromotionResponse> getAll(String userId, String shopId, String branchId, Pageable pageable) {
+        return promotionRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
+                .map(this::toResponse);
+    }
+
+    public PromotionResponse create(String userId, String shopId, PromotionRequest request) {
+        Promotion promotion = Promotion.builder()
+                .shopId(shopId)
+                .name(request.getName())
+                .discountType(request.getDiscountType())
+                .discountValue(request.getDiscountValue())
+                .applicableProductIds(request.getApplicableProductIds())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .active(request.isActive())
+                .branchId(request.getBranchId())
+                .build();
+
+        Promotion saved = promotionRepository.save(promotion);
+        auditLogService.log(userId, shopId, saved.getId(), "PROMOTION", "CREATED",
+                String.format("Tạo khuyến mãi: %s (%.2f %s)",
+                        saved.getName(),
+                        saved.getDiscountValue(),
+                        saved.getDiscountType()));
+        return toResponse(saved);
+    }
+
+    public PromotionResponse update(String userId, String shopId, String id, PromotionRequest request) {
+        Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
+                .filter(p -> p.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
+
+        if (!promotion.getBranchId().equals(request.getBranchId())) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        promotion.setName(request.getName());
+        promotion.setDiscountType(request.getDiscountType());
+        promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setApplicableProductIds(request.getApplicableProductIds());
+        promotion.setStartDate(request.getStartDate());
+        promotion.setEndDate(request.getEndDate());
+        promotion.setActive(request.isActive());
+
+        Promotion saved = promotionRepository.save(promotion);
+        auditLogService.log(userId, shopId, saved.getId(), "PROMOTION", "UPDATED",
+                String.format("Cập nhật khuyến mãi: %s", saved.getName()));
+        return toResponse(saved);
+    }
+
+    public void delete(String userId, String shopId, String id) {
+        Promotion promotion = promotionRepository.findByIdAndDeletedFalse(id)
+                .filter(p -> p.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
+
+        promotion.setDeleted(true);
+        promotionRepository.save(promotion);
+        auditLogService.log(userId, shopId, promotion.getId(), "PROMOTION", "DELETED",
+                String.format("Xoá mềm khuyến mãi: %s", promotion.getName()));
+
+    }
+
+    private PromotionResponse toResponse(Promotion p) {
+        return PromotionResponse.builder()
+                .id(p.getId())
+                .name(p.getName())
+                .discountType(p.getDiscountType())
+                .discountValue(p.getDiscountValue())
+                .applicableProductIds(p.getApplicableProductIds())
+                .startDate(p.getStartDate())
+                .endDate(p.getEndDate())
+                .active(p.isActive())
+                .build();
+    }
+}
+
+// File: src/main/java/com/example/sales/service/ReportService.java
+package com.example.sales.service;
+
+import com.example.sales.dto.report.DailyReportResponse;
+import com.example.sales.dto.report.ReportRequest;
+import com.example.sales.dto.report.ReportResponse;
+import com.example.sales.model.Order;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
+import org.springframework.data.mongodb.core.aggregation.ProjectionOperation;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+
+@Service
+@RequiredArgsConstructor
+public class ReportService {
+
+    private final MongoTemplate mongoTemplate;
+    private final ExcelExportService excelExportService;
+
+    public ReportResponse getReport(String shopId, ReportRequest request) {
+        MatchOperation match = buildMatchOperation(shopId, request);
+
+        Aggregation aggregation = newAggregation(
+                match,
+                unwind("items"),
+                group()
+                        .count().as("totalOrders")
+                        .sum("items.quantity").as("totalProductsSold")
+                        .sum("totalPrice").as("totalRevenue")
+        );
+
+        AggregationResults<ReportResponse> results =
+                mongoTemplate.aggregate(aggregation, Order.class, ReportResponse.class);
+
+        ReportResponse response = results.getUniqueMappedResult();
+
+        return response != null ? response : ReportResponse.builder()
+                .totalOrders(0)
+                .totalProductsSold(0)
+                .totalRevenue(0)
+                .build();
+    }
+
+    public List<DailyReportResponse> getDailyReport(String shopId, ReportRequest request) {
+        MatchOperation match = buildMatchOperation(shopId, request);
+
+        ProjectionOperation projectDate = project()
+                .andExpression("year(createdAt)").as("year")
+                .andExpression("month(createdAt)").as("month")
+                .andExpression("dayOfMonth(createdAt)").as("day")
+                .and("totalPrice").as("totalPrice")
+                .and("items").as("items");
+
+        Aggregation aggregation = newAggregation(
+                match,
+                projectDate,
+                unwind("items"),
+                group("year", "month", "day")
+                        .count().as("totalOrders")
+                        .sum("items.quantity").as("totalProductsSold")
+                        .sum("totalPrice").as("totalRevenue"),
+                project()
+                        .andExpression("dateFromParts(year: _id.year, month: _id.month, day: _id.day)").as("date")
+                        .andInclude("totalOrders", "totalProductsSold", "totalRevenue"),
+                sort(Sort.Direction.ASC, "date")
+        );
+
+        AggregationResults<DailyReportResponse> results =
+                mongoTemplate.aggregate(aggregation, Order.class, DailyReportResponse.class);
+
+        return results.getMappedResults();
+    }
+
+    public ResponseEntity<byte[]> exportDailyReportExcel(String shopId,
+                                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        ReportRequest request = new ReportRequest();
+        request.setStartDate(startDate);
+        request.setEndDate(endDate);
+
+        List<DailyReportResponse> data = getDailyReport(shopId, request);
+
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        return excelExportService.exportExcel(
+                "daily-report.xlsx",
+                "Báo cáo theo ngày",
+                List.of("Ngày", "Tổng đơn", "Tổng sản phẩm", "Tổng doanh thu"),
+                data,
+                r -> List.of(
+                        r.getDate().format(df),
+                        String.valueOf(r.getTotalOrders()),
+                        String.valueOf(r.getTotalProductsSold()),
+                        String.valueOf(r.getTotalRevenue())
+                )
+        );
+    }
+
+    private MatchOperation buildMatchOperation(String shopId, ReportRequest request) {
+        Criteria criteria = Criteria.where("shopId").is(shopId);
+
+        if (request.getStatus() != null) {
+            criteria = criteria.and("status").is(request.getStatus());
+        }
+
+        if (request.getStartDate() != null && request.getEndDate() != null) {
+            LocalDateTime start = request.getStartDate().atStartOfDay();
+            LocalDateTime end = request.getEndDate().atTime(LocalTime.MAX);
+            criteria = criteria.and("createdAt").gte(start).lte(end);
+        }
+
+        return match(criteria);
+    }
+}
+
+// File: src/main/java/com/example/sales/service/ShopService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.UserRole;
+import com.example.sales.dto.shop.ShopAdminResponse;
+import com.example.sales.dto.shop.ShopRequest;
+import com.example.sales.dto.shop.ShopResponse;
+import com.example.sales.dto.shop.ShopSimpleResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
+import com.example.sales.model.ShopUser;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.security.CustomUserDetails;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class ShopService extends BaseService {
+
+    private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
+    private final ShopUserRepository shopUserRepository;
+
+    public Shop createShop(String userId, ShopRequest request, String logoUrl) {
+        if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
+            throw new BusinessException(ApiCode.SHOP_NAME_EXISTS);
+        }
+        if (shopRepository.findByOwnerIdAndDeletedFalse(userId).isPresent()) {
+            throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
+        }
+
+        Shop shop = new Shop();
+        shop.setName(request.getName());
+        shop.setType(request.getType());
+        shop.setAddress(request.getAddress());
+        shop.setPhone(request.getPhone());
+        shop.setLogoUrl(logoUrl);
+        shop.setOwnerId(userId);
+
+        Shop saved = shopRepository.save(shop);
+        ShopUser shopUser = ShopUser.builder()
+                .shopId(shop.getId())
+                .userId(userId)
+                .role(ShopRole.OWNER)
+                .build();
+        shopUserRepository.save(shopUser);
+
+        auditLogService.log(userId, saved.getId(), saved.getId(), "SHOP", "CREATED",
+                String.format("Tạo cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+
+        return saved;
+    }
+
+    @Cacheable(value = "shops", key = "#ownerId")
+    public Shop getShopByOwner(String ownerId) {
+        return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
+
+    public Shop updateShop(String ownerId, ShopRequest request) {
+        Shop shop = getShopByOwner(ownerId);
+
+        shop.setName(request.getName());
+        shop.setType(request.getType());
+        shop.setAddress(request.getAddress());
+        shop.setPhone(request.getPhone());
+
+        Shop saved = shopRepository.save(shop);
+        auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",
+                String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
+        return saved;
+    }
+
+    public String getShopIdByOwner(String ownerId) {
+        return shopRepository.findByOwnerIdAndDeletedFalse(ownerId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND))
+                .getId();
+    }
+
+    public void deleteShop(String ownerId) {
+        Shop shop = getShopByOwner(ownerId);
+        shop.setDeleted(true);
+        shopRepository.save(shop);
+        auditLogService.log(null, shop.getId(), shop.getId(), "SHOP", "DELETED",
+                String.format("Xoá mềm cửa hàng: %s", shop.getName()));
+    }
+
+    @Cacheable(value = "shops", key = "#shopId")
+    public Shop getShopById(String shopId) {
+        return checkShopExists(shopRepository, shopId);
+    }
+
+    // File: ShopService.java
+    public Page<ShopSimpleResponse> searchShops(String keyword, Pageable pageable) {
+        return shopRepository.findByKeyword(keyword, pageable)
+                .map(shop -> ShopSimpleResponse.builder()
+                        .id(shop.getId())
+                        .name(shop.getName())
+                        .type(shop.getType())
+                        .logoUrl(shop.getLogoUrl())
+                        .active(shop.isActive())
+                        .build());
+    }
+
+    public Shop save(Shop shop) {
+        return shopRepository.save(shop);
+    }
+
+    public Object getShopResponse(CustomUserDetails user, Shop shop) {
+        if (user.getRole() == UserRole.ROLE_ADMIN) {
+            return ShopAdminResponse.builder()
+                    .id(shop.getId())
+                    .name(shop.getName())
+                    .type(shop.getType())
+                    .address(shop.getAddress())
+                    .phone(shop.getPhone())
+                    .logoUrl(shop.getLogoUrl())
+                    .active(shop.isActive())
+                    .plan(shop.getPlan())
+                    .currency(shop.getCurrency())
+                    .timezone(shop.getTimezone())
+                    .orderPrefix(shop.getOrderPrefix())
+                    .planExpiry(shop.getPlanExpiry())
+                    .build();
+        } else {
+            return ShopResponse.builder()
+                    .id(shop.getId())
+                    .name(shop.getName())
+                    .type(shop.getType())
+                    .address(shop.getAddress())
+                    .phone(shop.getPhone())
+                    .logoUrl(shop.getLogoUrl())
+                    .active(shop.isActive())
+                    .plan(shop.getPlan())
+                    .currency(shop.getCurrency())
+                    .build();
+        }
+    }
+
+}
+
+// File: src/main/java/com/example/sales/service/ShopUserService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.shop.ShopSimpleResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Shop;
+import com.example.sales.model.ShopUser;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.ShopUserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class ShopUserService extends BaseService {
+
+    private final ShopUserRepository shopUserRepository;
+    private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
+
+    @Cacheable(value = "shopUsers", key = "#shopId + '-' + #userId")
+    public ShopRole getUserRoleInShop(String shopId, String userId) {
+        return checkShopUserExists(shopUserRepository, shopId, userId).getRole();
+    }
+
+    public boolean isOwner(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.OWNER)
+                .orElse(false);
+    }
+
+    public boolean isStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                .map(shopUser -> shopUser.getRole() == ShopRole.STAFF)
+                .orElse(false);
+    }
+
+    public boolean isOwnerOrStaff(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                .map(shopUser -> {
+                    ShopRole role = shopUser.getRole();
+                    return role == ShopRole.OWNER || role == ShopRole.STAFF;
+                })
+                .orElse(false);
+    }
+
+    public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
+        ShopRole actual = getUserRoleInShop(shopId, userId);
+        if (Arrays.stream(roles).noneMatch(role -> role == actual)) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+    }
+
+    public void requireOwner(String shopId, String userId) {
+        if (!isOwner(shopId, userId)) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+    }
+
+    public void addUser(String shopId, String userId, ShopRole role, String branchId) {
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        if (!shop.isActive()) {
+            throw new BusinessException(ApiCode.SHOP_INACTIVE);
+        }
+        Optional<ShopUser> existing = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId);
+        if (existing.isPresent()) {
+            throw new BusinessException(ApiCode.DUPLICATE_DATA);
+        }
+        ShopUser shopUser = ShopUser.builder()
+                .shopId(shopId)
+                .userId(userId)
+                .role(role)
+                .branchId(branchId)
+                .build();
+        shopUserRepository.save(shopUser);
+        auditLogService.log(userId, shopId, shopUser.getId(), "SHOP_USER", "ADDED",
+                String.format("Thêm người dùng %s vào cửa hàng %s với vai trò %s", userId, shopId, role));
+    }
+
+    public void removeUser(String shopId, String userId) {
+        ShopUser user = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
+        shopUserRepository.delete(user);
+        auditLogService.log(userId, shopId, user.getId(), "SHOP_USER", "REMOVED",
+                String.format("Xoá người dùng %s khỏi cửa hàng %s", userId, shopId));
+    }
+
+    public Page<ShopSimpleResponse> getShopsForUser(String userId, Pageable pageable) {
+        return shopUserRepository.findByUserIdAndDeletedFalse(userId, pageable)
+                .map(su -> {
+                    return shopRepository.findByIdAndDeletedFalse(su.getShopId())
+                            .map(shop -> ShopSimpleResponse.builder()
+                                    .id(shop.getId())
+                                    .name(shop.getName())
+                                    .type(shop.getType())
+                                    .logoUrl(shop.getLogoUrl())
+                                    .active(shop.isActive())
+                                    .role(su.getRole())
+                                    .build())
+                            .orElse(null);
+                });
+    }
+}
+
+// File: src/main/java/com/example/sales/service/TableService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.TableStatus;
+import com.example.sales.dto.table.TableRequest;
+import com.example.sales.dto.table.TableResponse;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Shop;
+import com.example.sales.model.Table;
+import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.TableRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class TableService {
+
+    private final TableRepository tableRepository;
+    private final ShopRepository shopRepository;
+    private final AuditLogService auditLogService;
+    private final ShopUserService shopUserService;
+
+    @Transactional
+    public TableResponse create(String userId, TableRequest request) {
+        String shopId = request.getShopId();
+        String branchId = request.getBranchId();
+
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER);
+
+        // Kiểm tra cửa hàng tồn tại
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        // Kiểm tra trùng lặp tên bàn
+        if (tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
+                .stream().anyMatch(table -> table.getName().equalsIgnoreCase(request.getName()))) {
+            throw new BusinessException(ApiCode.TABLE_NAME_EXISTS);
+        }
+
+        // Kiểm tra capacity hợp lệ
+        if (request.getCapacity() != null && request.getCapacity() <= 0) {
+            throw new BusinessException(ApiCode.INVALID_CAPACITY);
+        }
+
+        Table table = Table.builder()
+                .name(request.getName())
+                .shopId(shopId)
+                .branchId(branchId)
+                .status(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE))
+                .capacity(request.getCapacity())
+                .note(request.getNote())
+                .build();
+
+        Table saved = tableRepository.save(table);
+        auditLogService.log(userId, shopId, saved.getId(), "TABLE", "CREATED",
+                String.format("Tạo bàn: %s (Chi nhánh: %s)", saved.getName(), saved.getBranchId()));
+        return toResponse(saved, shop);
+    }
+
+    public Page<TableResponse> getByShop(String userId, String shopId, String branchId, Pageable pageable) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+
+        // Kiểm tra cửa hàng tồn tại
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        // Lấy danh sách bàn với phân trang
+        return tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
+                .map(table -> toResponse(table, shop));
+    }
+
+    @Transactional
+    public TableResponse updateStatus(String userId, String tableId, TableStatus status) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(null, userId, ShopRole.OWNER, ShopRole.STAFF);
+
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+
+        table.setStatus(status);
+        Table saved = tableRepository.save(table);
+        auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "STATUS_UPDATED",
+                String.format("Cập nhật trạng thái bàn: %s → %s", table.getName(), status));
+        return toResponse(saved, shopRepository.findByIdAndDeletedFalse(table.getShopId()).orElse(null));
+    }
+
+    @Transactional
+    public TableResponse updateTable(String userId, String tableId, TableRequest request) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(request.getShopId(), userId, ShopRole.OWNER);
+
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+
+        // Kiểm tra bàn không đang được sử dụng
+        if (table.getStatus() == TableStatus.OCCUPIED) {
+            throw new BusinessException(ApiCode.TABLE_OCCUPIED);
+        }
+
+        // Kiểm tra cửa hàng tồn tại
+        Shop shop = shopRepository.findByIdAndDeletedFalse(request.getShopId())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
+        // Kiểm tra trùng lặp tên bàn
+        if (!table.getName().equalsIgnoreCase(request.getName()) &&
+                tableRepository.findByShopIdAndBranchIdAndDeletedFalse(request.getShopId(), request.getBranchId())
+                        .stream().anyMatch(t -> t.getName().equalsIgnoreCase(request.getName()))) {
+            throw new BusinessException(ApiCode.TABLE_NAME_EXISTS);
+        }
+
+        // Kiểm tra capacity hợp lệ
+        if (request.getCapacity() != null && request.getCapacity() <= 0) {
+            throw new BusinessException(ApiCode.INVALID_CAPACITY);
+        }
+
+        // Cập nhật thông tin bàn
+        table.setName(request.getName());
+        table.setShopId(request.getShopId());
+        table.setBranchId(request.getBranchId());
+        table.setCapacity(request.getCapacity());
+        table.setNote(request.getNote());
+        table.setStatus(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE));
+
+        Table saved = tableRepository.save(table);
+        auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "UPDATED",
+                String.format("Cập nhật thông tin bàn: %s", table.getName()));
+        return toResponse(saved, shop);
+    }
+
+    @Transactional
+    public void deleteTable(String userId, String tableId) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(null, userId, ShopRole.OWNER);
+
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+
+        // Kiểm tra bàn không đang được sử dụng
+        if (table.getStatus() == TableStatus.OCCUPIED) {
+            throw new BusinessException(ApiCode.TABLE_OCCUPIED);
+        }
+
+        table.setDeleted(true);
+        tableRepository.save(table);
+        auditLogService.log(userId, table.getShopId(), tableId, "TABLE", "DELETED",
+                String.format("Xóa bàn: %s", table.getName()));
+    }
+
+    private TableResponse toResponse(Table table, Shop shop) {
+        return TableResponse.builder()
+                .id(table.getId())
+                .name(table.getName())
+                .status(table.getStatus())
+                .shopId(table.getShopId())
+                .branchId(table.getBranchId())
+                .shopName(shop != null ? shop.getName() : null)
+                .capacity(table.getCapacity())
+                .note(table.getNote())
+                .currentOrderId(table.getCurrentOrderId())
+                .build();
+    }
+}
+
+// File: src/main/java/com/example/sales/service/TokenService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.RefreshToken;
+import com.example.sales.model.User;
+import com.example.sales.repository.RefreshTokenRepository;
+import com.example.sales.repository.UserRepository;
+import com.example.sales.security.JwtUtil;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class TokenService {
+
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+
+    public RefreshToken createRefreshToken(User user) {
+        RefreshToken token = new RefreshToken();
+        token.setToken(UUID.randomUUID().toString());
+        token.setUserId(user.getId());
+        token.setExpiryDate(new Date(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000)); // 7 ngày
+
+        return refreshTokenRepository.save(token);
+    }
+
+    public String refreshAccessToken(String refreshTokenValue) {
+        RefreshToken token = refreshTokenRepository.findByToken(refreshTokenValue)
+                .orElseThrow(() -> new BusinessException(ApiCode.REFRESH_TOKEN_INVALID));
+
+        if (token.getExpiryDate().before(new Date())) {
+            refreshTokenRepository.delete(token);
+            throw new BusinessException(ApiCode.REFRESH_TOKEN_EXPIRED);
+        }
+
+        User user = userRepository.findByIdAndDeletedFalse(token.getUserId())
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+
+        return jwtUtil.generateToken(user);
+    }
+
+    public void revokeToken(String refreshToken) {
+        refreshTokenRepository.findByToken(refreshToken)
+                .ifPresent(refreshTokenRepository::delete);
+    }
+}
+
+// File: src/main/java/com/example/sales/service/UserService.java
+package com.example.sales.service;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.BusinessException;
+import com.example.sales.model.User;
+import com.example.sales.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public User getCurrentUser(String userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+    }
+
+    public User updateProfile(String userId, String fullName, String phone, String businessType) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+        user.setFullName(fullName);
+        user.setPhone(phone);
+        user.setBusinessType(businessType);
+        return userRepository.save(user);
+    }
+
+    public void changePassword(String userId, String currentPassword, String newPassword) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new BusinessException(ApiCode.INCORRECT_PASSWORD);
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+}
+
+// File: src/main/java/com/example/sales/helper/CustomerSearchHelper.java
+package com.example.sales.helper;
+
+import com.example.sales.dto.customer.CustomerSearchRequest;
+import com.example.sales.model.Customer;
+import org.bson.Document;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+
+@Component
+public class CustomerSearchHelper {
+
+    private final MongoTemplate mongoTemplate;
+
+    public CustomerSearchHelper(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
+
+    public List<Customer> search(String userId, CustomerSearchRequest req, Pageable pageable) {
+        Aggregation agg = newAggregation(
+                buildMatch(userId, req),
+                sort(Sort.Direction.DESC, "_id"),
+                skip((long) pageable.getPageNumber() * pageable.getPageSize()),
+                limit(pageable.getPageSize())
+        );
+
+        return mongoTemplate.aggregate(agg, "customers", Customer.class).getMappedResults();
+    }
+
+    public long counts(String userId, CustomerSearchRequest req) {
+        Aggregation countAgg = newAggregation(
+                buildMatch(userId, req),
+                count().as("total")
+        );
+
+        return Optional.of(
+                mongoTemplate.aggregate(countAgg, "customers", Document.class)
+                        .getUniqueMappedResult()
+        ).map(d -> ((Number) d.get("total")).longValue()).orElse(0L);
+    }
+
+    public List<Customer> exportAll(String userId, CustomerSearchRequest req) {
+        Aggregation agg = newAggregation(
+                buildMatch(userId, req),
+                sort(Sort.Direction.ASC, "name")
+        );
+
+        return mongoTemplate.aggregate(agg, "customers", Customer.class).getMappedResults();
+    }
+
+    private MatchOperation buildMatch(String userId, CustomerSearchRequest req) {
+        String keyword = Optional.ofNullable(req.getKeyword()).orElse("").trim();
+
+        Criteria base = Criteria.where("userId").is(userId);
+        List<Criteria> andConditions = new ArrayList<>();
+        andConditions.add(base);
+
+        // keyword
+        if (!keyword.isEmpty()) {
+            andConditions.add(new Criteria().orOperator(
+                    Criteria.where("name").regex(keyword, "i"),
+                    Criteria.where("email").regex(keyword, "i"),
+                    Criteria.where("phone").regex(keyword, "i")
+            ));
+        }
+
+        // filter ngày tạo
+        if (req.getFromDate() != null || req.getToDate() != null) {
+            Criteria dateCriteria = Criteria.where("createdAt");
+            if (req.getFromDate() != null) {
+                dateCriteria = dateCriteria.gte(req.getFromDate().atStartOfDay());
+            }
+            if (req.getToDate() != null) {
+                dateCriteria = dateCriteria.lte(req.getToDate().atTime(23, 59, 59));
+            }
+            andConditions.add(dateCriteria);
+        }
+
+        return match(new Criteria().andOperator(andConditions.toArray(new Criteria[0])));
+    }
+}
+
+// File: src/main/java/com/example/sales/helper/ProductSearchHelper.java
+package com.example.sales.helper;
+
+import com.example.sales.dto.product.ProductSearchRequest;
+import com.example.sales.model.Product;
+import lombok.RequiredArgsConstructor;
+import org.bson.Document;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.stereotype.Component;
+
+import java.util.*;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+
+@Component
+@RequiredArgsConstructor
+public class ProductSearchHelper {
+
+    private final MongoTemplate mongoTemplate;
+
+    public List<Product> search(String shopId, String branchId, ProductSearchRequest req, Pageable pageable) {
+        Aggregation agg = newAggregation(
+                buildMatch(shopId, branchId, req),
+                sort(Sort.Direction.fromString(req.getSortDir()), req.getSortBy()),
+                skip((long) pageable.getPageNumber() * pageable.getPageSize()),
+                limit(pageable.getPageSize())
+        );
+
+        return mongoTemplate.aggregate(agg, "products", Product.class).getMappedResults();
+    }
+
+    public long counts(String shopId, String branchId, ProductSearchRequest req) {
+        Aggregation agg = newAggregation(
+                buildMatch(shopId, branchId, req),
+                count().as("total")
+        );
+
+        return Optional.of(
+                mongoTemplate.aggregate(agg, "products", Document.class).getUniqueMappedResult()
+        ).map(d -> ((Number) d.get("total")).longValue()).orElse(0L);
+    }
+
+    private MatchOperation buildMatch(String shopId, String branchId, ProductSearchRequest req) {
+        List<Criteria> criteria = new ArrayList<>();
+        criteria.add(Criteria.where("shopId").is(shopId));
+        if (branchId != null && !branchId.isBlank()) {
+            criteria.add(Criteria.where("branchId").is(branchId));
+        }
+        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
+            String pattern = ".*" + req.getKeyword().trim() + ".*";
+            criteria.add(new Criteria().orOperator(
+                    Criteria.where("name").regex(pattern, "i"),
+                    Criteria.where("category").regex(pattern, "i")
+            ));
+        }
+
+        if (req.getCategory() != null && !req.getCategory().isBlank()) {
+            criteria.add(Criteria.where("category").is(req.getCategory()));
+        }
+
+        if (req.getActive() != null) {
+            criteria.add(Criteria.where("active").is(req.getActive()));
+        }
+
+        if (req.getMinPrice() != null) {
+            criteria.add(Criteria.where("price").gte(req.getMinPrice()));
+        }
+
+        if (req.getMaxPrice() != null) {
+            criteria.add(Criteria.where("price").lte(req.getMaxPrice()));
+        }
+
+        return match(new Criteria().andOperator(criteria.toArray(new Criteria[0])));
+    }
+}
+
+[END]

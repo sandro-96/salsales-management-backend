@@ -18,7 +18,6 @@ public interface ShopRepository extends MongoRepository<Shop, String> {
     List<Shop> findByPlanExpiryBeforeAndPlanNot(LocalDateTime date, SubscriptionPlan plan);
     List<Shop> findByPlanExpiryBetween(LocalDateTime start, LocalDateTime end);
     boolean existsByNameAndDeletedFalse(String name);
-    // File: ShopRepository.java
     @Query("{ 'deleted': false, $or: [ { 'name': { $regex: ?0, $options: 'i' } }, { 'address': { $regex: ?0, $options: 'i' } } ] }")
     Page<Shop> findByKeyword(String keyword, Pageable pageable);
 }

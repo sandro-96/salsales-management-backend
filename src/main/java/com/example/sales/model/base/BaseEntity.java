@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
-@ToString(exclude = {"createdBy", "updatedBy"}) // 👈 Tránh vòng lặp khi log
+@ToString(exclude = {"createdBy", "updatedBy"})
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor

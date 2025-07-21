@@ -1,0 +1,778 @@
+[START]
+// File: src/main/java/com/example/sales/repository/AuditLogRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.AuditLog;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+
+public interface AuditLogRepository extends MongoRepository<AuditLog, String> {
+    List<AuditLog> findByTargetIdAndDeletedFalseOrderByCreatedAtDesc(String targetId);
+}
+
+// File: src/main/java/com/example/sales/repository/BranchRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Branch;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface BranchRepository extends MongoRepository<Branch, String> {
+    Page<Branch> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+    Optional<Branch> findByIdAndDeletedFalse(String id);
+}
+
+// File: src/main/java/com/example/sales/repository/CustomerRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Customer;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface CustomerRepository extends MongoRepository<Customer, String> {
+
+    List<Customer> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
+
+    Optional<Customer> findByIdAndDeletedFalse(String id);
+}
+
+// File: src/main/java/com/example/sales/repository/InventoryTransactionRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.InventoryTransaction;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+public interface InventoryTransactionRepository extends MongoRepository<InventoryTransaction, String> {
+    Page<InventoryTransaction> findByProductIdOrderByCreatedAtDesc(String productId, Pageable pageable);
+}
+
+// File: src/main/java/com/example/sales/repository/OrderRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.model.Order;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface OrderRepository extends MongoRepository<Order, String> {
+    Optional<Order> findByIdAndDeletedFalse(String id);
+    List<Order> findByShopIdAndDeletedFalse(String shopId);
+    List<Order> findByShopIdAndBranchIdAndStatusAndDeletedFalse(String shopId, String branchId, OrderStatus status);
+    Page<Order> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+    Page<Order> findByShopIdAndBranchIdAndStatusAndDeletedFalse(String shopId, String branchId, OrderStatus status, Pageable pageable);
+}
+
+// File: src/main/java/com/example/sales/repository/ProductRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface ProductRepository extends MongoRepository<Product, String> {
+    Optional<Product> findByIdAndDeletedFalse(String id);
+    Optional<Product> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
+    Page<Product> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+    List<Product> findByShopIdAndQuantityLessThanAndDeletedFalse(String shopId, int threshold);
+    List<Product> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
+    List<Product> findByShopIdAndDeletedFalse(String shopId);
+    @Query("{ 'shopId': ?0, 'deleted': false, $or: [ { 'name': { $regex: ?1, $options: 'i' } }, { 'sku': { $regex: ?1, $options: 'i' } }, { 'description': { $regex: ?1, $options: 'i' } } ] }")
+    Page<Product> findByShopIdAndKeyword(String shopId, String keyword, Pageable pageable);
+}
+
+// File: src/main/java/com/example/sales/repository/PromotionRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Promotion;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PromotionRepository extends MongoRepository<Promotion, String> {
+    List<Promotion> findByShopIdAndDeletedFalse(String shopId);
+
+    Optional<Promotion> findByIdAndDeletedFalse(String id);
+
+    Page<Promotion> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId, Pageable pageable);
+}
+
+// File: src/main/java/com/example/sales/repository/RefreshTokenRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.RefreshToken;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.Optional;
+
+public interface RefreshTokenRepository extends MongoRepository<RefreshToken, String> {
+    Optional<RefreshToken> findByToken(String token);
+}
+
+// File: src/main/java/com/example/sales/repository/ShopRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.Shop;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+public interface ShopRepository extends MongoRepository<Shop, String> {
+    Optional<Shop> findByOwnerIdAndDeletedFalse(String ownerId);
+    Optional<Shop> findByIdAndDeletedFalse(String id);
+    List<Shop> findByPlanExpiryBeforeAndPlanNot(LocalDateTime date, SubscriptionPlan plan);
+    List<Shop> findByPlanExpiryBetween(LocalDateTime start, LocalDateTime end);
+    boolean existsByNameAndDeletedFalse(String name);
+    @Query("{ 'deleted': false, $or: [ { 'name': { $regex: ?0, $options: 'i' } }, { 'address': { $regex: ?0, $options: 'i' } } ] }")
+    Page<Shop> findByKeyword(String keyword, Pageable pageable);
+}
+
+// File: src/main/java/com/example/sales/repository/ShopUserRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.ShopUser;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.Optional;
+
+public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
+    Optional<ShopUser> findByIdAndDeletedFalse(String id);
+
+    Optional<ShopUser> findByShopIdAndUserIdAndDeletedFalse(String shopId, String userId);
+
+    Page<ShopUser> findByUserIdAndDeletedFalse(String userId, Pageable pageable);
+}
+
+// File: src/main/java/com/example/sales/repository/SubscriptionHistoryRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.SubscriptionHistory;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+
+public interface SubscriptionHistoryRepository extends MongoRepository<SubscriptionHistory, String> {
+    List<SubscriptionHistory> findByShopIdOrderByCreatedAtDesc(String shopId);
+}
+
+// File: src/main/java/com/example/sales/repository/TableRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.Table;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface TableRepository extends MongoRepository<Table, String> {
+
+    List<Table> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
+    Page<Table> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId, Pageable pageable);
+
+    Optional<Table> findByIdAndDeletedFalse(String id);
+}
+
+// File: src/main/java/com/example/sales/repository/UserRepository.java
+package com.example.sales.repository;
+
+import com.example.sales.model.User;
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import java.util.Optional;
+
+public interface UserRepository extends MongoRepository<User, String> {
+    Optional<User> findByEmailAndDeletedFalse(String email);
+    Optional<User> findByIdAndDeletedFalse(String id);
+    Optional<User> findByVerificationTokenAndDeletedFalse(String token);
+}
+
+// File: src/main/java/com/example/sales/model/base/BaseEntity.java
+package com.example.sales.model.base;
+
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@ToString(exclude = {"createdBy", "updatedBy"})
+@EqualsAndHashCode
+@NoArgsConstructor
+@AllArgsConstructor
+public abstract class BaseEntity {
+
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+
+    @CreatedBy
+    private String createdBy;
+
+    @LastModifiedBy
+    private String updatedBy;
+
+    @Field("deleted")
+    private boolean deleted = false;
+
+    private LocalDateTime deletedAt;
+}
+
+// File: src/main/java/com/example/sales/model/AuditLog.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document("audit_logs")
+public class AuditLog extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String userId;
+    private String shopId;
+
+    private String targetId;     // ID của Order hoặc Product
+    private String targetType;   // "ORDER", "PRODUCT"
+
+    private String action;       // PRICE_CHANGED, STATUS_UPDATED, etc.
+    private String description;
+}
+
+// File: src/main/java/com/example/sales/model/Branch.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document("branches")
+public class Branch extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+    private String name;
+    private String address;
+    private String phone;
+
+    @Builder.Default
+    private boolean active = true;
+}
+
+// File: src/main/java/com/example/sales/model/Customer.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document("customers")
+public class Customer extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String userId;     // Chủ sở hữu
+    private String name;
+    private String phone;
+    private String email;
+    private String address;
+    private String note;
+    private String shopId;
+    private String branchId;   // Có thể null nếu không phân biệt chi nhánh
+}
+
+// File: src/main/java/com/example/sales/model/InventoryTransaction.java
+package com.example.sales.model;
+
+import com.example.sales.constant.InventoryType;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document("inventory_transactions")
+public class InventoryTransaction extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+    private String branchId;
+    private String productId;
+
+    private InventoryType type;  // IMPORT, EXPORT, ADJUSTMENT
+
+    private int quantity;
+
+    private String note;
+
+    private String referenceId;  // Liên kết đơn hàng, phiếu nhập, v.v.
+}
+
+// File: src/main/java/com/example/sales/model/Order.java
+package com.example.sales.model;
+
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Getter
+@Setter
+@ToString(exclude = "items") // 👈 Quan trọng: không in danh sách item
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document("orders")
+public class Order extends BaseEntity {
+    @Id
+    private String id;
+
+    private String shopId;
+    private String branchId;
+    private String tableId;
+    private String userId;
+
+    private List<OrderItem> items;
+
+    private double totalPrice;
+    private double totalAmount;
+
+    @Builder.Default
+    private OrderStatus status = OrderStatus.PENDING;
+
+    private String paymentId;
+    private String paymentMethod;
+    private LocalDateTime paymentTime;
+    private boolean isPaid;
+
+    private String note;
+}
+
+// File: src/main/java/com/example/sales/model/OrderItem.java
+package com.example.sales.model;
+
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+
+@Getter
+@Setter
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OrderItem {
+    private String productId;
+    private String productName;
+    private int quantity;
+    private double price;
+    private double priceAfterDiscount;
+    private String appliedPromotionId;
+}
+
+// File: src/main/java/com/example/sales/model/Product.java
+package com.example.sales.model;
+
+import com.example.sales.model.base.BaseEntity;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document("products")
+public class Product extends BaseEntity {
+    @Id
+    private String id;
+
+    @NotBlank(message = "Tên sản phẩm không được để trống")
+    private String name;
+
+    @NotBlank(message = "Danh mục không được để trống")
+    private String category;
+
+    @Min(value = 0, message = "Số lượng không được âm")
+    private int quantity;
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "Giá phải lớn hơn 0")
+    private double price;
+
+    private String unit;
+    private String imageUrl;
+    private String description;
+    private String shopId;
+    private String branchId;
+
+    @Builder.Default
+    private boolean active = true;
+
+    private String productCode;
+    private String sku;
+}
+
+// File: src/main/java/com/example/sales/model/Promotion.java
+package com.example.sales.model;
+
+import com.example.sales.constant.DiscountType;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document(collection = "promotions")
+public class Promotion extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+    private String branchId;
+
+    private String name;
+
+    private DiscountType discountType; // PERCENT, AMOUNT
+
+    private double discountValue;
+
+    private List<String> applicableProductIds;
+
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+
+    private boolean active;
+}
+
+// File: src/main/java/com/example/sales/model/RefreshToken.java
+package com.example.sales.model;
+
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.Date;
+
+@Getter
+@Setter
+@ToString(exclude = "token") // ❗ tránh log token
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "refresh_tokens")
+public class RefreshToken {
+    @Id
+    private String id;
+    private String token;
+    private String userId;
+    private Date expiryDate;
+}
+
+// File: src/main/java/com/example/sales/model/Shop.java
+package com.example.sales.model;
+
+import com.example.sales.constant.ShopType;
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document(collection = "shops")
+public class Shop extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String name;
+    private String ownerId;
+    private ShopType type;
+    private String address;
+    private String phone;
+    private String logoUrl;
+
+    @Builder.Default
+    private boolean active = true;
+
+    // ====== Nâng cao (SS) ======
+    @Builder.Default
+    private boolean trackInventory = true;
+
+    @Builder.Default
+    private String currency = "VND";
+
+    @Builder.Default
+    private String timezone = "Asia/Ho_Chi_Minh";
+
+    @Builder.Default
+    private String orderPrefix = "ORD";
+
+    @Builder.Default
+    private SubscriptionPlan plan = SubscriptionPlan.FREE;
+
+    private LocalDateTime planExpiry;
+}
+
+// File: src/main/java/com/example/sales/model/ShopUser.java
+package com.example.sales.model;
+
+import com.example.sales.constant.ShopRole;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document(collection = "shop_users")
+public class ShopUser extends BaseEntity {
+    @Id
+    private String id;
+    private String shopId;
+    private String userId;
+    private ShopRole role;
+    private String branchId;
+}
+
+// File: src/main/java/com/example/sales/model/SubscriptionHistory.java
+package com.example.sales.model;
+
+import com.example.sales.constant.SubscriptionActionType;
+import com.example.sales.constant.SubscriptionPlan;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document("subscription_histories")
+public class SubscriptionHistory extends BaseEntity {
+
+    @Id
+    private String id;
+
+    private String shopId;
+    private String userId;
+
+    private SubscriptionPlan oldPlan;
+    private SubscriptionPlan newPlan;
+    private int durationMonths;
+
+    private String transactionId;
+    private String paymentMethod;
+    private SubscriptionActionType actionType;
+}
+
+// File: src/main/java/com/example/sales/model/Table.java
+package com.example.sales.model;
+
+import com.example.sales.constant.TableStatus;
+import com.example.sales.model.base.BaseEntity;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document(collection = "tables")
+public class Table extends BaseEntity {
+    @Id
+    private String id;
+
+    private String shopId;
+    private String branchId;
+    private String name;
+    private TableStatus status;
+
+    private Integer capacity;
+    private String note;
+    private String currentOrderId;
+}
+
+// File: src/main/java/com/example/sales/model/User.java
+package com.example.sales.model;
+
+import com.example.sales.constant.UserRole;
+import com.example.sales.model.base.BaseEntity;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.Date;
+
+@Getter
+@Setter
+@ToString(exclude = {
+        "password",
+        "verificationToken",
+        "resetToken"
+}) // 👈 Tránh lộ thông tin nhạy cảm & vòng lặp
+@EqualsAndHashCode(callSuper = true)
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Document(collection = "users")
+public class User extends BaseEntity {
+
+    @Id
+    private String id;
+
+    @Email
+    @NotBlank
+    private String email;
+
+    @NotBlank
+    private String password;
+
+    private String businessType;
+    private String shopName;
+    private String fullName;
+    private String phone;
+    private String avatarUrl;
+
+    @Builder.Default
+    private boolean verified = false;
+
+    private String verificationToken;
+    private Date verificationExpiry;
+
+    @Builder.Default
+    private UserRole role = UserRole.ROLE_USER;
+
+    private String resetToken;
+    private Date resetTokenExpiry;
+}
+[END]
