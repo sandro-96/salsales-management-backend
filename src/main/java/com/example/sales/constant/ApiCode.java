@@ -1,6 +1,9 @@
 // File: src/main/java/com/example/sales/constant/ApiCode.java
 package com.example.sales.constant;
 
+import lombok.Getter;
+
+@Getter
 public enum ApiCode {
     // Success
     SUCCESS("2000", "Operation successful"),
@@ -38,13 +41,8 @@ public enum ApiCode {
     FILE_TYPE_NOT_ALLOWED("5002", "File type not allowed"),
 
     // Business Logic
-    SHOP_REQUIRED("4100", "Shop is required"),
-    ORDER_ALREADY_COMPLETED("4101", "Order already completed"),
     PRODUCT_UPDATED("4102", "Product updated successfully"),
     SHOP_NOT_FOUND("4103", "Shop not found"),
-    TABLE_CREATED("4104", "Table created successfully"),
-    TABLE_LIST("4105", "Table list retrieved"),
-    TABLE_STATUS_UPDATED("4106", "Table status updated"),
     USER_INFO("4107", "User info retrieved"),
     USER_NOT_FOUND("4108", "User not found"),
     BRANCH_NOT_FOUND("4109", "Branch not found"),
@@ -87,11 +85,4 @@ public enum ApiCode {
         this.message = message;
     }
 
-    public String getCode() {
-        return code;
-    }
-
-    public String getMessage() {
-        return message;
-    }
 }
