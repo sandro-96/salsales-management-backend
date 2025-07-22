@@ -18,22 +18,6 @@ public class PermissionChecker {
     private final ShopUserRepository shopUserRepository;
     private final BranchRepository branchRepository;
 
-    public boolean isOwner(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.OWNER);
-    }
-
-    public boolean isStaff(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.STAFF);
-    }
-
-    public boolean isOwnerOrStaff(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
-    }
-
-    public boolean isAdmin(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.ADMIN);
-    }
-
     public boolean hasRole(String shopId, String userId, ShopRole... roles) {
         Set<ShopRole> allowed = Set.of(roles);
         return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)

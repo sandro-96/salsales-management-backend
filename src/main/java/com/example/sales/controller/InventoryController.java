@@ -133,7 +133,7 @@ public class InventoryController {
         // ví dụ: đảm bảo user có quyền trong branchId này.
         // Hiện tại, @RequireRole sẽ kiểm tra quyền ở cấp shop.
 
-        Page<InventoryTransactionResponse> history = inventoryService.getTransactionHistory(branchProductId, pageable);
+        Page<InventoryTransactionResponse> history = inventoryService.getTransactionHistory(user.getId(), shopId, branchId, branchProductId, pageable);
         return ApiResponseDto.success(ApiCode.SUCCESS, history);
     }
 }

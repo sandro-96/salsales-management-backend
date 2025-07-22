@@ -55,7 +55,7 @@ public interface InventoryService {
      * @param pageable Thông tin phân trang.
      * @return Trang chứa danh sách các giao dịch tồn kho.
      */
-    Page<InventoryTransactionResponse> getTransactionHistory(String branchProductId, Pageable pageable);
+    Page<InventoryTransactionResponse> getTransactionHistory(String userId, String shopId, String branchId, String branchProductId, Pageable pageable);
 
     /**
      * Kiểm tra xem cửa hàng có yêu cầu quản lý tồn kho hay không.

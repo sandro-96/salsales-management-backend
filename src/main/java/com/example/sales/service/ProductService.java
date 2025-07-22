@@ -20,8 +20,6 @@ public interface ProductService {
     // id ở đây là id của BranchProduct
     ProductResponse getProduct(String shopId, String branchId, String id);
 
-    Page<ProductResponse> getAllByShop(String shopId, String branchId, Pageable pageable);
-
     // productId ở đây là id của BranchProduct để toggle activeInBranch
     ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId);
 

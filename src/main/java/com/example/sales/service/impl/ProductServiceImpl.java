@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/service/impl/ProductServiceImpl.java
 package com.example.sales.service.impl;
 
+import com.example.sales.cache.ProductCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopType;
 import com.example.sales.dto.product.ProductRequest;
@@ -16,7 +17,6 @@ import com.example.sales.service.AuditLogService;
 import com.example.sales.service.BaseService;
 import com.example.sales.service.ProductService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -24,11 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,6 +38,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final BranchProductRepository branchProductRepository; // New repository
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
+    private final ProductCache productCache; // Cache for product operations
 
     @Override
     public ProductResponse createProduct(String shopId, String branchId, ProductRequest request) {
@@ -200,30 +197,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         return toResponse(branchProduct, product);
     }
 
-    @Cacheable(value = "branch_products_by_shop_branch", key = "#shopId + ':' + #branchId")
-    @Override
-    public Page<ProductResponse> getAllByShop(String shopId, String branchId, Pageable pageable) {
-        Page<BranchProduct> branchProductsPage;
-        if (StringUtils.hasText(branchId)) {
-            branchProductsPage = branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
-        } else {
-            branchProductsPage = branchProductRepository.findByShopIdAndDeletedFalse(shopId, pageable);
-        }
-
-        Set<String> productIds = branchProductsPage.getContent().stream()
-                .map(BranchProduct::getProductId)
-                .collect(Collectors.toSet());
-
-        Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
-                .collect(Collectors.toMap(Product::getId, Function.identity()));
-
-        List<ProductResponse> productResponses = branchProductsPage.getContent().stream()
-                .map(bp -> toResponse(bp, productsMap.get(bp.getProductId())))
-                .collect(Collectors.toList());
-
-        return new PageImpl<>(productResponses, pageable, branchProductsPage.getTotalElements());
-    }
-
     @Override
     public ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId) {
         BranchProduct branchProduct = branchProductRepository.findByIdAndShopIdAndBranchIdAndDeletedFalse(branchProductId, shopId, branchId)
@@ -280,7 +253,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     public Page<ProductResponse> searchProducts(String shopId, String branchId, String keyword, Pageable pageable) {
         if (!StringUtils.hasText(keyword)) {
             // If no keyword, return all products by shop/branch
-            return getAllByShop(shopId, branchId, pageable);
+            return productCache.getAllByShop(shopId, branchId, pageable);
         }
 
         // 1. Search for matching master Products by keyword
@@ -321,7 +294,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         return new PageImpl<>(productResponses, pageable, branchProductsPage.getTotalElements());
     }
 
-    private ProductResponse toResponse(BranchProduct branchProduct, Product product) {
+    public ProductResponse toResponse(BranchProduct branchProduct, Product product) {
         if (branchProduct == null || product == null) {
             return null; // Handle cases where product might be null (e.g., deleted master product)
         }

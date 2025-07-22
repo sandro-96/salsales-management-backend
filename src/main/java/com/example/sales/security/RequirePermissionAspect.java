@@ -40,19 +40,24 @@ public class RequirePermissionAspect {
         for (int i = 0; i < args.length; i++) {
             for (Annotation annotationParam : paramAnnotations[i]) {
                 if (annotationParam instanceof AuthenticationPrincipal) {
+                    assert args[i] instanceof CustomUserDetails;
                     user = (CustomUserDetails) args[i];
                 }
                 if (annotationParam instanceof org.springframework.web.bind.annotation.PathVariable pv) {
                     if ("shopId".equals(pv.value())) {
+                        assert args[i] instanceof String;
                         shopId = (String) args[i];
                     } else if ("branchId".equals(pv.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                     }
                 }
                 if (annotationParam instanceof org.springframework.web.bind.annotation.RequestParam rp) {
                     if ("shopId".equals(rp.value())) {
+                        assert args[i] instanceof String;
                         shopId = (String) args[i];
                     } else if ("branchId".equals(rp.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                     }
                 }

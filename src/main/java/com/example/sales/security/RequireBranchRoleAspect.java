@@ -46,11 +46,13 @@ public class RequireBranchRoleAspect {
                 for (Annotation annotation : paramAnnotations[i]) {
                     if (annotation instanceof org.springframework.web.bind.annotation.PathVariable pathVar &&
                             "branchId".equals(pathVar.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                         break;
                     }
                     if (annotation instanceof org.springframework.web.bind.annotation.RequestParam reqParam &&
                             "branchId".equals(reqParam.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                         break;
                     }

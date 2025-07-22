@@ -405,22 +405,6 @@ public class PermissionChecker {
     private final ShopUserRepository shopUserRepository;
     private final BranchRepository branchRepository;
 
-    public boolean isOwner(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.OWNER);
-    }
-
-    public boolean isStaff(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.STAFF);
-    }
-
-    public boolean isOwnerOrStaff(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
-    }
-
-    public boolean isAdmin(String shopId, String userId) {
-        return hasRole(shopId, userId, ShopRole.ADMIN);
-    }
-
     public boolean hasRole(String shopId, String userId, ShopRole... roles) {
         Set<ShopRole> allowed = Set.of(roles);
         return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
@@ -565,11 +549,13 @@ public class RequireBranchRoleAspect {
                 for (Annotation annotation : paramAnnotations[i]) {
                     if (annotation instanceof org.springframework.web.bind.annotation.PathVariable pathVar &&
                             "branchId".equals(pathVar.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                         break;
                     }
                     if (annotation instanceof org.springframework.web.bind.annotation.RequestParam reqParam &&
                             "branchId".equals(reqParam.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                         break;
                     }
@@ -813,19 +799,24 @@ public class RequirePermissionAspect {
         for (int i = 0; i < args.length; i++) {
             for (Annotation annotationParam : paramAnnotations[i]) {
                 if (annotationParam instanceof AuthenticationPrincipal) {
+                    assert args[i] instanceof CustomUserDetails;
                     user = (CustomUserDetails) args[i];
                 }
                 if (annotationParam instanceof org.springframework.web.bind.annotation.PathVariable pv) {
                     if ("shopId".equals(pv.value())) {
+                        assert args[i] instanceof String;
                         shopId = (String) args[i];
                     } else if ("branchId".equals(pv.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                     }
                 }
                 if (annotationParam instanceof org.springframework.web.bind.annotation.RequestParam rp) {
                     if ("shopId".equals(rp.value())) {
+                        assert args[i] instanceof String;
                         shopId = (String) args[i];
                     } else if ("branchId".equals(rp.value())) {
+                        assert args[i] instanceof String;
                         branchId = (String) args[i];
                     }
                 }

@@ -148,7 +148,9 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    public Page<InventoryTransactionResponse> getTransactionHistory(String branchProductId, Pageable pageable) {
+    public Page<InventoryTransactionResponse> getTransactionHistory(String userId, String shopId, String branchId, String branchProductId, Pageable pageable) {
+        auditLogService.log(userId, shopId, branchProductId, "BRANCH_PRODUCT", "INVENTORY_HISTORY_VIEW",
+                String.format("Lấy lịch sử giao dịch tồn kho cho sản phẩm '%s' tại chi nhánh %s.", branchProductId, branchId));
         return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(branchProductId, pageable)
                 .map(this::mapToInventoryTransactionResponse);
     }

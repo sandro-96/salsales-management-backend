@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/controller/product/ProductCrudController.java
 package com.example.sales.controller.product;
 
+import com.example.sales.cache.ProductCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProductCrudController {
 
     private final ProductService productService;
+    private final ProductCache productCache;
 
     @Operation(summary = "Tạo sản phẩm mới tại một cửa hàng và chi nhánh cụ thể")
     @ApiResponses({
@@ -39,7 +41,6 @@ public class ProductCrudController {
     @PostMapping("/shops/{shopId}/products")
     @RequirePermission(Permission.PRODUCT_CREATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
-            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @RequestParam(required = false) String branchId,
             @Valid @RequestBody ProductRequest request) {
@@ -92,7 +93,7 @@ public class ProductCrudController {
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
-        Page<ProductResponse> response = productService.getAllByShop(shopId, branchId, pageable);
+        Page<ProductResponse> response = productCache.getAllByShop(shopId, branchId, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
     }
 

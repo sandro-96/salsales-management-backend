@@ -4,7 +4,6 @@ package com.example.sales.controller.product;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
-import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.ExcelImportService;
@@ -16,7 +15,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -39,7 +37,6 @@ public class ProductImportExportController {
     @PostMapping("/import")
     @RequirePermission(Permission.PRODUCT_IMPORT)
     public ResponseEntity<ApiResponseDto<Integer>> importProducts(
-            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @Parameter(description = "ID chi nhánh mà sản phẩm sẽ được nhập vào") @RequestParam String branchId,
             @Parameter(description = "File Excel chứa dữ liệu sản phẩm") @RequestParam("file") MultipartFile file) {
@@ -62,7 +59,6 @@ public class ProductImportExportController {
     @GetMapping("/export")
     @RequirePermission(Permission.PRODUCT_EXPORT)
     public void exportProducts(
-            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn). Nếu không cung cấp, sẽ xuất tất cả sản phẩm của shop trên mọi chi nhánh.")
             @RequestParam(required = false) String branchId,

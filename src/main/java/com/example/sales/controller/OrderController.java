@@ -153,7 +153,6 @@ public class OrderController {
             @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
     })
     public ApiResponseDto<Page<OrderResponse>> getByStatus(
-            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam @Parameter(description = "Trạng thái đơn hàng (PENDING, COMPLETED, CANCELLED, v.v.)") OrderStatus status,
             @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
