@@ -1,137 +1,192 @@
-🔍 Tổng quan UX
-Mục tiêu hệ thống:
-Quản lý cửa hàng (nhiều loại như nhà hàng, cafe, tạp hóa,...)
+1. Công nghệ đề xuất cho Frontend
+Để xây dựng FE, bạn có thể chọn một trong các công nghệ phổ biến sau:
 
-Quản lý nhân viên, khách hàng, sản phẩm, đơn hàng, khuyến mãi
+React.js hoặc Vue.js: Phù hợp với ứng dụng SPA (Single Page Application) để tận dụng CORS và gọi API từ backend.
+Next.js: Nếu muốn hỗ trợ SSR (Server-Side Rendering) hoặc SEO.
+Tailwind CSS hoặc Material-UI: Để xây dựng giao diện nhanh, đẹp và responsive.
+Vite: Công cụ build nhanh, phù hợp với React/Vue.
+Axios hoặc Fetch API: Để gọi các endpoint REST API từ backend.
+React Query hoặc Vue Query: Quản lý trạng thái và cache cho các API call.
+i18next: Hỗ trợ đa ngôn ngữ (phù hợp với WebConfig trong backend).
+2. Gợi ý giao diện người dùng (UI)
+2.1. Cấu trúc giao diện tổng thể
+Layout chính:
+Header: Logo, tên shop, menu điều hướng (Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Chi nhánh, Báo cáo, Cài đặt), và thông tin người dùng (avatar, tên, vai trò, đăng xuất).
+Sidebar: Menu dọc hiển thị các module chính (tùy thuộc vào vai trò người dùng). Ví dụ:
+OWNER: Dashboard, Quản lý chi nhánh, Quản lý người dùng, Báo cáo, Gói đăng ký.
+MANAGER: Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Báo cáo.
+CASHIER: Đơn hàng, Bàn (Table), Khách hàng.
+STAFF: Đơn hàng, Sản phẩm.
+Main Content: Khu vực chính hiển thị nội dung của module được chọn.
+Footer: Thông tin bản quyền, liên hệ hỗ trợ.
+Responsive Design:
+Sử dụng Tailwind CSS để đảm bảo giao diện tương thích với cả desktop và mobile.
+Trên mobile, sidebar có thể thu gọn thành hamburger menu.
+2.2. Các màn hình chính
+Dựa trên các DTO và endpoint trong backend, dưới đây là các màn hình UI chính:
 
-Phân quyền: ADMIN / OWNER / STAFF / CASHIER
-
-Giao diện dễ sử dụng, nhanh, có thể dùng cả trên máy tính bảng
-
-🧑‍💼 1. Vai trò người dùng & hành vi UX
-Vai trò	Mục tiêu chính	UX khuyến nghị
-ADMIN	Quản lý toàn hệ thống	Giao diện dashboard tổng hợp, minimal, chỉ dùng khi cần
-OWNER	Quản lý cửa hàng của mình	Truy cập nhiều nhất: báo cáo, đơn hàng, sản phẩm
-STAFF / CASHIER	Thao tác hàng ngày (tạo đơn, tìm sản phẩm, cập nhật trạng thái)	Giao diện tối giản, thao tác nhanh, thiết kế gần POS
-
-🧩 2. Sơ đồ tính năng chính theo UI
-🔐 Đăng nhập / Đăng ký / Quên mật khẩu
-Giao diện đơn giản, gợi ý sử dụng Google Login trong tương lai
-
-Gửi mã xác thực email ngay sau đăng ký
-
-🏪 Quản lý cửa hàng (Shop)
-✅ GET /api/shop/me, POST /api/shop
-
-UI:
-
-Hiển thị thông tin shop, logo, loại hình kinh doanh
-
-Cho phép cập nhật thông tin
-
-Nút xoá shop (ẩn kỹ, confirm 2 lớp)
-
-🧑‍🤝‍🧑 Quản lý nhân viên (Shop Users)
-✅ GET /api/shop-users/my, POST /add, DELETE /remove
+Đăng nhập/Đăng ký:
 
 UI:
-
-Danh sách nhân viên theo vai trò
-
-Form thêm mới với dropdown Vai trò
-
-Có phần Lịch sử mời / chờ xác nhận nếu cần mở rộng
-
-🧾 Đơn hàng (Order)
-✅ API hoàn chỉnh: tạo, huỷ, xác nhận thanh toán, cập nhật trạng thái
-
-UI:
-
-Danh sách dạng bảng, kèm trạng thái màu sắc (badge)
-
-Giao diện tạo đơn: dạng POS hoặc chọn từng sản phẩm
-
-Cho phép lọc theo chi nhánh, trạng thái, ngày
-
-Thêm chức năng in hoá đơn (PDF) sau này
-
-🍔 Sản phẩm
-✅ API: CRUD, tìm kiếm, import/export
+Form đăng nhập: Email, mật khẩu, nút "Đăng nhập" (gọi /api/auth/login với LoginRequest).
+Form đăng ký: Email, mật khẩu, xác nhận mật khẩu, tên shop (gọi /api/auth/register với RegisterRequest).
+Nút "Quên mật khẩu" (gọi /api/auth/refresh-token nếu có refresh token).
+Hiển thị thông báo lỗi (sử dụng ApiResponseDto với ApiCode để hiển thị thông báo như "Email không hợp lệ" hoặc "Mật khẩu sai").
+Giao diện:
+Thiết kế tối giản với logo ở giữa, form ở trung tâm màn hình, và nền nhạt (gradient hoặc trắng).
+Sử dụng Material-UI hoặc Tailwind để tạo form đẹp, với hiệu ứng hover và validation trực tiếp (ví dụ: @NotBlank cho email/mật khẩu).
+Dashboard:
 
 UI:
+Thẻ (card) hiển thị số liệu chính (KPIs):
+Tổng doanh thu ngày/tháng (gọi /api/report/daily với DailyReportResponse).
+Số đơn hàng mới (OrderStatus.NEW).
+Số sản phẩm tồn kho thấp (gọi /api/inventory).
+Số khách hàng mới (gọi /api/customer).
+Biểu đồ doanh thu (line chart) theo ngày/tuần/tháng (gọi /api/report với ReportRequest).
+Thông báo gói đăng ký (hiển thị nếu gần hết hạn, dựa trên PlanReminderScheduler).
+Giao diện:
+Sử dụng grid layout cho các thẻ KPI (4 cột trên desktop, 2 cột trên mobile).
+Biểu đồ sử dụng Chart.js hoặc Recharts để hiển thị dữ liệu doanh thu.
 
-Danh sách sản phẩm dạng card hoặc bảng
-
-Có ảnh thumbnail, trạng thái bán/ngưng
-
-Bộ lọc: danh mục, giá, trạng thái
-
-Import từ Excel với ví dụ file mẫu
-
-🎁 Khuyến mãi
-✅ API: CRUD + filter theo chi nhánh
-
-UI:
-
-Tạo chương trình khuyến mãi dễ dàng
-
-Giao diện xem sản phẩm áp dụng
-
-Có biểu tượng "⏰ Sắp hết hạn" nếu gần tới endDate
-
-👥 Khách hàng
-✅ API: CRUD, search, export
+Grok can make mistakes. Always check original sources.
+Download
+Quản lý đơn hàng:
 
 UI:
-
-Danh sách khách hàng
-
-Thêm ghi chú / địa chỉ / email
-
-Bộ lọc theo thời gian tạo, tên, số điện thoại
-
-Export ra Excel
-
-📊 Báo cáo & thống kê
-✅ API daily / summary / export
+Danh sách đơn hàng (bảng) với các cột: Mã đơn (orderId), Khách hàng, Tổng tiền, Trạng thái (OrderStatus), Ngày tạo, Hành động (Xem, Cập nhật, Hủy).
+Form tạo đơn hàng: Chọn sản phẩm (ProductResponse), số lượng, khách hàng (CustomerResponse), áp dụng khuyến mãi (PromotionResponse) (gọi /api/order với OrderRequest).
+Modal chi tiết đơn hàng: Hiển thị OrderResponse và OrderItemResponse, cho phép cập nhật trạng thái (gọi /api/order/update với OrderUpdateRequest).
+Giao diện:
+Bảng sử dụng DataTable (ví dụ: react-table) với tìm kiếm và phân trang.
+Form tạo đơn có autocomplete cho sản phẩm và khách hàng.
+Quản lý sản phẩm:
 
 UI:
-
-Giao diện dạng biểu đồ (bar chart, pie chart)
-
-Bộ lọc theo ngày / trạng thái đơn hàng
-
-Cho phép export ra Excel
-
-Thống kê tổng số đơn, doanh thu, sản phẩm bán
-
-📋 Bàn (Table)
-✅ API: CRUD + trạng thái
+Danh sách sản phẩm (bảng): Mã sản phẩm (sku), Tên, Giá, Tồn kho (BranchProduct), Hành động (Sửa, Xóa).
+Form thêm/sửa sản phẩm: Tên, mô tả, giá, danh mục, hình ảnh (gọi /api/product với ProductRequest).
+Tìm kiếm sản phẩm theo tên/danh mục (gọi /api/product/search với ProductSearchRequest).
+Giao diện:
+Hỗ trợ upload hình ảnh sản phẩm (tích hợp với ImageCleanupJob để xóa hình ảnh tạm).
+Responsive grid cho danh sách sản phẩm (3 cột trên desktop, 1 cột trên mobile).
+Quản lý khách hàng:
 
 UI:
+Danh sách khách hàng (bảng): Tên, Số điện thoại, Email, Tổng mua, Hành động (Xem, Sửa).
+Form thêm/sửa khách hàng: Tên, số điện thoại, email, địa chỉ (gọi /api/customer với CustomerRequest).
+Tìm kiếm khách hàng theo tên/số điện thoại (gọi /api/customer/search với CustomerSearchRequest).
+Giao diện:
+Bảng khách hàng với bộ lọc nhanh (ví dụ: theo tổng mua hoặc ngày đăng ký).
+Modal chi tiết khách hàng hiển thị lịch sử mua hàng (OrderResponse).
+Quản lý chi nhánh (chỉ dành cho OWNER/MANAGER):
 
-Dạng lưới (grid) cho mỗi bàn: hiển thị màu theo trạng thái
+UI:
+Danh sách chi nhánh (bảng): Tên chi nhánh, Địa chỉ, Người quản lý, Hành động (Sửa, Xóa).
+Form thêm/sửa chi nhánh: Tên, địa chỉ, người quản lý (gọi /api/branch với BranchRequest).
+Giao diện:
+Hiển thị chi nhánh dưới dạng thẻ hoặc bảng, với bản đồ nhỏ (Google Maps) để hiển thị địa chỉ nếu có.
+Quản lý bàn (Table) (dành cho CASHIER):
 
-Xanh lá = Available
+UI:
+Giao diện sơ đồ bàn (grid hoặc layout tùy chỉnh): Mỗi bàn hiển thị trạng thái (TableStatus: AVAILABLE, OCCUPIED, RESERVED).
+Modal quản lý bàn: Cập nhật trạng thái, thêm đơn hàng (gọi /api/table với TableRequest hoặc TableUpdateRequest).
+Giao diện:
+Sơ đồ bàn dạng grid với màu sắc khác nhau (xanh: AVAILABLE, đỏ: OCCUPIED, vàng: RESERVED).
+Hỗ trợ kéo-thả để sắp xếp bàn trên giao diện.
+Báo cáo:
 
-Cam = Occupied
+UI:
+Lọc báo cáo: Theo ngày, tuần, tháng, chi nhánh (gọi /api/report với ReportRequest).
+Biểu đồ: Doanh thu, số lượng đơn hàng, sản phẩm bán chạy (sử dụng ReportResponse và SalesReportDto).
+Nút xuất Excel (gọi /api/report/export).
+Giao diện:
+Sử dụng Chart.js để hiển thị biểu đồ doanh thu và sản phẩm.
+Bảng báo cáo chi tiết với phân trang.
 
-Xám = Closed
+Grok can make mistakes. Always check original sources.
+Download
+Quản lý gói đăng ký (chỉ dành cho OWNER):
 
-Nhấp vào bàn để tạo đơn mới
+UI:
+Hiển thị gói hiện tại (SubscriptionPlan: FREE, PRO, ENTERPRISE) và thời gian hết hạn.
+Nút nâng cấp gói (gọi /api/subscription/upgrade với UpgradePlanRequest).
+Lịch sử giao dịch gói (gọi /api/subscription/history với SubscriptionHistory).
+Giao diện:
+Thẻ hiển thị thông tin gói với màu sắc nổi bật (xanh cho PRO, vàng cho ENTERPRISE).
+Modal nâng cấp gói với các tùy chọn và giá (từ https://x.ai/grok).
+Cài đặt:
 
-🎨 UI Design đề xuất
-Thành phần	Đề xuất
-Frontend framework	React + TailwindCSS hoặc Vue + Quasar
-Library UI	Ant Design, MUI, hoặc Shadcn/UI (Tailwind-based)
-Biểu đồ	Recharts hoặc Chart.js
-Bảng (table)	AgGrid hoặc MUI Table có phân trang
-Xác thực	Giao diện đơn giản + Snackbar cho phản hồi lỗi
-Responsive	Thiết kế mobile-first với chế độ POS hoặc tablet
+UI:
+Cập nhật hồ sơ người dùng: Tên, email, mật khẩu (gọi /api/user/profile với UpdateProfileRequest).
+Quản lý người dùng shop (chỉ OWNER/MANAGER): Thêm, sửa, xóa người dùng (ShopUserResponse).
+Cài đặt đa ngôn ngữ (tích hợp với WebConfig).
+Giao diện:
+Form đơn giản với các trường được validate.
+Danh sách người dùng shop dưới dạng bảng.
+3. Luồng người dùng (User Flow)
+3.1. Luồng đăng nhập/đăng ký
+Người dùng truy cập trang đăng nhập (/login).
+Nhập email và mật khẩu → Gọi /api/auth/login → Nhận JwtResponse (chứa token).
+Lưu token vào localStorage hoặc cookie → Chuyển hướng đến dashboard (/).
+Nếu đăng ký (/register):
+Nhập thông tin (RegisterRequest) → Gọi /api/auth/register → Chuyển hướng đến đăng nhập.
+Nếu token hết hạn:
+Gọi /api/auth/refresh-token với RefreshTokenRequest → Cập nhật token mới.
+3.2. Luồng quản lý đơn hàng (CASHIER/STAFF)
+Truy cập module Đơn hàng (/orders).
+Xem danh sách đơn hàng (gọi /api/order với phân trang).
+Tạo đơn hàng mới:
+Nhấn nút "Tạo đơn hàng" → Mở form → Chọn sản phẩm, khách hàng, khuyến mãi → Gọi /api/order.
+Cập nhật trạng thái đơn hàng:
+Nhấn vào đơn hàng → Mở modal chi tiết → Chọn trạng thái mới (OrderStatus) → Gọi /api/order/update.
+Nếu là CASHIER, có thể quản lý bàn:
+Truy cập module Bàn (/tables) → Chọn bàn → Tạo đơn hàng từ bàn.
+3.3. Luồng quản lý sản phẩm (MANAGER/STAFF)
+Truy cập module Sản phẩm (/products).
+Tìm kiếm sản phẩm (gọi /api/product/search với ProductSearchRequest).
+Thêm/sửa sản phẩm:
+Nhấn "Thêm sản phẩm" → Mở form → Nhập thông tin (ProductRequest) → Gọi /api/product.
+Xóa sản phẩm (gọi /api/product/{id} với xóa mềm).
+3.4. Luồng quản lý chi nhánh (OWNER/MANAGER)
+Truy cập module Chi nhánh (/branches).
+Xem danh sách chi nhánh (gọi /api/branch).
+Thêm/sửa chi nhánh:
+Nhấn "Thêm chi nhánh" → Mở form → Nhập thông tin (BranchRequest) → Gọi /api/branch.
+3.5. Luồng báo cáo (OWNER/MANAGER)
+Truy cập module Báo cáo (/reports).
+Chọn bộ lọc (ngày, tuần, chi nhánh) → Gọi /api/report → Hiển thị biểu đồ và bảng.
+Xuất Excel: Nhấn nút "Xuất Excel" → Gọi /api/report/export → Tải file.
+3.6. Luồng nâng cấp gói (OWNER)
+Truy cập module Gói đăng ký (/subscription).
+Xem thông tin gói hiện tại (SubscriptionPlan).
+Nhấn "Nâng cấp" → Mở modal chọn gói → Gọi /api/subscription/upgrade.
+4. Đề xuất triển khai
+Quản lý trạng thái:
+Sử dụng Redux hoặc Zustand (React) hoặc Pinia (Vue) để quản lý trạng thái toàn cục (user, token, shop, v.v.).
+Sử dụng React Query/Vue Query để cache dữ liệu API (tương thích với OrderCache).
+Xác thực và phân quyền:
+Lưu token trong localStorage hoặc cookie, thêm middleware để kiểm tra token trước khi gọi API.
+Dựa trên UserRole và ShopRole trong token để ẩn/hiện các module trong sidebar.
+Xử lý lỗi:
+Hiển thị thông báo lỗi từ ApiResponseDto (ví dụ: toast notification với react-toastify).
+Chuyển hướng về đăng nhập nếu nhận lỗi 401 (Unauthorized).
+Đa ngôn ngữ:
+Tích hợp i18next, tải các tệp ngôn ngữ từ backend (messages.properties).
+Hiệu suất:
+Sử dụng lazy loading cho các module ít sử dụng (ví dụ: Báo cáo, Cài đặt).
+Cache dữ liệu tĩnh (sản phẩm, khách hàng) với React Query.
+5. Ví dụ luồng cụ thể (Tạo đơn hàng)
+CASHIER truy cập module Đơn hàng:
+Sidebar hiển thị các module: Đơn hàng, Bàn, Khách hàng.
+Nhấn "Đơn hàng" → Gọi /api/order → Hiển thị bảng đơn hàng.
+Tạo đơn hàng mới:
+Nhấn "Tạo đơn hàng" → Mở form → Gọi /api/product để lấy danh sách sản phẩm.
+Chọn sản phẩm, số lượng, khách hàng (tìm kiếm bằng /api/customer/search).
+Áp dụng khuyến mãi (gọi /api/promotion) → Gửi OrderRequest tới /api/order.
+Xác nhận:
+Hiển thị thông báo thành công (ApiResponseDto) → Làm mới bảng đơn hàng.
+6. Kết luận
+Giao diện và luồng người dùng được đề xuất tập trung vào tính đơn giản, trực quan và phù hợp với các vai trò người dùng (OWNER, MANAGER, CASHIER, STAFF). Các màn hình chính (Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Chi nhánh, Báo cáo) tận dụng các endpoint backend hiện có và đảm bảo trải nghiệm mượt mà. Sử dụng React/Vue với Tailwind CSS và Chart.js sẽ giúp triển khai nhanh và hiệu quả.
 
-🚀 Đề xuất mở rộng
-Tính năng	Gợi ý
-Chat support	Giao diện mini-chat tích hợp help/tutorial
-Realtime đơn hàng	Sử dụng WebSocket hoặc polling
-QR Code bàn	In QR để scan tạo đơn
-PWA	Cho phép cài lên thiết bị (quản lý đơn hàng nhanh hơn)
+Nếu bạn cần mẫu code cụ thể cho một màn hình (ví dụ: component React cho danh sách đơn hàng) hoặc mockup giao diện (Figma), hãy cho tôi biết!
+

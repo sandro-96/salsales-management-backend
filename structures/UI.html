@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div class="response-content-markdown markdown [&amp;_a:not(.not-prose)]:text-current [&amp;_a:not(.not-prose):hover]:text-primary [&amp;_a:not(.not-prose):hover]:decoration-primary [&amp;_a:not(.not-prose)]:underline [&amp;_a:not(.not-prose)]:decoration-primary/30 [&amp;_a:not(.not-prose)]:underline-offset-2 [&amp;_h2:not(.not-prose):first-child]:mt-0 [&amp;_h3:not(.not-prose):first-child]:mt-0 [&amp;_h4:not(.not-prose):first-child]:mt-0"><p dir="auto" class="break-words" style="white-space: pre-wrap;">Dựa trên yêu cầu của bạn về mockup giao diện (Figma) cho hệ thống quản lý bán hàng (Sales Management System) và các phân tích trước đó về backend, tôi sẽ gợi ý thiết kế mockup chi tiết cho một số màn hình chính trong Figma, tập trung vào tính thẩm mỹ, khả năng sử dụng (UX), và phù hợp với các tính năng của hệ thống. Tôi cũng sẽ cung cấp hướng dẫn để bạn tạo mockup trong Figma, đồng thời đề xuất một số Figma templates miễn phí/phí phù hợp từ các nguồn đã tìm thấy. Các mockup sẽ được thiết kế cho các vai trò (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OWNER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">MANAGER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">CASHIER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">STAFF</span>) và hỗ trợ cả desktop (1440x1024px) và mobile (responsive).</p>
+    <hr class="border-border-l2">
+    <h3 dir="auto" class=""><strong class="font-semibold">1. Cấu trúc Mockup trong Figma</strong></h3>
+    <p dir="auto" class="break-words" style="white-space: pre-wrap;">Trước khi đi vào chi tiết các màn hình, đây là cấu trúc tổng thể của dự án Figma:</p>
+    <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Artboards</strong>: Tạo riêng artboards cho desktop (1440x1024px) và mobile (375x812px) để đảm bảo responsive.</li>
+        <li class="break-words"><strong class="font-semibold">Design System</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Typography</strong>: Sử dụng Google Fonts (ví dụ: Roboto hoặc Inter) cho tính nhất quán, với các style: Heading (24-32px), Body (14-16px), Caption (12px).</li>
+                <li class="break-words"><strong class="font-semibold">Colors</strong>: Palette hiện đại (Primary: #3b82f6, Secondary: #10b981, Accent: #f59e0b, Neutral: #f4f4f5, #1f2937 cho dark mode).</li>
+                <li class="break-words"><strong class="font-semibold">Components</strong>: Tạo các component tái sử dụng (button, input, card, table, modal) với auto-layout.</li>
+                <li class="break-words"><strong class="font-semibold">Auto Layout</strong>: Sử dụng auto-layout cho mọi frame để dễ dàng điều chỉnh kích thước và responsive.</li>
+                <li class="break-words"><strong class="font-semibold">Variants</strong>: Tạo variants cho button (Primary, Secondary, Disabled), table status (AVAILABLE, OCCUPIED), v.v.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Plugins đề xuất</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Mockup Plugin</strong>: Để thêm device mockups (ví dụ: iPhone, MacBook) vào trình bày.</li>
+                <li class="break-words"><strong class="font-semibold">Unsplash</strong>: Chèn ảnh sản phẩm placeholder.</li>
+                <li class="break-words"><strong class="font-semibold">Iconify</strong>: Thêm icon cho các button và menu.</li>
+            </ul>
+        </li>
+    </ul>
+    <hr class="border-border-l2">
+    <h3 dir="auto" class=""><strong class="font-semibold">2. Mockup cho các màn hình chính</strong></h3>
+    <p dir="auto" class="break-words" style="white-space: pre-wrap;">Dưới đây là mô tả chi tiết các mockup cho các màn hình chính, phù hợp với backend và các vai trò người dùng. Mỗi màn hình sẽ được thiết kế với giao diện hiện đại, sử dụng auto-layout và hỗ trợ light/dark mode.</p>
+    <h4 dir="auto" class=""><strong class="font-semibold">2.1. Màn hình Đăng nhập</strong></h4>
+    <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Mô tả</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Form đăng nhập với các trường: Email, Password, nút "Đăng nhập", liên kết "Quên mật khẩu", và nút "Đăng ký".</li>
+                <li class="break-words">Hiển thị thông báo lỗi (dựa trên <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ApiResponseDto</span>) nếu email/mật khẩu không hợp lệ.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thiết kế</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Desktop</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Frame 1440x1024px, form đặt ở trung tâm với nền gradient (#3b82f6 → #10b981).</li>
+                        <li class="break-words">Logo shop ở trên cùng, kích thước 150px.</li>
+                        <li class="break-words">Input fields sử dụng border radius 8px, padding 12px, với icon (email, lock) bên trái.</li>
+                        <li class="break-words">Button "Đăng nhập" màu Primary (#3b82f6), hover: #1d4ed8.</li>
+                        <li class="break-words">Thông báo lỗi hiển thị dưới form (màu đỏ #ef4444).</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Mobile</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Frame 375x812px, form full-width, padding 16px.</li>
+                        <li class="break-words">Ẩn logo hoặc giảm kích thước để tiết kiệm không gian.</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Components</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Input field (text, password) với variants: Default, Error, Focused.</li>
+                        <li class="break-words">Button (Primary, Text Link cho "Quên mật khẩu").</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Luồng</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Người dùng nhập email/mật khẩu → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/auth/login</span> → Thành công: Chuyển đến Dashboard; Thất bại: Hiển thị toast notification (sử dụng <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">react-toastify</span> nếu tích hợp với frontend).</li>
+            </ul>
+        </li>
+    </ul>
+    <h4 dir="auto" class=""><strong class="font-semibold">2.2. Màn hình Dashboard</strong></h4>
+    <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Mô tả</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Hiển thị KPIs: Tổng doanh thu, số đơn hàng mới, sản phẩm tồn kho thấp, khách hàng mới (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report/daily</span>).</li>
+                <li class="break-words">Biểu đồ doanh thu theo ngày/tuần/tháng (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report</span>).</li>
+                <li class="break-words">Thông báo gói đăng ký gần hết hạn (dựa trên <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">PlanReminderScheduler</span>).</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thiết kế</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Desktop</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Header: Logo, tên shop, thông tin người dùng (avatar, vai trò, đăng xuất).</li>
+                        <li class="break-words">Sidebar: Menu dọc (Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Chi nhánh, Báo cáo, Cài đặt), width 250px, màu nền #1f2937 (dark mode).</li>
+                        <li class="break-words">Main Content:
+                            <ul dir="auto" class="marker:text-secondary">
+                                <li class="break-words">Grid 4x2 cho KPI cards (doanh thu, đơn hàng, tồn kho, khách hàng), mỗi card có icon, số liệu lớn (font 24px), và mô tả ngắn.</li>
+                                <li class="break-words">Line chart (doanh thu) sử dụng màu #3b82f6, kích thước 600x400px.</li>
+                                <li class="break-words">Card thông báo gói đăng ký (nếu có), màu accent #f59e0b.</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Mobile</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Sidebar thu gọn thành hamburger menu.</li>
+                        <li class="break-words">KPI cards xếp dọc (1 cột), chart thu nhỏ thành 350x200px.</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Components</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">KPI Card: Background #ffffff (light) hoặc #374151 (dark), border radius 12px.</li>
+                        <li class="break-words">Chart: Dựa trên Chart.js, sử dụng auto-layout để điều chỉnh kích thước.</li>
+                        <li class="break-words">Notification Card: Button "Nâng cấp ngay" (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/subscription/upgrade</span>).</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Figma Template tham khảo</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Fig Sales - Free Sales Analytics Figma Dashboard</strong>: Template miễn phí với KPI cards và chart, phù hợp cho dashboard bán hàng.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k1»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">figma.com</button></button></li>
+                <li class="break-words"><strong class="font-semibold">Sales Management Dashboard UI Kit</strong>: Gồm auto-layouted charts và tables, lý tưởng cho việc tùy chỉnh KPIs.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k2»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">figma.com</button></button></li>
+            </ul>
+        </li>
+    </ul>
+    <h4 dir="auto" class=""><strong class="font-semibold">2.3. Màn hình Quản lý Đơn hàng</strong></h4>
+    <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Mô tả</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Danh sách đơn hàng (bảng): Mã đơn, khách hàng, tổng tiền, trạng thái (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderStatus</span>), ngày tạo, hành động (Xem, Sửa, Hủy).</li>
+                <li class="break-words">Form tạo đơn: Chọn sản phẩm, số lượng, khách hàng, khuyến mãi.</li>
+                <li class="break-words">Modal chi tiết đơn hàng: Hiển thị <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderResponse</span> và <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderItemResponse</span>, cập nhật trạng thái.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thiết kế</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Desktop</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Bảng đơn hàng: Sử dụng table component với cột cố định, hỗ trợ tìm kiếm (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order</span>) và phân trang.</li>
+                        <li class="break-words">Mỗi hàng có nút hành động (icon: eye, edit, trash) với tooltip.</li>
+                        <li class="break-words">Form tạo đơn: Modal full-screen với autocomplete cho sản phẩm (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product</span>) và khách hàng (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/customer/search</span>).</li>
+                        <li class="break-words">Modal chi tiết đơn: Tabs cho thông tin đơn hàng, sản phẩm, và lịch sử trạng thái.</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Mobile</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Bảng chuyển thành danh sách thẻ (card) với thông tin rút gọn (mã đơn, tổng tiền, trạng thái).</li>
+                        <li class="break-words">Form tạo đơn: Scrollable modal, autocomplete tối ưu cho mobile.</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Components</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Table: Sử dụng auto-layout, với variants cho trạng thái (NEW: xanh, CANCELLED: đỏ).</li>
+                        <li class="break-words">Autocomplete Input: Hỗ trợ gợi ý sản phẩm/khách hàng.</li>
+                        <li class="break-words">Modal: Background #ffffff, shadow nhẹ, button "Lưu" và "Hủy".</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Figma Template tham khảo</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Selley Figma Template</strong>: Giao diện vector-based, dễ tùy chỉnh, phù hợp cho quản lý đơn hàng với bảng và form.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k3»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">theme-junkie.com</button></button></li>
+                <li class="break-words"><strong class="font-semibold">Untitled UI Figma</strong>: Cung cấp table và modal components với auto-layout 5.0, lý tưởng cho danh sách đơn hàng.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k4»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">untitledui.com</button></button></li>
+            </ul>
+        </li>
+    </ul>
+    <h4 dir="auto" class=""><strong class="font-semibold">2.4. Màn hình Quản lý Sản phẩm</strong></h4>
+    <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Mô tả</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Danh sách sản phẩm: Mã sản phẩm (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">sku</span>), tên, giá, tồn kho, hành động.</li>
+                <li class="break-words">Form thêm/sửa sản phẩm: Tên, mô tả, giá, danh mục, hình ảnh.</li>
+                <li class="break-words">Tìm kiếm sản phẩm (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product/search</span>).</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thiết kế</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Desktop</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Danh sách sản phẩm: Grid layout (3 cột) hoặc table, mỗi sản phẩm hiển thị hình ảnh thumbnail (50x50px).</li>
+                        <li class="break-words">Form thêm/sửa: Modal với các trường input và upload hình ảnh (tích hợp với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ImageCleanupJob</span>).</li>
+                        <li class="break-words">Tìm kiếm: Input field với icon search, hỗ trợ bộ lọc theo danh mục.</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Mobile</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Grid chuyển thành 1 cột, hình ảnh thu nhỏ thành 100x100px.</li>
+                        <li class="break-words">Form thêm/sửa: Scrollable modal, upload hình ảnh tối ưu cho mobile.</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Components</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Product Card: Hình ảnh, tên, giá, button "Sửa/Xóa".</li>
+                        <li class="break-words">File Upload: Hỗ trợ drag-and-drop, hiển thị preview hình ảnh.</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Figma Template tham khảo</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Materio Figma Admin Dashboard UI Kit</strong>: 500+ components, hỗ trợ grid sản phẩm và form chỉnh sửa.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k5»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">theme-junkie.com</button></button></li>
+                <li class="break-words"><strong class="font-semibold">Open Fashion - Free eCommerce UI Kit</strong>: Template miễn phí với grid sản phẩm và upload hình ảnh.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k6»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">uistore.design</button></button></li>
+            </ul>
+        </li>
+    </ul>
+    <h4 dir="auto" class=""><strong class="font-semibold">2.5. Màn hình Quản lý Bàn (CASHIER)</strong></h4>
+    <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Mô tả</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Sơ đồ bàn: Hiển thị trạng thái (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">TableStatus</span>: AVAILABLE, OCCUPIED, RESERVED).</li>
+                <li class="break-words">Modal quản lý bàn: Cập nhật trạng thái, tạo đơn hàng từ bàn.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thiết kế</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Desktop</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Grid layout (4x3) cho bàn, mỗi bàn là card (100x100px) với màu trạng thái (AVAILABLE: #10b981, OCCUPIED: #ef4444, RESERVED: #f59e0b).</li>
+                        <li class="break-words">Modal quản lý: Hiển thị thông tin bàn, button tạo đơn hàng (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order</span>).</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Mobile</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Grid chuyển thành 2 cột, card bàn thu nhỏ thành 150x150px.</li>
+                        <li class="break-words">Modal full-screen, button full-width.</li>
+                    </ul>
+                </li>
+                <li class="break-words"><strong class="font-semibold">Components</strong>:
+                    <ul dir="auto" class="marker:text-secondary">
+                        <li class="break-words">Table Card: Variants cho trạng thái, icon bàn, số bàn.</li>
+                        <li class="break-words">Modal: Button "Tạo đơn hàng", "Cập nhật trạng thái".</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Figma Template tham khảo</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Frox - Multipurpose Dashboard Figma UI Kit</strong>: Hỗ trợ grid layout cho sơ đồ bàn và modal quản lý.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k7»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">themeforest.net</button></button></li>
+            </ul>
+        </li>
+    </ul>
+    <hr class="border-border-l2">
+    <h3 dir="auto" class=""><strong class="font-semibold">3. Hướng dẫn tạo Mockup trong Figma</strong></h3>
+    <ol dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Tạo Project Figma</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Vào Figma → Tạo new file → Đặt tên "Sales Management System".</li>
+                <li class="break-words">Tạo artboards: Desktop (1440x1024px), Mobile (375x812px).</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thiết lập Design System</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Colors</strong>: Tạo color styles (Primary: #3b82f6, Secondary: #10b981, v.v.).</li>
+                <li class="break-words"><strong class="font-semibold">Typography</strong>: Tạo text styles (Heading, Body, Caption) với Google Fonts.</li>
+                <li class="break-words"><strong class="font-semibold">Components</strong>: Tạo button, input, card, table với auto-layout.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thiết kế Màn hình</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Bắt đầu với màn hình Đăng nhập (dùng rectangle cho nền gradient, frame cho form).</li>
+                <li class="break-words">Dashboard: Sử dụng grid layout (4x2) cho KPI cards, thêm placeholder cho chart (sử dụng plugin Chart).</li>
+                <li class="break-words">Đơn hàng/Sản phẩm: Tạo table component với auto-layout, thêm variants cho trạng thái.</li>
+                <li class="break-words">Bàn: Tạo grid layout với card component, sử dụng color styles cho trạng thái.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Thêm Mockup Device</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Cài plugin Mockup → Chọn artboard → Thêm device frame (MacBook, iPhone).</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Kiểm tra Responsive</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Sử dụng Figma’s Layout Grid và Auto Layout để đảm bảo responsive.</li>
+                <li class="break-words">Test giao diện mobile bằng cách thu nhỏ artboard hoặc dùng plugin Responsive Viewer.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Xuất và Chia sẻ</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Xuất artboards thành PNG/PDF để trình bày.</li>
+                <li class="break-words">Chia sẻ link Figma với chế độ view-only cho khách hàng/đội ngũ.</li>
+            </ul>
+        </li>
+    </ol>
+    <hr class="border-border-l2">
+    <h3 dir="auto" class=""><strong class="font-semibold">4. Figma Templates đề xuất</strong></h3>
+    <p dir="auto" class="break-words" style="white-space: pre-wrap;">Dựa trên các nguồn tìm được, đây là một số template Figma phù hợp để bạn bắt đầu:</p>
+    <ol dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Miễn phí</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Fig Sales - Free Sales Analytics Dashboard</strong>: Template đơn giản với KPI cards và chart, phù hợp cho dashboard.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k8»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">figma.com</button></button></li>
+                <li class="break-words"><strong class="font-semibold">Sales Analytics - Mobile UI Kit</strong>: Light/dark theme, hỗ trợ mobile, lý tưởng cho KPI và table.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1k9»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">figma.com</button></button></li>
+                <li class="break-words"><strong class="font-semibold">Open Fashion - Free eCommerce UI Kit</strong>: Grid sản phẩm, form upload hình ảnh, phù hợp cho module sản phẩm.<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1ka»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">uistore.design</button></button></li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Trả phí</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words"><strong class="font-semibold">Materio Figma Admin Dashboard UI Kit</strong>: 500+ components, auto-layout, lý tưởng cho dashboard và quản lý đơn hàng (giá ~$29).<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1kb»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">theme-junkie.com</button></button></li>
+                <li class="break-words"><strong class="font-semibold">Selley Figma Template</strong>: Vector-based, phù hợp cho quản lý bán hàng với bảng và form (giá ~$29).<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1kc»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">theme-junkie.com</button></button></li>
+                <li class="break-words"><strong class="font-semibold">Frox - Multipurpose Dashboard Figma UI Kit</strong>: Hỗ trợ grid layout và modal, phù hợp cho module bàn (giá ~$29).<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1kd»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">themeforest.net</button></button></li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Cách sử dụng</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Tải template từ Figma Community hoặc ThemeForest.</li>
+                <li class="break-words">Import .FIG file vào Figma (drag-and-drop vào Figma app).<button type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="radix-«r1ke»" data-state="closed" class="citation" tabindex="-1" style="outline: none;"><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none h-5 px-1.5 text-[10px] rounded-full border-none ms-0.5 bg-surface-inset hover:bg-surface-invert text-secondary hover:text-fg-invert dark:bg-surface-l2 dark:hover:bg-surface-l4 dark:text-fg-secondary dark:hover:text-fg-primary" type="button" tabindex="-1">uistore.design</button></button></li>
+                <li class="break-words">Tùy chỉnh màu sắc, font, và components theo design system của bạn.</li>
+            </ul>
+        </li>
+    </ol>
+    <hr class="border-border-l2">
+    <h3 dir="auto" class=""><strong class="font-semibold">5. Lưu ý khi thiết kế</strong></h3>
+    <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Phân quyền giao diện</strong>: Ẩn/hiện các module trong sidebar dựa trên <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">UserRole</span> và <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ShopRole</span> (ví dụ: OWNER thấy module Chi nhánh, CASHIER chỉ thấy Bàn).</li>
+        <li class="break-words"><strong class="font-semibold">Đa ngôn ngữ</strong>: Thêm text placeholder (EN, VI) để hỗ trợ i18next, ví dụ: "Login" / "Đăng nhập".</li>
+        <li class="break-words"><strong class="font-semibold">Accessibility</strong>: Đảm bảo contrast ratio (WCAG 2.1), ví dụ: Text trên button Primary (#ffffff trên #3b82f6).</li>
+        <li class="break-words"><strong class="font-semibold">Prototype</strong>: Sử dụng Figma Prototype để tạo luồng chuyển trang (Đăng nhập → Dashboard → Đơn hàng).</li>
+    </ul>
+    <hr class="border-border-l2">
+    <h3 dir="auto" class=""><strong class="font-semibold">6. Ví dụ Prototype đơn giản</strong></h3>
+    <ol dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Đăng nhập → Dashboard</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Click button "Đăng nhập" → Chuyển đến artboard Dashboard.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Dashboard → Đơn hàng</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Click menu "Đơn hàng" trong sidebar → Chuyển đến artboard Quản lý Đơn hàng.</li>
+                <li class="break-words">Click nút "Tạo đơn hàng" → Mở modal form.</li>
+            </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Quản lý Bàn → Tạo đơn</strong>:
+            <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Click card bàn (OCCUPIED) → Mở modal → Click "Tạo đơn hàng" → Chuyển đến form tạo đơn.</li>
+            </ul>
+        </li>
+    </ol>
+    <hr class="border-border-l2">
+    <h3 dir="auto" class=""><strong class="font-semibold">7. Kết luận</strong></h3>
+    <p dir="auto" class="break-words" style="white-space: pre-wrap;">Các mockup được gợi ý tập trung vào tính trực quan, responsive, và phù hợp với backend (JWT, DTOs, API endpoints). Sử dụng Figma với auto-layout và các template miễn phí/phí sẽ giúp bạn tiết kiệm thời gian. Nếu bạn cần file Figma mẫu cụ thể (ví dụ: mockup Dashboard hoặc Đơn hàng), tôi có thể mô tả chi tiết hơn về cách tạo components hoặc cung cấp cấu trúc JSON cho components trong Figma. Ngoài ra, nếu bạn muốn tôi tìm thêm template Figma cụ thể hoặc hướng dẫn code giao diện trong React/Vue, hãy cho tôi biết!</p>
+    <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Bạn có muốn tôi tạo một file Figma mẫu (mô tả JSON cho components) hoặc hướng dẫn chi tiết hơn cho một màn hình cụ thể không?</strong></p></div>
+</body>
+</html>

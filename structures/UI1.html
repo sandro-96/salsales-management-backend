@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div class="response-content-markdown markdown [&amp;_a:not(.not-prose)]:text-current [&amp;_a:not(.not-prose):hover]:text-primary [&amp;_a:not(.not-prose):hover]:decoration-primary [&amp;_a:not(.not-prose)]:underline [&amp;_a:not(.not-prose)]:decoration-primary/30 [&amp;_a:not(.not-prose)]:underline-offset-2 [&amp;_h2:not(.not-prose):first-child]:mt-0 [&amp;_h3:not(.not-prose):first-child]:mt-0 [&amp;_h4:not(.not-prose):first-child]:mt-0"><p dir="auto" class="break-words" style="white-space: pre-wrap;">Dựa trên cấu trúc dự án Spring Boot quản lý bán hàng (Sales Management System) đã phân tích, tôi sẽ gợi ý giao diện người dùng (UI) và luồng người dùng (user flow) cho ứng dụng frontend (FE) để phù hợp với các tính năng backend hiện có. Các gợi ý này tập trung vào việc tạo ra một giao diện trực quan, thân thiện và hỗ trợ mô hình kinh doanh nhiều chi nhánh, đồng thời tận dụng các endpoint và DTO được định nghĩa trong backend. Tôi sẽ đề xuất thiết kế UI và luồng người dùng cho các vai trò chính (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OWNER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">MANAGER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">CASHIER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">STAFF</span>) và các tính năng chính như quản lý đơn hàng, sản phẩm, khách hàng, chi nhánh, và báo cáo.</p>
+  <hr class="border-border-l2">
+  <h3 dir="auto" class=""><strong class="font-semibold">1. Công nghệ đề xuất cho Frontend</strong></h3>
+  <p dir="auto" class="break-words" style="white-space: pre-wrap;">Để xây dựng FE, bạn có thể chọn một trong các công nghệ phổ biến sau:</p>
+  <ul dir="auto" class="marker:text-secondary">
+    <li class="break-words"><strong class="font-semibold">React.js</strong> hoặc <strong class="font-semibold">Vue.js</strong>: Phù hợp với ứng dụng SPA (Single Page Application) để tận dụng CORS và gọi API từ backend.</li>
+    <li class="break-words"><strong class="font-semibold">Next.js</strong>: Nếu muốn hỗ trợ SSR (Server-Side Rendering) hoặc SEO.</li>
+    <li class="break-words"><strong class="font-semibold">Tailwind CSS</strong> hoặc <strong class="font-semibold">Material-UI</strong>: Để xây dựng giao diện nhanh, đẹp và responsive.</li>
+    <li class="break-words"><strong class="font-semibold">Vite</strong>: Công cụ build nhanh, phù hợp với React/Vue.</li>
+    <li class="break-words"><strong class="font-semibold">Axios</strong> hoặc <strong class="font-semibold">Fetch API</strong>: Để gọi các endpoint REST API từ backend.</li>
+    <li class="break-words"><strong class="font-semibold">React Query</strong> hoặc <strong class="font-semibold">Vue Query</strong>: Quản lý trạng thái và cache cho các API call.</li>
+    <li class="break-words"><strong class="font-semibold">i18next</strong>: Hỗ trợ đa ngôn ngữ (phù hợp với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">WebConfig</span> trong backend).</li>
+  </ul>
+  <hr class="border-border-l2">
+  <h3 dir="auto" class=""><strong class="font-semibold">2. Gợi ý giao diện người dùng (UI)</strong></h3>
+  <h4 dir="auto" class=""><strong class="font-semibold">2.1. Cấu trúc giao diện tổng thể</strong></h4>
+  <ul dir="auto" class="marker:text-secondary">
+    <li class="break-words"><strong class="font-semibold">Layout chính</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">Header</strong>: Logo, tên shop, menu điều hướng (Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Chi nhánh, Báo cáo, Cài đặt), và thông tin người dùng (avatar, tên, vai trò, đăng xuất).</li>
+        <li class="break-words"><strong class="font-semibold">Sidebar</strong>: Menu dọc hiển thị các module chính (tùy thuộc vào vai trò người dùng). Ví dụ:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">OWNER: Dashboard, Quản lý chi nhánh, Quản lý người dùng, Báo cáo, Gói đăng ký.</li>
+            <li class="break-words">MANAGER: Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Báo cáo.</li>
+            <li class="break-words">CASHIER: Đơn hàng, Bàn (Table), Khách hàng.</li>
+            <li class="break-words">STAFF: Đơn hàng, Sản phẩm.</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Main Content</strong>: Khu vực chính hiển thị nội dung của module được chọn.</li>
+        <li class="break-words"><strong class="font-semibold">Footer</strong>: Thông tin bản quyền, liên hệ hỗ trợ.</li>
+      </ul>
+    </li>
+    <li class="break-words"><strong class="font-semibold">Responsive Design</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Sử dụng Tailwind CSS để đảm bảo giao diện tương thích với cả desktop và mobile.</li>
+        <li class="break-words">Trên mobile, sidebar có thể thu gọn thành hamburger menu.</li>
+      </ul>
+    </li>
+  </ul>
+  <h4 dir="auto" class=""><strong class="font-semibold">2.2. Các màn hình chính</strong></h4>
+  <p dir="auto" class="break-words" style="white-space: pre-wrap;">Dựa trên các DTO và endpoint trong backend, dưới đây là các màn hình UI chính:</p>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Đăng nhập/Đăng ký</strong>:</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Form đăng nhập: Email, mật khẩu, nút "Đăng nhập" (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/auth/login</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">LoginRequest</span>).</li>
+            <li class="break-words">Form đăng ký: Email, mật khẩu, xác nhận mật khẩu, tên shop (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/auth/register</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">RegisterRequest</span>).</li>
+            <li class="break-words">Nút "Quên mật khẩu" (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/auth/refresh-token</span> nếu có refresh token).</li>
+            <li class="break-words">Hiển thị thông báo lỗi (sử dụng <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ApiResponseDto</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ApiCode</span> để hiển thị thông báo như "Email không hợp lệ" hoặc "Mật khẩu sai").</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Thiết kế tối giản với logo ở giữa, form ở trung tâm màn hình, và nền nhạt (gradient hoặc trắng).</li>
+            <li class="break-words">Sử dụng Material-UI hoặc Tailwind để tạo form đẹp, với hiệu ứng hover và validation trực tiếp (ví dụ: <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">@NotBlank</span> cho email/mật khẩu).</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Dashboard</strong>:</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Thẻ (card) hiển thị số liệu chính (KPIs):
+              <ul dir="auto" class="marker:text-secondary">
+                <li class="break-words">Tổng doanh thu ngày/tháng (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report/daily</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">DailyReportResponse</span>).</li>
+                <li class="break-words">Số đơn hàng mới (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderStatus.NEW</span>).</li>
+                <li class="break-words">Số sản phẩm tồn kho thấp (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/inventory</span>).</li>
+                <li class="break-words">Số khách hàng mới (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/customer</span>).</li>
+              </ul>
+            </li>
+            <li class="break-words">Biểu đồ doanh thu (line chart) theo ngày/tuần/tháng (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ReportRequest</span>).</li>
+            <li class="break-words">Thông báo gói đăng ký (hiển thị nếu gần hết hạn, dựa trên <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">PlanReminderScheduler</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Sử dụng grid layout cho các thẻ KPI (4 cột trên desktop, 2 cột trên mobile).</li>
+            <li class="break-words">Biểu đồ sử dụng Chart.js hoặc Recharts để hiển thị dữ liệu doanh thu.</li>
+          </ul>
+        </li>
+      </ul>
+      <div dir="auto" class="not-prose"><div class="py-2"><div class="h-[500px] bg-surface-l1 rounded-xl overflow-hidden border border-border @md/mainview:-mx-4"><div class="h-full flex flex-col w-full flex-1"><div class="h-full px-2 pt-4 pb-2"><div class="flex flex-col h-full"><div class="flex flex-col flex-1"><iframe class="w-full flex-1 bg-surface-l1" sandbox="allow-scripts allow-same-origin" src="https://artifacts.grokusercontent.com/chartjs" nonce=""></iframe></div></div></div><div data-orientation="horizontal" role="none" class="shrink-0 bg-border h-[1px] w-full"></div><div class="flex items-center justify-between py-2 pl-4 pr-2"><span class="text-sm text-secondary">Grok can make mistakes. Always check original sources.</span><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none bg-button-secondary text-primary hover:bg-button-secondary-hover h-8 px-3 text-xs rounded-full" type="button" id="radix-«r1h8»" aria-haspopup="menu" aria-expanded="false" data-state="closed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Download</button></div></div></div></div></div>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Quản lý đơn hàng</strong>:</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Danh sách đơn hàng (bảng) với các cột: Mã đơn (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">orderId</span>), Khách hàng, Tổng tiền, Trạng thái (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderStatus</span>), Ngày tạo, Hành động (Xem, Cập nhật, Hủy).</li>
+            <li class="break-words">Form tạo đơn hàng: Chọn sản phẩm (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ProductResponse</span>), số lượng, khách hàng (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">CustomerResponse</span>), áp dụng khuyến mãi (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">PromotionResponse</span>) (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderRequest</span>).</li>
+            <li class="break-words">Modal chi tiết đơn hàng: Hiển thị <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderResponse</span> và <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderItemResponse</span>, cho phép cập nhật trạng thái (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order/update</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderUpdateRequest</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Bảng sử dụng DataTable (ví dụ: <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">react-table</span>) với tìm kiếm và phân trang.</li>
+            <li class="break-words">Form tạo đơn có autocomplete cho sản phẩm và khách hàng.</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Quản lý sản phẩm</strong>:</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Danh sách sản phẩm (bảng): Mã sản phẩm (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">sku</span>), Tên, Giá, Tồn kho (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">BranchProduct</span>), Hành động (Sửa, Xóa).</li>
+            <li class="break-words">Form thêm/sửa sản phẩm: Tên, mô tả, giá, danh mục, hình ảnh (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ProductRequest</span>).</li>
+            <li class="break-words">Tìm kiếm sản phẩm theo tên/danh mục (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product/search</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ProductSearchRequest</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Hỗ trợ upload hình ảnh sản phẩm (tích hợp với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ImageCleanupJob</span> để xóa hình ảnh tạm).</li>
+            <li class="break-words">Responsive grid cho danh sách sản phẩm (3 cột trên desktop, 1 cột trên mobile).</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Quản lý khách hàng</strong>:</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Danh sách khách hàng (bảng): Tên, Số điện thoại, Email, Tổng mua, Hành động (Xem, Sửa).</li>
+            <li class="break-words">Form thêm/sửa khách hàng: Tên, số điện thoại, email, địa chỉ (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/customer</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">CustomerRequest</span>).</li>
+            <li class="break-words">Tìm kiếm khách hàng theo tên/số điện thoại (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/customer/search</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">CustomerSearchRequest</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Bảng khách hàng với bộ lọc nhanh (ví dụ: theo tổng mua hoặc ngày đăng ký).</li>
+            <li class="break-words">Modal chi tiết khách hàng hiển thị lịch sử mua hàng (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderResponse</span>).</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Quản lý chi nhánh</strong> (chỉ dành cho OWNER/MANAGER):</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Danh sách chi nhánh (bảng): Tên chi nhánh, Địa chỉ, Người quản lý, Hành động (Sửa, Xóa).</li>
+            <li class="break-words">Form thêm/sửa chi nhánh: Tên, địa chỉ, người quản lý (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/branch</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">BranchRequest</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Hiển thị chi nhánh dưới dạng thẻ hoặc bảng, với bản đồ nhỏ (Google Maps) để hiển thị địa chỉ nếu có.</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Quản lý bàn (Table)</strong> (dành cho CASHIER):</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Giao diện sơ đồ bàn (grid hoặc layout tùy chỉnh): Mỗi bàn hiển thị trạng thái (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">TableStatus</span>: AVAILABLE, OCCUPIED, RESERVED).</li>
+            <li class="break-words">Modal quản lý bàn: Cập nhật trạng thái, thêm đơn hàng (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/table</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">TableRequest</span> hoặc <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">TableUpdateRequest</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Sơ đồ bàn dạng grid với màu sắc khác nhau (xanh: AVAILABLE, đỏ: OCCUPIED, vàng: RESERVED).</li>
+            <li class="break-words">Hỗ trợ kéo-thả để sắp xếp bàn trên giao diện.</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Báo cáo</strong>:</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Lọc báo cáo: Theo ngày, tuần, tháng, chi nhánh (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ReportRequest</span>).</li>
+            <li class="break-words">Biểu đồ: Doanh thu, số lượng đơn hàng, sản phẩm bán chạy (sử dụng <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ReportResponse</span> và <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">SalesReportDto</span>).</li>
+            <li class="break-words">Nút xuất Excel (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report/export</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Sử dụng Chart.js để hiển thị biểu đồ doanh thu và sản phẩm.</li>
+            <li class="break-words">Bảng báo cáo chi tiết với phân trang.</li>
+          </ul>
+        </li>
+      </ul>
+      <div dir="auto" class="not-prose"><div class="py-2"><div class="h-[500px] bg-surface-l1 rounded-xl overflow-hidden border border-border @md/mainview:-mx-4"><div class="h-full flex flex-col w-full flex-1"><div class="h-full px-2 pt-4 pb-2"><div class="flex flex-col h-full"><div class="flex flex-col flex-1"><iframe class="w-full flex-1 bg-surface-l1" sandbox="allow-scripts allow-same-origin" src="https://artifacts.grokusercontent.com/chartjs" nonce=""></iframe></div></div></div><div data-orientation="horizontal" role="none" class="shrink-0 bg-border h-[1px] w-full"></div><div class="flex items-center justify-between py-2 pl-4 pr-2"><span class="text-sm text-secondary">Grok can make mistakes. Always check original sources.</span><button class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-100 [&amp;_svg]:shrink-0 select-none bg-button-secondary text-primary hover:bg-button-secondary-hover h-8 px-3 text-xs rounded-full" type="button" id="radix-«r1ha»" aria-haspopup="menu" aria-expanded="false" data-state="closed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Download</button></div></div></div></div></div>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Quản lý gói đăng ký</strong> (chỉ dành cho OWNER):</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Hiển thị gói hiện tại (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">SubscriptionPlan</span>: FREE, PRO, ENTERPRISE) và thời gian hết hạn.</li>
+            <li class="break-words">Nút nâng cấp gói (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/subscription/upgrade</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">UpgradePlanRequest</span>).</li>
+            <li class="break-words">Lịch sử giao dịch gói (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/subscription/history</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">SubscriptionHistory</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Thẻ hiển thị thông tin gói với màu sắc nổi bật (xanh cho PRO, vàng cho ENTERPRISE).</li>
+            <li class="break-words">Modal nâng cấp gói với các tùy chọn và giá (từ <a href="https://x.ai/grok" target="_blank" rel="noopener noreferrer nofollow">https://x.ai/grok</a>).</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+    <li class="break-words">
+      <p dir="auto" class="break-words" style="white-space: pre-wrap;"><strong class="font-semibold">Cài đặt</strong>:</p>
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words"><strong class="font-semibold">UI</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Cập nhật hồ sơ người dùng: Tên, email, mật khẩu (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/user/profile</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">UpdateProfileRequest</span>).</li>
+            <li class="break-words">Quản lý người dùng shop (chỉ OWNER/MANAGER): Thêm, sửa, xóa người dùng (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ShopUserResponse</span>).</li>
+            <li class="break-words">Cài đặt đa ngôn ngữ (tích hợp với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">WebConfig</span>).</li>
+          </ul>
+        </li>
+        <li class="break-words"><strong class="font-semibold">Giao diện</strong>:
+          <ul dir="auto" class="marker:text-secondary">
+            <li class="break-words">Form đơn giản với các trường được validate.</li>
+            <li class="break-words">Danh sách người dùng shop dưới dạng bảng.</li>
+          </ul>
+        </li>
+      </ul>
+    </li>
+  </ol>
+  <hr class="border-border-l2">
+  <h3 dir="auto" class=""><strong class="font-semibold">3. Luồng người dùng (User Flow)</strong></h3>
+  <h4 dir="auto" class=""><strong class="font-semibold">3.1. Luồng đăng nhập/đăng ký</strong></h4>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words">Người dùng truy cập trang đăng nhập (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/login</span>).</li>
+    <li class="break-words">Nhập email và mật khẩu → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/auth/login</span> → Nhận <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">JwtResponse</span> (chứa token).</li>
+    <li class="break-words">Lưu token vào localStorage hoặc cookie → Chuyển hướng đến dashboard (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/</span>).</li>
+    <li class="break-words">Nếu đăng ký (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/register</span>):
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Nhập thông tin (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">RegisterRequest</span>) → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/auth/register</span> → Chuyển hướng đến đăng nhập.</li>
+      </ul>
+    </li>
+    <li class="break-words">Nếu token hết hạn:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/auth/refresh-token</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">RefreshTokenRequest</span> → Cập nhật token mới.</li>
+      </ul>
+    </li>
+  </ol>
+  <h4 dir="auto" class=""><strong class="font-semibold">3.2. Luồng quản lý đơn hàng (CASHIER/STAFF)</strong></h4>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words">Truy cập module Đơn hàng (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/orders</span>).</li>
+    <li class="break-words">Xem danh sách đơn hàng (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order</span> với phân trang).</li>
+    <li class="break-words">Tạo đơn hàng mới:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Nhấn nút "Tạo đơn hàng" → Mở form → Chọn sản phẩm, khách hàng, khuyến mãi → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order</span>.</li>
+      </ul>
+    </li>
+    <li class="break-words">Cập nhật trạng thái đơn hàng:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Nhấn vào đơn hàng → Mở modal chi tiết → Chọn trạng thái mới (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderStatus</span>) → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order/update</span>.</li>
+      </ul>
+    </li>
+    <li class="break-words">Nếu là CASHIER, có thể quản lý bàn:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Truy cập module Bàn (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/tables</span>) → Chọn bàn → Tạo đơn hàng từ bàn.</li>
+      </ul>
+    </li>
+  </ol>
+  <h4 dir="auto" class=""><strong class="font-semibold">3.3. Luồng quản lý sản phẩm (MANAGER/STAFF)</strong></h4>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words">Truy cập module Sản phẩm (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/products</span>).</li>
+    <li class="break-words">Tìm kiếm sản phẩm (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product/search</span> với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ProductSearchRequest</span>).</li>
+    <li class="break-words">Thêm/sửa sản phẩm:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Nhấn "Thêm sản phẩm" → Mở form → Nhập thông tin (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ProductRequest</span>) → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product</span>.</li>
+      </ul>
+    </li>
+    <li class="break-words">Xóa sản phẩm (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product/{id}</span> với xóa mềm).</li>
+  </ol>
+  <h4 dir="auto" class=""><strong class="font-semibold">3.4. Luồng quản lý chi nhánh (OWNER/MANAGER)</strong></h4>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words">Truy cập module Chi nhánh (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/branches</span>).</li>
+    <li class="break-words">Xem danh sách chi nhánh (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/branch</span>).</li>
+    <li class="break-words">Thêm/sửa chi nhánh:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Nhấn "Thêm chi nhánh" → Mở form → Nhập thông tin (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">BranchRequest</span>) → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/branch</span>.</li>
+      </ul>
+    </li>
+  </ol>
+  <h4 dir="auto" class=""><strong class="font-semibold">3.5. Luồng báo cáo (OWNER/MANAGER)</strong></h4>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words">Truy cập module Báo cáo (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/reports</span>).</li>
+    <li class="break-words">Chọn bộ lọc (ngày, tuần, chi nhánh) → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report</span> → Hiển thị biểu đồ và bảng.</li>
+    <li class="break-words">Xuất Excel: Nhấn nút "Xuất Excel" → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/report/export</span> → Tải file.</li>
+  </ol>
+  <h4 dir="auto" class=""><strong class="font-semibold">3.6. Luồng nâng cấp gói (OWNER)</strong></h4>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words">Truy cập module Gói đăng ký (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/subscription</span>).</li>
+    <li class="break-words">Xem thông tin gói hiện tại (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">SubscriptionPlan</span>).</li>
+    <li class="break-words">Nhấn "Nâng cấp" → Mở modal chọn gói → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/subscription/upgrade</span>.</li>
+  </ol>
+  <hr class="border-border-l2">
+  <h3 dir="auto" class=""><strong class="font-semibold">4. Đề xuất triển khai</strong></h3>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words"><strong class="font-semibold">Quản lý trạng thái</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Sử dụng Redux hoặc Zustand (React) hoặc Pinia (Vue) để quản lý trạng thái toàn cục (user, token, shop, v.v.).</li>
+        <li class="break-words">Sử dụng React Query/Vue Query để cache dữ liệu API (tương thích với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderCache</span>).</li>
+      </ul>
+    </li>
+    <li class="break-words"><strong class="font-semibold">Xác thực và phân quyền</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Lưu token trong localStorage hoặc cookie, thêm middleware để kiểm tra token trước khi gọi API.</li>
+        <li class="break-words">Dựa trên <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">UserRole</span> và <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ShopRole</span> trong token để ẩn/hiện các module trong sidebar.</li>
+      </ul>
+    </li>
+    <li class="break-words"><strong class="font-semibold">Xử lý lỗi</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Hiển thị thông báo lỗi từ <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ApiResponseDto</span> (ví dụ: toast notification với <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">react-toastify</span>).</li>
+        <li class="break-words">Chuyển hướng về đăng nhập nếu nhận lỗi 401 (Unauthorized).</li>
+      </ul>
+    </li>
+    <li class="break-words"><strong class="font-semibold">Đa ngôn ngữ</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Tích hợp i18next, tải các tệp ngôn ngữ từ backend (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">messages.properties</span>).</li>
+      </ul>
+    </li>
+    <li class="break-words"><strong class="font-semibold">Hiệu suất</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Sử dụng lazy loading cho các module ít sử dụng (ví dụ: Báo cáo, Cài đặt).</li>
+        <li class="break-words">Cache dữ liệu tĩnh (sản phẩm, khách hàng) với React Query.</li>
+      </ul>
+    </li>
+  </ol>
+  <hr class="border-border-l2">
+  <h3 dir="auto" class=""><strong class="font-semibold">5. Ví dụ luồng cụ thể (Tạo đơn hàng)</strong></h3>
+  <ol dir="auto" class="marker:text-secondary">
+    <li class="break-words"><strong class="font-semibold">CASHIER truy cập module Đơn hàng</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Sidebar hiển thị các module: Đơn hàng, Bàn, Khách hàng.</li>
+        <li class="break-words">Nhấn "Đơn hàng" → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order</span> → Hiển thị bảng đơn hàng.</li>
+      </ul>
+    </li>
+    <li class="break-words"><strong class="font-semibold">Tạo đơn hàng mới</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Nhấn "Tạo đơn hàng" → Mở form → Gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/product</span> để lấy danh sách sản phẩm.</li>
+        <li class="break-words">Chọn sản phẩm, số lượng, khách hàng (tìm kiếm bằng <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/customer/search</span>).</li>
+        <li class="break-words">Áp dụng khuyến mãi (gọi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/promotion</span>) → Gửi <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OrderRequest</span> tới <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">/api/order</span>.</li>
+      </ul>
+    </li>
+    <li class="break-words"><strong class="font-semibold">Xác nhận</strong>:
+      <ul dir="auto" class="marker:text-secondary">
+        <li class="break-words">Hiển thị thông báo thành công (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">ApiResponseDto</span>) → Làm mới bảng đơn hàng.</li>
+      </ul>
+    </li>
+  </ol>
+  <hr class="border-border-l2">
+  <h3 dir="auto" class=""><strong class="font-semibold">6. Kết luận</strong></h3>
+  <p dir="auto" class="break-words" style="white-space: pre-wrap;">Giao diện và luồng người dùng được đề xuất tập trung vào tính đơn giản, trực quan và phù hợp với các vai trò người dùng (<span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">OWNER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">MANAGER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">CASHIER</span>, <span class="text-sm px-1 rounded-sm !font-mono bg-orange-400/10 text-orange-500 dark:bg-orange-300/10 dark:text-orange-200">STAFF</span>). Các màn hình chính (Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Chi nhánh, Báo cáo) tận dụng các endpoint backend hiện có và đảm bảo trải nghiệm mượt mà. Sử dụng React/Vue với Tailwind CSS và Chart.js sẽ giúp triển khai nhanh và hiệu quả.</p>
+  <p dir="auto" class="break-words" style="white-space: pre-wrap;">Nếu bạn cần mẫu code cụ thể cho một màn hình (ví dụ: component React cho danh sách đơn hàng) hoặc mockup giao diện (Figma), hãy cho tôi biết!</p></div>
+</body>
+</html>
