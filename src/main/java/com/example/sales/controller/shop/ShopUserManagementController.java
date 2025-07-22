@@ -2,9 +2,11 @@
 package com.example.sales.controller.shop;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ShopUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,7 +28,7 @@ public class ShopUserManagementController {
 
     // ✅ API để thêm người dùng vào chi nhánh
     @PostMapping("/branches/{branchId}/users/{userId}")
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN, ShopRole.MANAGER})
+    @RequirePermission(Permission.SHOP_USER_CREATE)
     @Operation(summary = "Thêm/Tái kích hoạt người dùng vào một chi nhánh",
             description = "Thêm người dùng vào chi nhánh cụ thể với vai trò xác định. " +
                     "Nếu người dùng đã bị xóa, sẽ tái kích hoạt họ.")
@@ -54,7 +56,7 @@ public class ShopUserManagementController {
 
     // ✅ API mới: Xóa người dùng khỏi một chi nhánh cụ thể
     @DeleteMapping("/branches/{branchId}/users/{userId}")
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN, ShopRole.MANAGER}) // MANAGER có thể xóa STAFF/CASHIER trong chi nhánh của họ
+    @RequirePermission(Permission.SHOP_USER_BRANCH_DELETE)
     @Operation(summary = "Xóa người dùng khỏi một chi nhánh cụ thể",
             description = "Xóa mềm (soft delete) một người dùng khỏi một chi nhánh cụ thể của cửa hàng. " +
                     "Chỉ dành cho các vai trò có quyền quản lý nhân viên.")
@@ -80,6 +82,7 @@ public class ShopUserManagementController {
     // ✅ API mới: Xóa người dùng khỏi toàn bộ shop (tất cả các chi nhánh)
     @DeleteMapping("/users/{userId}")
     @RequireRole({ShopRole.OWNER, ShopRole.ADMIN}) // Chỉ OWNER hoặc ADMIN mới có thể xóa người dùng khỏi toàn bộ shop
+    @RequirePermission(Permission.SHOP_USER_DELETE)
     @Operation(summary = "Xóa người dùng khỏi cửa hàng (tất cả các chi nhánh)",
             description = "Xóa mềm (soft delete) một người dùng khỏi tất cả các chi nhánh của một cửa hàng. " +
                     "Chỉ dành cho các vai trò có quyền quản lý cấp cao.")

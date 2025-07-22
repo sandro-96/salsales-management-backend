@@ -104,15 +104,5 @@ public class ShopController {
         shopService.deleteShop(user.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
-
-    // File: ShopController.java
-    @GetMapping("/search")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    @Operation(summary = "Tìm kiếm cửa hàng", description = "Tìm kiếm cửa hàng theo tên hoặc địa chỉ")
-    public ApiResponseDto<Page<ShopSimpleResponse>> search(
-            @RequestParam String keyword,
-            Pageable pageable) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.searchShops(keyword, pageable));
-    }
 }
 

@@ -16,6 +16,7 @@ import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -63,7 +64,8 @@ public class ShopService extends BaseService {
                 .shopId(savedShop.getId())
                 .userId(userId)
                 .role(ShopRole.OWNER)
-                .branchId(savedBranch.getId()) // Gắn owner vào chi nhánh mặc định
+                .branchId(savedBranch.getId())
+                .permissions(PermissionUtils.getDefaultPermissions(ShopRole.OWNER))
                 .build();
         shopUserRepository.save(shopUser);
 

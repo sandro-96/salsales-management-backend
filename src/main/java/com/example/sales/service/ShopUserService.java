@@ -5,10 +5,13 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Branch;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -26,6 +29,7 @@ public class ShopUserService extends BaseService {
     private final ShopUserRepository shopUserRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
+    private final BranchRepository branchRepository;
 
     @Cacheable(value = "shopUsers", key = "#shopId + '-' + #userId")
     public ShopRole getUserRoleInShop(String shopId, String userId) {
@@ -67,6 +71,7 @@ public class ShopUserService extends BaseService {
     }
 
     public void addUser(String shopId, String userId, ShopRole role, String branchId, String performedByUserId) {
+        validateBranchRoleHierarchy(shopId, branchId, performedByUserId, userId);
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         if (!shop.isActive()) {
@@ -82,6 +87,7 @@ public class ShopUserService extends BaseService {
             } else {
                 shopUser.setDeleted(false);
                 shopUser.setRole(role);
+                shopUser.setPermissions(PermissionUtils.getDefaultPermissions(role));
                 shopUserRepository.save(shopUser);
                 auditLogService.log(performedByUserId, shopId, shopUser.getId(), "SHOP_USER", "REACTIVATED",
                         String.format("Tái kích hoạt người dùng %s vào chi nhánh %s của cửa hàng %s với vai trò %s", userId, branchId, shopId, role));
@@ -92,6 +98,7 @@ public class ShopUserService extends BaseService {
                     .userId(userId)
                     .role(role)
                     .branchId(branchId)
+                    .permissions(PermissionUtils.getDefaultPermissions(role))
                     .build();
             shopUserRepository.save(newShopUser);
             auditLogService.log(performedByUserId, shopId, newShopUser.getId(), "SHOP_USER", "ADDED",
@@ -100,6 +107,7 @@ public class ShopUserService extends BaseService {
     }
 
     public void removeUser(String shopId, String userId, String branchId, String performedByUserId) {
+        validateBranchRoleHierarchy(shopId, branchId, performedByUserId, userId);
         ShopUser shopUser = shopUserRepository.findByUserIdAndShopIdAndBranchIdAndDeletedFalse(userId, shopId, branchId)
                 .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUser.setDeleted(true);
@@ -111,34 +119,107 @@ public class ShopUserService extends BaseService {
 
     // ✅ Phương thức mới để xóa user khỏi shop, không quan tâm branch
     public void removeUserFromShop(String shopId, String userId, String performedByUserId) {
-        // Tìm tất cả các bản ghi ShopUser của người dùng này trong shop này
-        List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndShopIdAndDeletedFalse(userId, shopId);
+        if (userId.equals(performedByUserId)) {
+            auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "UNAUTHORIZED",
+                    "Người dùng không thể xóa chính mình khỏi cửa hàng");
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
 
-        if (shopUsers.isEmpty()) {
+        List<ShopUser> targetShopUsers = shopUserRepository.findByUserIdAndShopIdAndDeletedFalse(userId, shopId);
+        if (targetShopUsers.isEmpty()) {
+            auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "NOT_FOUND",
+                    String.format("Người dùng %s không tồn tại trong cửa hàng %s", userId, shopId));
             throw new BusinessException(ApiCode.NOT_FOUND);
         }
 
-        // Thực hiện xóa mềm cho tất cả các bản ghi tìm được
-        for (ShopUser shopUser : shopUsers) {
-            shopUser.setDeleted(true);
+        // Lấy các bản ghi ShopUser của người thực hiện trong shop
+        List<ShopUser> performerShopUsers = shopUserRepository.findByUserIdAndShopIdAndDeletedFalse(performedByUserId, shopId);
+        if (performerShopUsers.isEmpty()) {
+            auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "ACCESS_DENIED",
+                    String.format("Người dùng %s không có quyền thao tác trong cửa hàng %s", performedByUserId, shopId));
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
-        shopUserRepository.saveAll(shopUsers); // Lưu tất cả các bản ghi đã cập nhật
+
+        for (ShopUser targetSU : targetShopUsers) {
+            ShopUser performer = performerShopUsers.stream()
+                    .filter(p -> p.getBranchId().equals(targetSU.getBranchId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (performer == null) {
+                auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "ACCESS_DENIED",
+                        String.format("Người dùng %s không có quyền thao tác trong chi nhánh %s của cửa hàng %s", performedByUserId, targetSU.getBranchId(), shopId));
+                throw new BusinessException(ApiCode.ACCESS_DENIED);
+            }
+
+            ensureCanModifyRole(performer.getRole(), targetSU.getRole());
+            targetSU.setDeleted(true);
+        }
+
+        shopUserRepository.saveAll(targetShopUsers);
 
         auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "REMOVED_FROM_SHOP",
                 String.format("Xoá người dùng %s khỏi tất cả các chi nhánh của cửa hàng %s", userId, shopId));
     }
 
+
     public Page<ShopSimpleResponse> getShopsForUser(String userId, Pageable pageable) {
         return shopUserRepository.findByUserIdAndDeletedFalse(userId, pageable)
-                .map(su -> shopRepository.findByIdAndDeletedFalse(su.getShopId())
-                        .map(shop -> ShopSimpleResponse.builder()
-                                .id(shop.getId())
-                                .name(shop.getName())
-                                .type(shop.getType())
-                                .logoUrl(shop.getLogoUrl())
-                                .active(shop.isActive())
-                                .role(su.getRole())
-                                .build())
-                        .orElse(null));
+                .map(su -> {
+                    Optional<Shop> shopOpt = shopRepository.findByIdAndDeletedFalse(su.getShopId());
+                    Optional<Branch> branchOpt = branchRepository.findByIdAndDeletedFalse(su.getBranchId());
+
+                    if (shopOpt.isEmpty() || branchOpt.isEmpty()) return null;
+
+                    Shop shop = shopOpt.get();
+                    Branch branch = branchOpt.get();
+
+                    return ShopSimpleResponse.builder()
+                            .id(shop.getId())
+                            .name(shop.getName())
+                            .type(shop.getType())
+                            .logoUrl(shop.getLogoUrl())
+                            .active(shop.isActive())
+                            .role(su.getRole())
+                            .branchId(branch.getId())
+                            .branchName(branch.getName())
+                            .branchAddress(branch.getAddress())
+                            .build();
+                });
     }
+
+
+    private void ensureCanModifyRole(ShopRole actorRole, ShopRole targetRole) {
+        if (actorRole == ShopRole.MANAGER &&
+                (targetRole == ShopRole.OWNER || targetRole == ShopRole.ADMIN || targetRole == ShopRole.MANAGER)) {
+            auditLogService.log(null, null, null, "ROLE_MODIFICATION", "DENIED",
+                    "MANAGER attempted to modify a higher role.");
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
+        if (actorRole.ordinal() < targetRole.ordinal()) {
+            auditLogService.log(null, null, null, "ROLE_MODIFICATION", "DENIED",
+                    String.format("User with role %s attempted to modify user with role %s.", actorRole, targetRole));
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+    }
+
+
+    public ShopRole getUserRoleInBranch(String shopId, String userId, String branchId) {
+        return shopUserRepository.findByUserIdAndShopIdAndBranchIdAndDeletedFalse(userId, shopId, branchId)
+                .map(ShopUser::getRole)
+                .orElseThrow(() -> new BusinessException(ApiCode.UNAUTHORIZED));
+    }
+
+    public void validateBranchRoleHierarchy(String shopId, String branchId, String actorUserId, String targetUserId) {
+        // Lấy role người thực hiện (actor) tại branch
+        ShopRole actorRole = getUserRoleInBranch(shopId, actorUserId, branchId);
+
+        // Lấy role người bị thao tác (target)
+        ShopRole targetRole = getUserRoleInBranch(shopId, targetUserId, branchId);
+
+        // Thực hiện logic so sánh
+        ensureCanModifyRole(actorRole, targetRole);
+    }
+
 }

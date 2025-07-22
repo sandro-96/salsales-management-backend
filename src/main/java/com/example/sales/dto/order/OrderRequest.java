@@ -41,8 +41,5 @@ public class OrderRequest {
 
         @Min(value = 1, message = "Số lượng phải lớn hơn 0")
         private int quantity;
-
-        @Min(value = 0, message = "Giá sản phẩm không được âm")
-        private double price; // Giá tại thời điểm đặt hàng (có thể khác giá hiện tại của sản phẩm)
     }
 }

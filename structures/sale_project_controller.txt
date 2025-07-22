@@ -81,12 +81,12 @@ public class AdminUserController {
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -116,12 +116,13 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền tạo")
     })
     @PostMapping("/shops/{shopId}/products")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PRODUCT_CREATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @RequestParam(required = false) String branchId,
             @Valid @RequestBody ProductRequest request) {
-        ProductResponse response = productService.createProduct(shopId, request);
+        ProductResponse response = productService.createProduct(shopId, branchId, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
@@ -132,7 +133,7 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật")
     })
     @PutMapping("/shops/{shopId}/branches/{branchId}/products/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_UPDATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> update(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
@@ -150,7 +151,7 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền xóa")
     })
     @DeleteMapping("/shops/{shopId}/branches/{branchId}/products/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PRODUCT_DELETE)
     public ResponseEntity<ApiResponseDto<Void>> delete(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
@@ -165,7 +166,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm")
     })
     @GetMapping("/shops/{shopId}/products")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
@@ -181,7 +181,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm")
     })
     @GetMapping("/shops/{shopId}/branches/{branchId}/products/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<ProductResponse>> getById(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh") @PathVariable String branchId,
@@ -195,7 +194,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm khớp từ khóa")
     })
     @GetMapping("/shops/{shopId}/products/search")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> search(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
@@ -211,10 +209,10 @@ public class ProductCrudController {
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.ExcelImportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -246,7 +244,7 @@ public class ProductImportExportController {
             @ApiResponse(responseCode = "403", description = "Không có quyền nhập")
     })
     @PostMapping("/import")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PRODUCT_IMPORT)
     public ResponseEntity<ApiResponseDto<Integer>> importProducts(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
@@ -269,7 +267,7 @@ public class ProductImportExportController {
             @ApiResponse(responseCode = "403", description = "Không có quyền xuất")
     })
     @GetMapping("/export")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_EXPORT)
     public void exportProducts(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
@@ -293,11 +291,11 @@ public class ProductImportExportController {
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -330,7 +328,7 @@ public class ProductStatusController {
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
     })
     @PatchMapping("/shops/{shopId}/branches/{branchId}/products/{branchProductId}/toggle")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_UPDATE_STATUS)
     public ResponseEntity<ApiResponseDto<ProductResponse>> toggleActive(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng", required = true) @PathVariable String shopId,
@@ -350,7 +348,7 @@ public class ProductStatusController {
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
     @GetMapping("/shops/{shopId}/low-stock")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_VIEW_LOW_STOCK)
     public ResponseEntity<ApiResponseDto<List<ProductResponse>>> getLowStock(
             @Parameter(description = "ID cửa hàng", required = true) @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
@@ -517,14 +515,14 @@ public class AuthController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequirePlan;
-import com.example.sales.security.RequireRole;
 import com.example.sales.service.BranchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -547,7 +545,7 @@ public class BranchController {
     private final BranchService branchService;
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.BRANCH_VIEW)
     @Operation(summary = "Lấy danh sách chi nhánh", description = "Lấy danh sách chi nhánh của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách chi nhánh được trả về thành công"),
@@ -564,7 +562,7 @@ public class BranchController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
+    @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Tạo chi nhánh mới", description = "Tạo một chi nhánh mới cho cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được tạo thành công"),
@@ -581,7 +579,7 @@ public class BranchController {
     }
 
     @PutMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
+    @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Cập nhật chi nhánh", description = "Cập nhật thông tin chi nhánh của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được cập nhật thành công"),
@@ -599,7 +597,7 @@ public class BranchController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Xóa chi nhánh", description = "Xóa mềm một chi nhánh của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được xóa thành công"),
@@ -620,12 +618,12 @@ public class BranchController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -648,7 +646,7 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_VIEW)
     @Operation(summary = "Lấy danh sách khách hàng", description = "Trả về danh sách khách hàng theo cửa hàng và (tuỳ chọn) chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lấy danh sách khách hàng thành công"),
@@ -662,7 +660,7 @@ public class CustomerController {
     }
 
     @PostMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_UPDATE)
     @Operation(summary = "Tạo khách hàng", description = "Tạo một khách hàng mới trong cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tạo khách hàng thành công"),
@@ -678,7 +676,7 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_UPDATE)
     @Operation(summary = "Cập nhật khách hàng", description = "Cập nhật thông tin khách hàng theo ID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật khách hàng thành công"),
@@ -695,7 +693,7 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_DELETE)
     @Operation(summary = "Xóa khách hàng", description = "Xoá mềm một khách hàng theo ID và chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Xoá khách hàng thành công"),
@@ -716,13 +714,13 @@ public class CustomerController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.InventoryType; // Import InventoryType
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.InventoryType;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.inventory.InventoryRequest;
-import com.example.sales.dto.inventory.InventoryTransactionResponse; // Import InventoryTransactionResponse
+import com.example.sales.dto.inventory.InventoryTransactionResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -746,7 +744,7 @@ public class InventoryController {
 
     // ✅ Endpoint để nhập sản phẩm vào kho
     @PostMapping("/import")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF}) // MANAGER/STAFF có thể nhập kho
+    @RequirePermission(Permission.INVENTORY_MANAGE)
     @Operation(summary = "Nhập thêm số lượng sản phẩm vào kho của chi nhánh", description = "Tạo một giao dịch nhập kho cho sản phẩm tại một chi nhánh cụ thể.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Nhập kho thành công, trả về số lượng tồn kho mới"),
@@ -773,7 +771,7 @@ public class InventoryController {
 
     // ✅ Endpoint để xuất sản phẩm khỏi kho
     @PostMapping("/export")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER}) // CASHIER cũng có thể xuất kho (khi bán hàng)
+    @RequirePermission(Permission.INVENTORY_MANAGE)
     @Operation(summary = "Xuất bớt số lượng sản phẩm khỏi kho của chi nhánh", description = "Tạo một giao dịch xuất kho cho sản phẩm tại một chi nhánh cụ thể. Kiểm tra số lượng tồn kho.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Xuất kho thành công, trả về số lượng tồn kho mới"),
@@ -800,7 +798,7 @@ public class InventoryController {
 
     // ✅ Endpoint để điều chỉnh tồn kho
     @PostMapping("/adjust")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF}) // Chỉ các vai trò quản lý/nhân viên có thể điều chỉnh
+    @RequirePermission(Permission.INVENTORY_MANAGE)
     @Operation(summary = "Điều chỉnh số lượng tồn kho của sản phẩm tại chi nhánh", description = "Tạo một giao dịch điều chỉnh tồn kho cho sản phẩm tại một chi nhánh cụ thể. Có thể tăng hoặc giảm.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Điều chỉnh tồn kho thành công, trả về số lượng tồn kho mới"),
@@ -828,7 +826,7 @@ public class InventoryController {
 
     // ✅ Endpoint để lấy lịch sử giao dịch tồn kho
     @GetMapping("/branches/{branchId}/products/{branchProductId}/history")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF}) // OWNER/MANAGER/STAFF có thể xem lịch sử
+    @RequirePermission(Permission.INVENTORY_VIEW)
     @Operation(summary = "Lấy lịch sử giao dịch tồn kho cho một sản phẩm tại chi nhánh", description = "Lấy lịch sử giao dịch tồn kho của một BranchProduct cụ thể với phân trang.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lịch sử giao dịch tồn kho được trả về thành công"),
@@ -857,12 +855,13 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.OrderStatus;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
+import com.example.sales.dto.order.OrderUpdateRequest;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -885,7 +884,7 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.ORDER_VIEW)
     @Operation(summary = "Lấy danh sách đơn hàng", description = "Lấy danh sách đơn hàng của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách đơn hàng được trả về thành công"),
@@ -893,16 +892,15 @@ public class OrderController {
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
             @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
     })
-    public ApiResponseDto<Page<OrderResponse>> getMyOrders(
-            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+    public ApiResponseDto<Page<OrderResponse>> getShopOrders(
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> orders = orderService.getOrdersByUser(user.getId(), shopId, pageable);
+        Page<OrderResponse> orders = orderService.getShopOrders(shopId, pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 
     @PostMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.ORDER_CREATE)
     @Operation(summary = "Tạo đơn hàng mới", description = "Tạo đơn hàng với danh sách sản phẩm, thông tin bàn và chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Đơn hàng được tạo thành công"),
@@ -914,13 +912,14 @@ public class OrderController {
     public ApiResponseDto<OrderResponse> createOrder(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam @Parameter(description = "ID của chi nhánh (nếu có)") String branchId,
             @RequestBody @Valid @Parameter(description = "Thông tin đơn hàng") OrderRequest request) {
-        OrderResponse created = orderService.createOrder(user.getId(), shopId, request);
+        OrderResponse created = orderService.createOrder(user.getId(), branchId, shopId, request);
         return ApiResponseDto.success(ApiCode.ORDER_CREATED, created);
     }
 
     @PutMapping("/{id}/cancel")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.ORDER_CANCEL)
     @Operation(summary = "Hủy đơn hàng", description = "Hủy đơn hàng nếu chưa được thanh toán")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Đơn hàng được hủy thành công"),
@@ -938,7 +937,7 @@ public class OrderController {
     }
 
     @PostMapping("/{orderId}/confirm-payment")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.ORDER_PAYMENT_CONFIRM)
     @Operation(summary = "Xác nhận thanh toán", description = "Xác nhận thanh toán cho đơn hàng và cập nhật trạng thái")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Thanh toán được xác nhận thành công"),
@@ -957,8 +956,28 @@ public class OrderController {
         return ApiResponseDto.success(ApiCode.ORDER_PAYMENT_CONFIRMED, confirmed);
     }
 
+    @PutMapping("/{id}")
+    @RequirePermission(Permission.ORDER_UPDATE)
+    @Operation(summary = "Cập nhật đơn hàng", description = "Cập nhật thông tin đơn hàng như bàn, ghi chú hoặc danh sách sản phẩm (chỉ khi đơn chưa thanh toán)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đơn hàng được cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Đơn hàng đã thanh toán hoặc dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Đơn hàng hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> updateOrder(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable("id") @Parameter(description = "ID đơn hàng") String orderId,
+            @RequestParam @Parameter(description = "ID cửa hàng") String shopId,
+            @Valid @RequestBody @Parameter(description = "Thông tin cập nhật đơn hàng") OrderUpdateRequest request) {
+
+        OrderResponse response = orderService.updateOrder(user.getId(), shopId, orderId, request);
+        return ApiResponseDto.success(ApiCode.ORDER_UPDATED, response);
+    }
+
     @PutMapping("/{id}/status")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.ORDER_UPDATE)
     @Operation(summary = "Cập nhật trạng thái đơn hàng", description = "Cập nhật trạng thái đơn hàng (PENDING, COMPLETED, CANCELLED, v.v.)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trạng thái đơn hàng được cập nhật thành công"),
@@ -977,7 +996,7 @@ public class OrderController {
     }
 
     @GetMapping("/filter")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.ORDER_VIEW)
     @Operation(summary = "Lấy đơn hàng theo trạng thái", description = "Lấy danh sách đơn hàng theo trạng thái và chi nhánh với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách đơn hàng được trả về thành công"),
@@ -991,7 +1010,7 @@ public class OrderController {
             @RequestParam @Parameter(description = "Trạng thái đơn hàng (PENDING, COMPLETED, CANCELLED, v.v.)") OrderStatus status,
             @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> filtered = orderService.getOrdersByStatus(user.getId(), shopId, status, branchId, pageable);
+        Page<OrderResponse> filtered = orderService.getOrdersByStatus(shopId, status, branchId, pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, filtered);
     }
 }
@@ -1000,14 +1019,14 @@ public class OrderController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequirePlan;
-import com.example.sales.security.RequireRole;
 import com.example.sales.service.PromotionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -1031,7 +1050,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PROMOTION_VIEW)
     @Operation(summary = "Lấy danh sách khuyến mãi", description = "Lấy danh sách khuyến mãi của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách khuyến mãi được trả về thành công"),
@@ -1049,7 +1068,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PROMOTION_CREATE)
     @Operation(summary = "Tạo khuyến mãi mới", description = "Tạo một khuyến mãi mới cho cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Khuyến mãi được tạo thành công"),
@@ -1067,7 +1086,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PROMOTION_UPDATE)
     @Operation(summary = "Cập nhật khuyến mãi", description = "Cập nhật thông tin khuyến mãi của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Khuyến mãi được cập nhật thành công"),
@@ -1086,7 +1105,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PROMOTION_DELETE)
     @Operation(summary = "Xóa khuyến mãi", description = "Xóa mềm một khuyến mãi của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Khuyến mãi được xóa thành công"),
@@ -1107,14 +1126,14 @@ public class PromotionController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequirePlan;
-import com.example.sales.security.RequireRole;
 import com.example.sales.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -1140,7 +1159,7 @@ public class ReportController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/summary")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.REPORT_VIEW)
     @Operation(
             summary = "Lấy báo cáo tổng hợp",
             description = "Trả về báo cáo tổng hợp doanh thu, số lượng đơn hàng, sản phẩm đã bán,... trong khoảng thời gian được chỉ định"
@@ -1159,7 +1178,7 @@ public class ReportController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/daily")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.REPORT_VIEW)
     @Operation(
             summary = "Lấy báo cáo theo ngày",
             description = "Trả về danh sách báo cáo chi tiết theo từng ngày trong khoảng thời gian chỉ định"
@@ -1178,7 +1197,7 @@ public class ReportController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/daily/export")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.REPORT_VIEW)
     @Operation(
             summary = "Xuất báo cáo theo ngày ra file Excel",
             description = "Xuất dữ liệu báo cáo theo ngày trong khoảng thời gian chỉ định dưới dạng file Excel"
@@ -1304,16 +1323,6 @@ public class ShopController {
     public ApiResponseDto<?> deleteShop(@AuthenticationPrincipal CustomUserDetails user) {
         shopService.deleteShop(user.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS);
-    }
-
-    // File: ShopController.java
-    @GetMapping("/search")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
-    @Operation(summary = "Tìm kiếm cửa hàng", description = "Tìm kiếm cửa hàng theo tên hoặc địa chỉ")
-    public ApiResponseDto<Page<ShopSimpleResponse>> search(
-            @RequestParam String keyword,
-            Pageable pageable) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.searchShops(keyword, pageable));
     }
 }
 
@@ -1443,13 +1452,13 @@ public class SubscriptionController {
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.table.TableRequest;
 import com.example.sales.dto.table.TableResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.TableService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -1472,7 +1481,6 @@ public class TableController {
     private final TableService tableService;
 
     @PostMapping
-    @RequireRole(ShopRole.OWNER)
     @Operation(summary = "Tạo bàn mới", description = "Tạo một bàn mới trong cửa hàng với thông tin bàn và chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Bàn được tạo thành công"),
@@ -1488,7 +1496,7 @@ public class TableController {
     }
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.TABLE_CREATE)
     @Operation(summary = "Lấy danh sách bàn", description = "Lấy danh sách bàn của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách bàn được trả về thành công"),
@@ -1505,7 +1513,7 @@ public class TableController {
     }
 
     @PutMapping("/{id}/status")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.TABLE_UPDATE)
     @Operation(summary = "Cập nhật trạng thái bàn", description = "Cập nhật trạng thái bàn (AVAILABLE, OCCUPIED, v.v.)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trạng thái bàn được cập nhật thành công"),
@@ -1522,7 +1530,7 @@ public class TableController {
     }
 
     @PutMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.TABLE_UPDATE)
     @Operation(summary = "Cập nhật thông tin bàn", description = "Cập nhật thông tin bàn như tên, sức chứa, ghi chú")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Thông tin bàn được cập nhật thành công"),
@@ -1539,7 +1547,7 @@ public class TableController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.TABLE_DELETE)
     @Operation(summary = "Xóa bàn", description = "Xóa mềm một bàn nếu bàn không đang được sử dụng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Bàn được xóa thành công"),
@@ -1694,9 +1702,11 @@ public class WebhookController {
 package com.example.sales.controller.shop;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.ShopUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -1718,7 +1728,7 @@ public class ShopUserManagementController {
 
     // ✅ API để thêm người dùng vào chi nhánh
     @PostMapping("/branches/{branchId}/users/{userId}")
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN, ShopRole.MANAGER})
+    @RequirePermission(Permission.SHOP_USER_CREATE)
     @Operation(summary = "Thêm/Tái kích hoạt người dùng vào một chi nhánh",
             description = "Thêm người dùng vào chi nhánh cụ thể với vai trò xác định. " +
                     "Nếu người dùng đã bị xóa, sẽ tái kích hoạt họ.")
@@ -1746,7 +1756,7 @@ public class ShopUserManagementController {
 
     // ✅ API mới: Xóa người dùng khỏi một chi nhánh cụ thể
     @DeleteMapping("/branches/{branchId}/users/{userId}")
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN, ShopRole.MANAGER}) // MANAGER có thể xóa STAFF/CASHIER trong chi nhánh của họ
+    @RequirePermission(Permission.SHOP_USER_BRANCH_DELETE)
     @Operation(summary = "Xóa người dùng khỏi một chi nhánh cụ thể",
             description = "Xóa mềm (soft delete) một người dùng khỏi một chi nhánh cụ thể của cửa hàng. " +
                     "Chỉ dành cho các vai trò có quyền quản lý nhân viên.")
@@ -1772,6 +1782,7 @@ public class ShopUserManagementController {
     // ✅ API mới: Xóa người dùng khỏi toàn bộ shop (tất cả các chi nhánh)
     @DeleteMapping("/users/{userId}")
     @RequireRole({ShopRole.OWNER, ShopRole.ADMIN}) // Chỉ OWNER hoặc ADMIN mới có thể xóa người dùng khỏi toàn bộ shop
+    @RequirePermission(Permission.SHOP_USER_DELETE)
     @Operation(summary = "Xóa người dùng khỏi cửa hàng (tất cả các chi nhánh)",
             description = "Xóa mềm (soft delete) một người dùng khỏi tất cả các chi nhánh của một cửa hàng. " +
                     "Chỉ dành cho các vai trò có quyền quản lý cấp cao.")

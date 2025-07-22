@@ -1,7 +1,11 @@
 // File: src/main/java/com/example/sales/service/OrderService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.*;
+import com.example.sales.cache.OrderCache;
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.DiscountType;
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.order.OrderItemResponse;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
@@ -11,8 +15,7 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
 import com.example.sales.repository.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j; // Thêm Log
-import org.springframework.cache.annotation.Cacheable;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects; // Thêm Objects
 
 @Service
 @RequiredArgsConstructor
@@ -29,21 +31,16 @@ public class OrderService extends BaseService {
 
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
-    private final ProductRepository productRepository; // Vẫn cần để lấy thông tin Product master
-    private final BranchProductRepository branchProductRepository; // Thêm BranchProductRepository
+    private final ProductRepository productRepository;
+    private final BranchProductRepository branchProductRepository;
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
     private final ShopRepository shopRepository;
-    private final InventoryService inventoryService; // Thay thế InventoryTransactionRepository bằng InventoryService
-    private final ShopUserService shopUserService;
-
-    public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
-        return orderRepository.findByShopIdAndDeletedFalse(shopId)
-                .stream().map(this::toResponse).toList();
-    }
+    private final InventoryService inventoryService;
+    private final OrderCache orderCache;
 
     @Transactional
-    public OrderResponse createOrder(String userId, String shopId, OrderRequest request) {
+    public OrderResponse createOrder(String userId, String branchId, String shopId, OrderRequest request) {
         Order order = new Order();
         order.setShopId(shopId);
         order.setTableId(request.getTableId());
@@ -52,7 +49,6 @@ public class OrderService extends BaseService {
         order.setStatus(OrderStatus.PENDING);
         order.setPaid(false);
 
-        String branchId = request.getBranchId();
         if (branchId == null || branchId.isBlank()) {
             log.error("Branch ID không được để trống");
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
@@ -78,7 +74,7 @@ public class OrderService extends BaseService {
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
 
-            double basePrice = reqItem.getPrice();
+            double basePrice = branchProduct.getPrice();
             double finalPrice = basePrice;
             String promoId = null;
 
@@ -129,7 +125,7 @@ public class OrderService extends BaseService {
     }
 
     public void cancelOrder(String userId, String shopId, String orderId) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -141,7 +137,7 @@ public class OrderService extends BaseService {
         // Hoàn kho khi hủy đơn hàng nếu shop có quản lý tồn kho
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-        if (inventoryService.isInventoryManagementRequired(shopId)) {
+        if (shop.getType().isTrackInventory()) {
             for (OrderItem item : order.getItems()) {
                 inventoryService.importProductQuantity(
                         userId, shopId, order.getBranchId(), item.getBranchProductId(),
@@ -153,7 +149,7 @@ public class OrderService extends BaseService {
     }
 
     public OrderResponse confirmPayment(String userId, String shopId, String orderId, String paymentId, String paymentMethod) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -173,7 +169,7 @@ public class OrderService extends BaseService {
     }
 
     public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
             log.error("Không thể cập nhật trạng thái đơn hàng đã hủy hoặc đã hoàn thành");
@@ -203,13 +199,6 @@ public class OrderService extends BaseService {
         }
 
         return toResponse(updated);
-    }
-
-    @Cacheable(value = "orders", key = "#orderId + '-' + #shopId")
-    private Order getOrderByShop(String orderId, String shopId) {
-        return orderRepository.findByIdAndDeletedFalse(orderId)
-                .filter(o -> o.getShopId().equals(shopId))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
     }
 
     private void occupyTable(Order order) {
@@ -245,23 +234,19 @@ public class OrderService extends BaseService {
                 .orElse(null);
     }
 
-    // Phương thức adjustInventory đã được loại bỏ và thay bằng InventoryService
-
-    // File: OrderService.java
-    public Page<OrderResponse> getOrdersByUser(String userId, String shopId, Pageable pageable) {
-        // Có thể thêm filter theo branchId nếu người dùng chỉ có quyền ở một branch cụ thể
-        return orderRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+    public Page<OrderResponse> getShopOrders(String shopId, Pageable pageable) {
+        return orderRepository.findByShopIdOrderByCreatedAtDesc(shopId, pageable)
                 .map(this::toResponse);
     }
 
-    public Page<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId, Pageable pageable) {
+    public Page<OrderResponse> getOrdersByStatus(String shopId, OrderStatus status, String branchId, Pageable pageable) {
         return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)
                 .map(this::toResponse);
     }
 
     @Transactional
     public OrderResponse updateOrder(String userId, String shopId, String orderId, OrderUpdateRequest request) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -270,10 +255,11 @@ public class OrderService extends BaseService {
         // Gỡ bàn cũ nếu đổi bàn
         if (request.getTableId() != null && !request.getTableId().equals(order.getTableId())) {
             releaseTable(order);
+            String oldTableId = order.getTableId();
             order.setTableId(request.getTableId());
             occupyTable(order);
             auditLogService.log(userId, shopId, orderId, "ORDER", "TABLE_CHANGED",
-                    "Đổi bàn cho đơn hàng từ %s sang %s".formatted(order.getTableId(), request.getTableId()));
+                    "Đổi bàn cho đơn hàng từ %s sang %s".formatted(oldTableId, request.getTableId()));
         }
 
         if (request.getNote() != null) {
@@ -307,7 +293,7 @@ public class OrderService extends BaseService {
                         .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), order.getBranchId()) // Lấy branchId từ order
                         .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
-                double basePrice = reqItem.getPrice();
+                double basePrice = branchProduct.getPrice();
                 double finalPrice = basePrice;
                 String promoId = null;
 

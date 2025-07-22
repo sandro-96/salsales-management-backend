@@ -2,12 +2,12 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,7 +30,7 @@ public class CustomerController {
     private final CustomerService customerService;
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_VIEW)
     @Operation(summary = "Lấy danh sách khách hàng", description = "Trả về danh sách khách hàng theo cửa hàng và (tuỳ chọn) chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lấy danh sách khách hàng thành công"),
@@ -44,7 +44,7 @@ public class CustomerController {
     }
 
     @PostMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_UPDATE)
     @Operation(summary = "Tạo khách hàng", description = "Tạo một khách hàng mới trong cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tạo khách hàng thành công"),
@@ -60,7 +60,7 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_UPDATE)
     @Operation(summary = "Cập nhật khách hàng", description = "Cập nhật thông tin khách hàng theo ID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật khách hàng thành công"),
@@ -77,7 +77,7 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.CUSTOMER_DELETE)
     @Operation(summary = "Xóa khách hàng", description = "Xoá mềm một khách hàng theo ID và chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Xoá khách hàng thành công"),

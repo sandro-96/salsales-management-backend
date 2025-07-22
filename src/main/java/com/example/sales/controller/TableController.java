@@ -2,13 +2,13 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.table.TableRequest;
 import com.example.sales.dto.table.TableResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.TableService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,7 +31,6 @@ public class TableController {
     private final TableService tableService;
 
     @PostMapping
-    @RequireRole(ShopRole.OWNER)
     @Operation(summary = "Tạo bàn mới", description = "Tạo một bàn mới trong cửa hàng với thông tin bàn và chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Bàn được tạo thành công"),
@@ -47,7 +46,7 @@ public class TableController {
     }
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.TABLE_CREATE)
     @Operation(summary = "Lấy danh sách bàn", description = "Lấy danh sách bàn của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách bàn được trả về thành công"),
@@ -64,7 +63,7 @@ public class TableController {
     }
 
     @PutMapping("/{id}/status")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.TABLE_UPDATE)
     @Operation(summary = "Cập nhật trạng thái bàn", description = "Cập nhật trạng thái bàn (AVAILABLE, OCCUPIED, v.v.)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trạng thái bàn được cập nhật thành công"),
@@ -81,7 +80,7 @@ public class TableController {
     }
 
     @PutMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.TABLE_UPDATE)
     @Operation(summary = "Cập nhật thông tin bàn", description = "Cập nhật thông tin bàn như tên, sức chứa, ghi chú")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Thông tin bàn được cập nhật thành công"),
@@ -98,7 +97,7 @@ public class TableController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.TABLE_DELETE)
     @Operation(summary = "Xóa bàn", description = "Xóa mềm một bàn nếu bàn không đang được sử dụng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Bàn được xóa thành công"),

@@ -2,10 +2,10 @@
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ExcelExportService;
 import com.example.sales.service.ExcelImportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,7 +37,7 @@ public class ProductImportExportController {
             @ApiResponse(responseCode = "403", description = "Không có quyền nhập")
     })
     @PostMapping("/import")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PRODUCT_IMPORT)
     public ResponseEntity<ApiResponseDto<Integer>> importProducts(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
@@ -60,7 +60,7 @@ public class ProductImportExportController {
             @ApiResponse(responseCode = "403", description = "Không có quyền xuất")
     })
     @GetMapping("/export")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_EXPORT)
     public void exportProducts(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,

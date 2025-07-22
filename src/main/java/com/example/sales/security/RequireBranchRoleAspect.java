@@ -4,7 +4,6 @@ package com.example.sales.security;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.exception.BusinessException;
-import com.example.sales.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -26,37 +25,49 @@ public class RequireBranchRoleAspect {
 
     private final PermissionChecker permissionChecker;
 
-    @Before("@annotation(com.example.sales.security.RequireBranchRole)")
-    public void checkBranchPermission(JoinPoint joinPoint) {
+    @Before("@annotation(requireBranchRole)")
+    public void check(JoinPoint joinPoint, RequireBranchRole requireBranchRole) {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
-        RequireBranchRole annotation = method.getAnnotation(RequireBranchRole.class);
-        ShopRole[] roles = annotation.value();
-
-        User user = null;
-        String branchId = null;
-
         Object[] args = joinPoint.getArgs();
         Annotation[][] paramAnnotations = method.getParameterAnnotations();
 
+        CustomUserDetails user = null;
+        String branchId = null;
+
         for (int i = 0; i < args.length; i++) {
+            // Tìm CustomUserDetails từ @AuthenticationPrincipal
             if (user == null && Arrays.stream(paramAnnotations[i])
                     .anyMatch(a -> a.annotationType() == AuthenticationPrincipal.class)) {
-                user = (User) args[i];
+                user = (CustomUserDetails) args[i];
             }
-            if (branchId == null && args[i] instanceof String str && str.startsWith("branch_")) {
-                branchId = str;
+
+            // Ưu tiên: Tìm tham số tên branchId rõ ràng
+            if (branchId == null && paramAnnotations[i] != null) {
+                for (Annotation annotation : paramAnnotations[i]) {
+                    if (annotation instanceof org.springframework.web.bind.annotation.PathVariable pathVar &&
+                            "branchId".equals(pathVar.value())) {
+                        branchId = (String) args[i];
+                        break;
+                    }
+                    if (annotation instanceof org.springframework.web.bind.annotation.RequestParam reqParam &&
+                            "branchId".equals(reqParam.value())) {
+                        branchId = (String) args[i];
+                        break;
+                    }
+                }
             }
         }
 
         if (user == null || branchId == null) {
-            log.warn("Thiếu user hoặc branchId khi kiểm tra quyền cho method: {}", method.getName());
+            log.warn("Thiếu user hoặc branchId trong @RequireBranchRole - method: {}", method.getName());
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
-        boolean allowed = permissionChecker.hasBranchRole(branchId, user.getId(), roles);
-        if (!allowed) {
-            log.warn("Người dùng {} bị từ chối truy cập branch {} với vai trò yêu cầu: {}",
-                    user.getId(), branchId, Arrays.toString(roles));
+        ShopRole[] allowedRoles = requireBranchRole.value();
+        boolean hasRole = permissionChecker.hasBranchRole(branchId, user.getId(), allowedRoles);
+        if (!hasRole) {
+            log.warn("Người dùng {} bị từ chối truy cập branch {} với vai trò: {}",
+                    user.getId(), branchId, Arrays.toString(allowedRoles));
             throw new BusinessException(ApiCode.ACCESS_DENIED);
         }
     }

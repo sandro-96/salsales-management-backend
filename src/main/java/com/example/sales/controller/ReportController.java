@@ -2,14 +2,14 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequirePlan;
-import com.example.sales.security.RequireRole;
 import com.example.sales.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,7 +35,7 @@ public class ReportController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/summary")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.REPORT_VIEW)
     @Operation(
             summary = "Lấy báo cáo tổng hợp",
             description = "Trả về báo cáo tổng hợp doanh thu, số lượng đơn hàng, sản phẩm đã bán,... trong khoảng thời gian được chỉ định"
@@ -54,7 +54,7 @@ public class ReportController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping("/daily")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.REPORT_VIEW)
     @Operation(
             summary = "Lấy báo cáo theo ngày",
             description = "Trả về danh sách báo cáo chi tiết theo từng ngày trong khoảng thời gian chỉ định"
@@ -73,7 +73,7 @@ public class ReportController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping("/daily/export")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.REPORT_VIEW)
     @Operation(
             summary = "Xuất báo cáo theo ngày ra file Excel",
             description = "Xuất dữ liệu báo cáo theo ngày trong khoảng thời gian chỉ định dưới dạng file Excel"

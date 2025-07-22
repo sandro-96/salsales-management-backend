@@ -15,4 +15,7 @@ public class ShopSimpleResponse {
     private String logoUrl;
     private boolean active;
     private ShopRole role; // 👈 vai trò của user trong shop
+    private String branchId;     // ✅ Chi nhánh user thuộc về
+    private String branchName;   // ✅ Tên chi nhánh
+    private String branchAddress;// ✅ Địa chỉ chi nhánh
 }

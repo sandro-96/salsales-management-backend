@@ -2,14 +2,14 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequirePlan;
-import com.example.sales.security.RequireRole;
 import com.example.sales.service.BranchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -32,7 +32,7 @@ public class BranchController {
     private final BranchService branchService;
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.BRANCH_VIEW)
     @Operation(summary = "Lấy danh sách chi nhánh", description = "Lấy danh sách chi nhánh của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách chi nhánh được trả về thành công"),
@@ -49,7 +49,7 @@ public class BranchController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
+    @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Tạo chi nhánh mới", description = "Tạo một chi nhánh mới cho cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được tạo thành công"),
@@ -66,7 +66,7 @@ public class BranchController {
     }
 
     @PutMapping("/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
+    @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Cập nhật chi nhánh", description = "Cập nhật thông tin chi nhánh của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được cập nhật thành công"),
@@ -84,7 +84,7 @@ public class BranchController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Xóa chi nhánh", description = "Xóa mềm một chi nhánh của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được xóa thành công"),

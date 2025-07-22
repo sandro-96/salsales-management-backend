@@ -44,7 +44,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final AuditLogService auditLogService;
 
     @Override
-    public ProductResponse createProduct(String shopId, ProductRequest request) {
+    public ProductResponse createProduct(String shopId, String branchId, ProductRequest request) {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
@@ -75,14 +75,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // 2. Create BranchProduct
         // Check if BranchProduct already exists for this productId and branchId
-        if (branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), request.getBranchId()).isPresent()) {
+        if (branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), branchId).isPresent()) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
         BranchProduct branchProduct = BranchProduct.builder()
                 .productId(product.getId())
                 .shopId(shopId)
-                .branchId(request.getBranchId())
+                .branchId(branchId)
                 .quantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0)
                 .price(request.getPrice())
                 .unit(request.getUnit())

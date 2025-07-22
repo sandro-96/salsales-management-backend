@@ -57,6 +57,7 @@ public enum ApiCode {
     ORDER_LIST("4118", "Order list retrieved"),
     ORDER_CANCELLED("4119", "Order cancelled"),
     ORDER_CREATED("4120", "Order created successfully"),
+    ORDER_UPDATED("4120", "Order updated successfully"),
     CUSTOMER_CREATED("4121", "Customer created successfully"),
     CUSTOMER_UPDATED("4122", "Customer updated successfully"),
     CUSTOMER_DELETED("4123", "Customer deleted successfully"),

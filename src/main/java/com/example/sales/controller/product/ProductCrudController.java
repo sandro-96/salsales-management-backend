@@ -2,12 +2,12 @@
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,12 +37,13 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền tạo")
     })
     @PostMapping("/shops/{shopId}/products")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PRODUCT_CREATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @RequestParam(required = false) String branchId,
             @Valid @RequestBody ProductRequest request) {
-        ProductResponse response = productService.createProduct(shopId, request);
+        ProductResponse response = productService.createProduct(shopId, branchId, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
@@ -53,7 +54,7 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật")
     })
     @PutMapping("/shops/{shopId}/branches/{branchId}/products/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_UPDATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> update(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
@@ -71,7 +72,7 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "403", description = "Không có quyền xóa")
     })
     @DeleteMapping("/shops/{shopId}/branches/{branchId}/products/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PRODUCT_DELETE)
     public ResponseEntity<ApiResponseDto<Void>> delete(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
@@ -86,7 +87,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm")
     })
     @GetMapping("/shops/{shopId}/products")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
@@ -102,7 +102,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm")
     })
     @GetMapping("/shops/{shopId}/branches/{branchId}/products/{id}")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<ProductResponse>> getById(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh") @PathVariable String branchId,
@@ -116,7 +115,6 @@ public class ProductCrudController {
             @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm khớp từ khóa")
     })
     @GetMapping("/shops/{shopId}/products/search")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> search(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,

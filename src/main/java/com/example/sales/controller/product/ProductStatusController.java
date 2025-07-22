@@ -2,11 +2,11 @@
 package com.example.sales.controller.product;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,7 +39,7 @@ public class ProductStatusController {
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
     })
     @PatchMapping("/shops/{shopId}/branches/{branchId}/products/{branchProductId}/toggle")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_UPDATE_STATUS)
     public ResponseEntity<ApiResponseDto<ProductResponse>> toggleActive(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng", required = true) @PathVariable String shopId,
@@ -59,7 +59,7 @@ public class ProductStatusController {
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
     @GetMapping("/shops/{shopId}/low-stock")
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PRODUCT_VIEW_LOW_STOCK)
     public ResponseEntity<ApiResponseDto<List<ProductResponse>>> getLowStock(
             @Parameter(description = "ID cửa hàng", required = true) @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,

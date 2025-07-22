@@ -2,14 +2,14 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.promotion.PromotionRequest;
 import com.example.sales.dto.promotion.PromotionResponse;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequirePlan;
-import com.example.sales.security.RequireRole;
 import com.example.sales.service.PromotionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,7 +33,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.STAFF})
+    @RequirePermission(Permission.PROMOTION_VIEW)
     @Operation(summary = "Lấy danh sách khuyến mãi", description = "Lấy danh sách khuyến mãi của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách khuyến mãi được trả về thành công"),
@@ -51,7 +51,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PROMOTION_CREATE)
     @Operation(summary = "Tạo khuyến mãi mới", description = "Tạo một khuyến mãi mới cho cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Khuyến mãi được tạo thành công"),
@@ -69,7 +69,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PROMOTION_UPDATE)
     @Operation(summary = "Cập nhật khuyến mãi", description = "Cập nhật thông tin khuyến mãi của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Khuyến mãi được cập nhật thành công"),
@@ -88,7 +88,7 @@ public class PromotionController {
 
     @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
-    @RequireRole(ShopRole.OWNER)
+    @RequirePermission(Permission.PROMOTION_DELETE)
     @Operation(summary = "Xóa khuyến mãi", description = "Xóa mềm một khuyến mãi của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Khuyến mãi được xóa thành công"),

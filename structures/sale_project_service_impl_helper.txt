@@ -768,7 +768,11 @@ public class MailService {
 // File: src/main/java/com/example/sales/service/OrderService.java
 package com.example.sales.service;
 
-import com.example.sales.constant.*;
+import com.example.sales.cache.OrderCache;
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.DiscountType;
+import com.example.sales.constant.OrderStatus;
+import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.order.OrderItemResponse;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
@@ -778,8 +782,7 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
 import com.example.sales.repository.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j; // Thêm Log
-import org.springframework.cache.annotation.Cacheable;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -787,7 +790,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects; // Thêm Objects
 
 @Service
 @RequiredArgsConstructor
@@ -796,21 +798,16 @@ public class OrderService extends BaseService {
 
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
-    private final ProductRepository productRepository; // Vẫn cần để lấy thông tin Product master
-    private final BranchProductRepository branchProductRepository; // Thêm BranchProductRepository
+    private final ProductRepository productRepository;
+    private final BranchProductRepository branchProductRepository;
     private final PromotionRepository promotionRepository;
     private final AuditLogService auditLogService;
     private final ShopRepository shopRepository;
-    private final InventoryService inventoryService; // Thay thế InventoryTransactionRepository bằng InventoryService
-    private final ShopUserService shopUserService;
-
-    public List<OrderResponse> getOrdersByUser(String userId, String shopId) {
-        return orderRepository.findByShopIdAndDeletedFalse(shopId)
-                .stream().map(this::toResponse).toList();
-    }
+    private final InventoryService inventoryService;
+    private final OrderCache orderCache;
 
     @Transactional
-    public OrderResponse createOrder(String userId, String shopId, OrderRequest request) {
+    public OrderResponse createOrder(String userId, String branchId, String shopId, OrderRequest request) {
         Order order = new Order();
         order.setShopId(shopId);
         order.setTableId(request.getTableId());
@@ -819,7 +816,6 @@ public class OrderService extends BaseService {
         order.setStatus(OrderStatus.PENDING);
         order.setPaid(false);
 
-        String branchId = request.getBranchId();
         if (branchId == null || branchId.isBlank()) {
             log.error("Branch ID không được để trống");
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
@@ -845,7 +841,7 @@ public class OrderService extends BaseService {
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
 
-            double basePrice = reqItem.getPrice();
+            double basePrice = branchProduct.getPrice();
             double finalPrice = basePrice;
             String promoId = null;
 
@@ -896,7 +892,7 @@ public class OrderService extends BaseService {
     }
 
     public void cancelOrder(String userId, String shopId, String orderId) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -908,7 +904,7 @@ public class OrderService extends BaseService {
         // Hoàn kho khi hủy đơn hàng nếu shop có quản lý tồn kho
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-        if (inventoryService.isInventoryManagementRequired(shopId)) {
+        if (shop.getType().isTrackInventory()) {
             for (OrderItem item : order.getItems()) {
                 inventoryService.importProductQuantity(
                         userId, shopId, order.getBranchId(), item.getBranchProductId(),
@@ -920,7 +916,7 @@ public class OrderService extends BaseService {
     }
 
     public OrderResponse confirmPayment(String userId, String shopId, String orderId, String paymentId, String paymentMethod) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -940,7 +936,7 @@ public class OrderService extends BaseService {
     }
 
     public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
             log.error("Không thể cập nhật trạng thái đơn hàng đã hủy hoặc đã hoàn thành");
@@ -970,13 +966,6 @@ public class OrderService extends BaseService {
         }
 
         return toResponse(updated);
-    }
-
-    @Cacheable(value = "orders", key = "#orderId + '-' + #shopId")
-    private Order getOrderByShop(String orderId, String shopId) {
-        return orderRepository.findByIdAndDeletedFalse(orderId)
-                .filter(o -> o.getShopId().equals(shopId))
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
     }
 
     private void occupyTable(Order order) {
@@ -1012,23 +1001,19 @@ public class OrderService extends BaseService {
                 .orElse(null);
     }
 
-    // Phương thức adjustInventory đã được loại bỏ và thay bằng InventoryService
-
-    // File: OrderService.java
-    public Page<OrderResponse> getOrdersByUser(String userId, String shopId, Pageable pageable) {
-        // Có thể thêm filter theo branchId nếu người dùng chỉ có quyền ở một branch cụ thể
-        return orderRepository.findByShopIdAndDeletedFalse(shopId, pageable)
+    public Page<OrderResponse> getShopOrders(String shopId, Pageable pageable) {
+        return orderRepository.findByShopIdOrderByCreatedAtDesc(shopId, pageable)
                 .map(this::toResponse);
     }
 
-    public Page<OrderResponse> getOrdersByStatus(String userId, String shopId, OrderStatus status, String branchId, Pageable pageable) {
+    public Page<OrderResponse> getOrdersByStatus(String shopId, OrderStatus status, String branchId, Pageable pageable) {
         return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)
                 .map(this::toResponse);
     }
 
     @Transactional
     public OrderResponse updateOrder(String userId, String shopId, String orderId, OrderUpdateRequest request) {
-        Order order = getOrderByShop(orderId, shopId);
+        Order order = orderCache.getOrderByShop(orderId, shopId);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -1037,10 +1022,11 @@ public class OrderService extends BaseService {
         // Gỡ bàn cũ nếu đổi bàn
         if (request.getTableId() != null && !request.getTableId().equals(order.getTableId())) {
             releaseTable(order);
+            String oldTableId = order.getTableId();
             order.setTableId(request.getTableId());
             occupyTable(order);
             auditLogService.log(userId, shopId, orderId, "ORDER", "TABLE_CHANGED",
-                    "Đổi bàn cho đơn hàng từ %s sang %s".formatted(order.getTableId(), request.getTableId()));
+                    "Đổi bàn cho đơn hàng từ %s sang %s".formatted(oldTableId, request.getTableId()));
         }
 
         if (request.getNote() != null) {
@@ -1074,7 +1060,7 @@ public class OrderService extends BaseService {
                         .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), order.getBranchId()) // Lấy branchId từ order
                         .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
-                double basePrice = reqItem.getPrice();
+                double basePrice = branchProduct.getPrice();
                 double finalPrice = basePrice;
                 String promoId = null;
 
@@ -1225,7 +1211,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface ProductService {
-    ProductResponse createProduct(String shopId, ProductRequest request);
+    ProductResponse createProduct(String shopId, String branchId, ProductRequest request);
 
     // id ở đây là id của BranchProduct
     ProductResponse updateProduct(String userId, String shopId, String branchId, String id, ProductRequest request);
@@ -1493,6 +1479,7 @@ import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -1540,7 +1527,8 @@ public class ShopService extends BaseService {
                 .shopId(savedShop.getId())
                 .userId(userId)
                 .role(ShopRole.OWNER)
-                .branchId(savedBranch.getId()) // Gắn owner vào chi nhánh mặc định
+                .branchId(savedBranch.getId())
+                .permissions(PermissionUtils.getDefaultPermissions(ShopRole.OWNER))
                 .build();
         shopUserRepository.save(shopUser);
 
@@ -1638,10 +1626,13 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Branch;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -1659,6 +1650,7 @@ public class ShopUserService extends BaseService {
     private final ShopUserRepository shopUserRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
+    private final BranchRepository branchRepository;
 
     @Cacheable(value = "shopUsers", key = "#shopId + '-' + #userId")
     public ShopRole getUserRoleInShop(String shopId, String userId) {
@@ -1700,6 +1692,7 @@ public class ShopUserService extends BaseService {
     }
 
     public void addUser(String shopId, String userId, ShopRole role, String branchId, String performedByUserId) {
+        validateBranchRoleHierarchy(shopId, branchId, performedByUserId, userId);
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         if (!shop.isActive()) {
@@ -1715,6 +1708,7 @@ public class ShopUserService extends BaseService {
             } else {
                 shopUser.setDeleted(false);
                 shopUser.setRole(role);
+                shopUser.setPermissions(PermissionUtils.getDefaultPermissions(role));
                 shopUserRepository.save(shopUser);
                 auditLogService.log(performedByUserId, shopId, shopUser.getId(), "SHOP_USER", "REACTIVATED",
                         String.format("Tái kích hoạt người dùng %s vào chi nhánh %s của cửa hàng %s với vai trò %s", userId, branchId, shopId, role));
@@ -1725,6 +1719,7 @@ public class ShopUserService extends BaseService {
                     .userId(userId)
                     .role(role)
                     .branchId(branchId)
+                    .permissions(PermissionUtils.getDefaultPermissions(role))
                     .build();
             shopUserRepository.save(newShopUser);
             auditLogService.log(performedByUserId, shopId, newShopUser.getId(), "SHOP_USER", "ADDED",
@@ -1733,6 +1728,7 @@ public class ShopUserService extends BaseService {
     }
 
     public void removeUser(String shopId, String userId, String branchId, String performedByUserId) {
+        validateBranchRoleHierarchy(shopId, branchId, performedByUserId, userId);
         ShopUser shopUser = shopUserRepository.findByUserIdAndShopIdAndBranchIdAndDeletedFalse(userId, shopId, branchId)
                 .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
         shopUser.setDeleted(true);
@@ -1744,36 +1740,109 @@ public class ShopUserService extends BaseService {
 
     // ✅ Phương thức mới để xóa user khỏi shop, không quan tâm branch
     public void removeUserFromShop(String shopId, String userId, String performedByUserId) {
-        // Tìm tất cả các bản ghi ShopUser của người dùng này trong shop này
-        List<ShopUser> shopUsers = shopUserRepository.findByUserIdAndShopIdAndDeletedFalse(userId, shopId);
+        if (userId.equals(performedByUserId)) {
+            auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "UNAUTHORIZED",
+                    "Người dùng không thể xóa chính mình khỏi cửa hàng");
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
 
-        if (shopUsers.isEmpty()) {
+        List<ShopUser> targetShopUsers = shopUserRepository.findByUserIdAndShopIdAndDeletedFalse(userId, shopId);
+        if (targetShopUsers.isEmpty()) {
+            auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "NOT_FOUND",
+                    String.format("Người dùng %s không tồn tại trong cửa hàng %s", userId, shopId));
             throw new BusinessException(ApiCode.NOT_FOUND);
         }
 
-        // Thực hiện xóa mềm cho tất cả các bản ghi tìm được
-        for (ShopUser shopUser : shopUsers) {
-            shopUser.setDeleted(true);
+        // Lấy các bản ghi ShopUser của người thực hiện trong shop
+        List<ShopUser> performerShopUsers = shopUserRepository.findByUserIdAndShopIdAndDeletedFalse(performedByUserId, shopId);
+        if (performerShopUsers.isEmpty()) {
+            auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "ACCESS_DENIED",
+                    String.format("Người dùng %s không có quyền thao tác trong cửa hàng %s", performedByUserId, shopId));
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
-        shopUserRepository.saveAll(shopUsers); // Lưu tất cả các bản ghi đã cập nhật
+
+        for (ShopUser targetSU : targetShopUsers) {
+            ShopUser performer = performerShopUsers.stream()
+                    .filter(p -> p.getBranchId().equals(targetSU.getBranchId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (performer == null) {
+                auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "ACCESS_DENIED",
+                        String.format("Người dùng %s không có quyền thao tác trong chi nhánh %s của cửa hàng %s", performedByUserId, targetSU.getBranchId(), shopId));
+                throw new BusinessException(ApiCode.ACCESS_DENIED);
+            }
+
+            ensureCanModifyRole(performer.getRole(), targetSU.getRole());
+            targetSU.setDeleted(true);
+        }
+
+        shopUserRepository.saveAll(targetShopUsers);
 
         auditLogService.log(performedByUserId, shopId, userId, "SHOP_USER", "REMOVED_FROM_SHOP",
                 String.format("Xoá người dùng %s khỏi tất cả các chi nhánh của cửa hàng %s", userId, shopId));
     }
 
+
     public Page<ShopSimpleResponse> getShopsForUser(String userId, Pageable pageable) {
         return shopUserRepository.findByUserIdAndDeletedFalse(userId, pageable)
-                .map(su -> shopRepository.findByIdAndDeletedFalse(su.getShopId())
-                        .map(shop -> ShopSimpleResponse.builder()
-                                .id(shop.getId())
-                                .name(shop.getName())
-                                .type(shop.getType())
-                                .logoUrl(shop.getLogoUrl())
-                                .active(shop.isActive())
-                                .role(su.getRole())
-                                .build())
-                        .orElse(null));
+                .map(su -> {
+                    Optional<Shop> shopOpt = shopRepository.findByIdAndDeletedFalse(su.getShopId());
+                    Optional<Branch> branchOpt = branchRepository.findByIdAndDeletedFalse(su.getBranchId());
+
+                    if (shopOpt.isEmpty() || branchOpt.isEmpty()) return null;
+
+                    Shop shop = shopOpt.get();
+                    Branch branch = branchOpt.get();
+
+                    return ShopSimpleResponse.builder()
+                            .id(shop.getId())
+                            .name(shop.getName())
+                            .type(shop.getType())
+                            .logoUrl(shop.getLogoUrl())
+                            .active(shop.isActive())
+                            .role(su.getRole())
+                            .branchId(branch.getId())
+                            .branchName(branch.getName())
+                            .branchAddress(branch.getAddress())
+                            .build();
+                });
     }
+
+
+    private void ensureCanModifyRole(ShopRole actorRole, ShopRole targetRole) {
+        if (actorRole == ShopRole.MANAGER &&
+                (targetRole == ShopRole.OWNER || targetRole == ShopRole.ADMIN || targetRole == ShopRole.MANAGER)) {
+            auditLogService.log(null, null, null, "ROLE_MODIFICATION", "DENIED",
+                    "MANAGER attempted to modify a higher role.");
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
+        if (actorRole.ordinal() < targetRole.ordinal()) {
+            auditLogService.log(null, null, null, "ROLE_MODIFICATION", "DENIED",
+                    String.format("User with role %s attempted to modify user with role %s.", actorRole, targetRole));
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+    }
+
+
+    public ShopRole getUserRoleInBranch(String shopId, String userId, String branchId) {
+        return shopUserRepository.findByUserIdAndShopIdAndBranchIdAndDeletedFalse(userId, shopId, branchId)
+                .map(ShopUser::getRole)
+                .orElseThrow(() -> new BusinessException(ApiCode.UNAUTHORIZED));
+    }
+
+    public void validateBranchRoleHierarchy(String shopId, String branchId, String actorUserId, String targetUserId) {
+        // Lấy role người thực hiện (actor) tại branch
+        ShopRole actorRole = getUserRoleInBranch(shopId, actorUserId, branchId);
+
+        // Lấy role người bị thao tác (target)
+        ShopRole targetRole = getUserRoleInBranch(shopId, targetUserId, branchId);
+
+        // Thực hiện logic so sánh
+        ensureCanModifyRole(actorRole, targetRole);
+    }
+
 }
 
 // File: src/main/java/com/example/sales/service/TableService.java
@@ -2265,7 +2334,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final AuditLogService auditLogService;
 
     @Override
-    public ProductResponse createProduct(String shopId, ProductRequest request) {
+    public ProductResponse createProduct(String shopId, String branchId, ProductRequest request) {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
@@ -2296,14 +2365,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // 2. Create BranchProduct
         // Check if BranchProduct already exists for this productId and branchId
-        if (branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), request.getBranchId()).isPresent()) {
+        if (branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), branchId).isPresent()) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
         BranchProduct branchProduct = BranchProduct.builder()
                 .productId(product.getId())
                 .shopId(shopId)
-                .branchId(request.getBranchId())
+                .branchId(branchId)
                 .quantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0)
                 .price(request.getPrice())
                 .unit(request.getUnit())

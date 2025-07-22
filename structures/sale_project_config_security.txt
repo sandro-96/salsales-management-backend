@@ -388,12 +388,14 @@ public class JwtUtil {
 // File: src/main/java/com/example/sales/security/PermissionChecker.java
 package com.example.sales.security;
 
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Set;
 
 @Component
@@ -427,7 +429,27 @@ public class PermissionChecker {
     }
     public boolean hasBranchRole(String branchId, String userId, ShopRole... roles) {
         return branchRepository.findByIdAndDeletedFalse(branchId)
-                .map(branch -> hasRole(branch.getShopId(), userId, roles))
+                .map(branch -> {
+                    // Ưu tiên kiểm tra ở branch trước
+                    boolean branchMatch = shopUserRepository
+                            .findByUserIdAndShopIdAndBranchIdAndDeletedFalse(branch.getShopId(), userId, branchId)
+                            .map(su -> Arrays.asList(roles).contains(su.getRole()))
+                            .orElse(false);
+                    if (branchMatch) return true;
+
+                    // Nếu không có ở branch, kiểm tra role cấp shop (nếu OWNER có toàn quyền)
+                    return shopUserRepository
+                            .findByShopIdAndUserIdAndDeletedFalse(branch.getShopId(), userId)
+                            .stream()
+                            .anyMatch(su -> su.getRole() == ShopRole.OWNER && Arrays.asList(roles).contains(su.getRole()));
+                })
+                .orElse(false);
+    }
+
+
+    public boolean hasPermission(String shopId, String branchId, String userId, Permission permission) {
+        return shopUserRepository.findByUserIdAndShopIdAndBranchIdAndDeletedFalse(shopId, userId, branchId)
+                .map(shopUser -> shopUser.getPermissions() != null && shopUser.getPermissions().contains(permission))
                 .orElse(false);
     }
 }
@@ -501,7 +523,6 @@ package com.example.sales.security;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.exception.BusinessException;
-import com.example.sales.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -523,37 +544,49 @@ public class RequireBranchRoleAspect {
 
     private final PermissionChecker permissionChecker;
 
-    @Before("@annotation(com.example.sales.security.RequireBranchRole)")
-    public void checkBranchPermission(JoinPoint joinPoint) {
+    @Before("@annotation(requireBranchRole)")
+    public void check(JoinPoint joinPoint, RequireBranchRole requireBranchRole) {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
-        RequireBranchRole annotation = method.getAnnotation(RequireBranchRole.class);
-        ShopRole[] roles = annotation.value();
-
-        User user = null;
-        String branchId = null;
-
         Object[] args = joinPoint.getArgs();
         Annotation[][] paramAnnotations = method.getParameterAnnotations();
 
+        CustomUserDetails user = null;
+        String branchId = null;
+
         for (int i = 0; i < args.length; i++) {
+            // Tìm CustomUserDetails từ @AuthenticationPrincipal
             if (user == null && Arrays.stream(paramAnnotations[i])
                     .anyMatch(a -> a.annotationType() == AuthenticationPrincipal.class)) {
-                user = (User) args[i];
+                user = (CustomUserDetails) args[i];
             }
-            if (branchId == null && args[i] instanceof String str && str.startsWith("branch_")) {
-                branchId = str;
+
+            // Ưu tiên: Tìm tham số tên branchId rõ ràng
+            if (branchId == null && paramAnnotations[i] != null) {
+                for (Annotation annotation : paramAnnotations[i]) {
+                    if (annotation instanceof org.springframework.web.bind.annotation.PathVariable pathVar &&
+                            "branchId".equals(pathVar.value())) {
+                        branchId = (String) args[i];
+                        break;
+                    }
+                    if (annotation instanceof org.springframework.web.bind.annotation.RequestParam reqParam &&
+                            "branchId".equals(reqParam.value())) {
+                        branchId = (String) args[i];
+                        break;
+                    }
+                }
             }
         }
 
         if (user == null || branchId == null) {
-            log.warn("Thiếu user hoặc branchId khi kiểm tra quyền cho method: {}", method.getName());
+            log.warn("Thiếu user hoặc branchId trong @RequireBranchRole - method: {}", method.getName());
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
-        boolean allowed = permissionChecker.hasBranchRole(branchId, user.getId(), roles);
-        if (!allowed) {
-            log.warn("Người dùng {} bị từ chối truy cập branch {} với vai trò yêu cầu: {}",
-                    user.getId(), branchId, Arrays.toString(roles));
+        ShopRole[] allowedRoles = requireBranchRole.value();
+        boolean hasRole = permissionChecker.hasBranchRole(branchId, user.getId(), allowedRoles);
+        if (!hasRole) {
+            log.warn("Người dùng {} bị từ chối truy cập branch {} với vai trò: {}",
+                    user.getId(), branchId, Arrays.toString(allowedRoles));
             throw new BusinessException(ApiCode.ACCESS_DENIED);
         }
     }
@@ -562,13 +595,15 @@ public class RequireBranchRoleAspect {
 // File: src/main/java/com/example/sales/security/RequirePermission.java
 package com.example.sales.security;
 
+import com.example.sales.constant.Permission;
+
 import java.lang.annotation.*;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface RequirePermission {
-    String value();
+    Permission value();
 }
 
 // File: src/main/java/com/example/sales/security/RequirePlan.java
@@ -664,4 +699,150 @@ public class RequireRoleAspect {
         }
     }
 }
+
+// File: src/main/java/com/example/sales/security/PermissionUtils.java
+package com.example.sales.security;
+
+import com.example.sales.constant.Permission;
+import com.example.sales.constant.ShopRole;
+
+import java.util.Set;
+
+import static com.example.sales.constant.Permission.*;
+
+public class PermissionUtils {
+
+    public static Set<Permission> getDefaultPermissions(ShopRole role) {
+        return switch (role) {
+            case OWNER -> Set.of(
+                    PRODUCT_CREATE, PRODUCT_UPDATE, PRODUCT_DELETE,
+                    ORDER_CREATE, ORDER_UPDATE, ORDER_CANCEL,
+                    CUSTOMER_VIEW, CUSTOMER_UPDATE, CUSTOMER_DELETE,
+                    BRANCH_UPDATE, SHOP_MANAGE, PRODUCT_IMPORT,
+                    PRODUCT_EXPORT, PRODUCT_UPDATE_STATUS,
+                    PRODUCT_VIEW_LOW_STOCK,
+                    ORDER_PAYMENT_CONFIRM,
+                    ORDER_VIEW,
+                    PROMOTION_CREATE,
+                    PROMOTION_UPDATE,
+                    PROMOTION_DELETE,
+                    PROMOTION_VIEW,
+                    TABLE_CREATE, TABLE_UPDATE, TABLE_DELETE, TABLE_VIEW,
+                    SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_DELETE, SHOP_USER_VIEW, SHOP_USER_BRANCH_DELETE,
+                    BRANCH_MANAGE, INVENTORY_MANAGE, INVENTORY_VIEW,
+                    REPORT_VIEW
+            );
+            case MANAGER -> Set.of(
+                    PRODUCT_CREATE, PRODUCT_UPDATE,
+                    ORDER_CREATE, ORDER_UPDATE,
+                    CUSTOMER_VIEW, CUSTOMER_UPDATE, CUSTOMER_DELETE, PRODUCT_IMPORT,
+                    PRODUCT_EXPORT, PRODUCT_UPDATE_STATUS,
+                    PRODUCT_VIEW_LOW_STOCK,
+                    ORDER_PAYMENT_CONFIRM,
+                    ORDER_VIEW,
+                    PROMOTION_CREATE,
+                    PROMOTION_UPDATE,
+                    PROMOTION_DELETE,
+                    PROMOTION_VIEW,
+                    TABLE_CREATE, TABLE_UPDATE, TABLE_DELETE, TABLE_VIEW,
+                    SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_VIEW, SHOP_USER_BRANCH_DELETE,
+                    BRANCH_VIEW, INVENTORY_MANAGE, INVENTORY_VIEW,
+                    REPORT_VIEW
+            );
+            case CASHIER -> Set.of(
+                    ORDER_CREATE, ORDER_UPDATE,
+                    CUSTOMER_VIEW, PRODUCT_EXPORT,
+                    ORDER_PAYMENT_CONFIRM,
+                    ORDER_VIEW,
+                    PROMOTION_VIEW,
+                    TABLE_VIEW,
+                    BRANCH_VIEW, INVENTORY_MANAGE, INVENTORY_VIEW
+            );
+            case STAFF -> Set.of(
+                    ORDER_CREATE, ORDER_UPDATE,
+                    CUSTOMER_VIEW,
+                    ORDER_VIEW,
+                    PROMOTION_VIEW,
+                    TABLE_VIEW,
+                    BRANCH_VIEW, INVENTORY_VIEW
+            );
+            default -> Set.of();
+        };
+    }
+}
+
+// File: src/main/java/com/example/sales/security/RequirePermissionAspect.java
+package com.example.sales.security;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.Permission;
+import com.example.sales.exception.BusinessException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.stereotype.Component;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+
+@Aspect
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class RequirePermissionAspect {
+
+    private final PermissionChecker permissionChecker;
+
+    @Before("@annotation(com.example.sales.security.RequirePermission)")
+    public void checkPermission(JoinPoint joinPoint) {
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+        RequirePermission annotation = method.getAnnotation(RequirePermission.class);
+        Permission requiredPermission = annotation.value();
+
+        CustomUserDetails user = null;
+        String shopId = null;
+        String branchId = null;
+
+        Object[] args = joinPoint.getArgs();
+        Annotation[][] paramAnnotations = method.getParameterAnnotations();
+
+        for (int i = 0; i < args.length; i++) {
+            for (Annotation annotationParam : paramAnnotations[i]) {
+                if (annotationParam instanceof AuthenticationPrincipal) {
+                    user = (CustomUserDetails) args[i];
+                }
+                if (annotationParam instanceof org.springframework.web.bind.annotation.PathVariable pv) {
+                    if ("shopId".equals(pv.value())) {
+                        shopId = (String) args[i];
+                    } else if ("branchId".equals(pv.value())) {
+                        branchId = (String) args[i];
+                    }
+                }
+                if (annotationParam instanceof org.springframework.web.bind.annotation.RequestParam rp) {
+                    if ("shopId".equals(rp.value())) {
+                        shopId = (String) args[i];
+                    } else if ("branchId".equals(rp.value())) {
+                        branchId = (String) args[i];
+                    }
+                }
+            }
+        }
+
+        if (user == null || shopId == null || branchId == null) {
+            log.warn("Thiếu tham số khi kiểm tra @RequirePermission: user={}, shopId={}, branchId={}", user, shopId, branchId);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        boolean hasPermission = permissionChecker.hasPermission(shopId, branchId, user.getId(), requiredPermission);
+        if (!hasPermission) {
+            log.warn("Người dùng {} KHÔNG có quyền {} tại shop={}, branch={}", user.getId(), requiredPermission, shopId, branchId);
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+    }
+}
+
 [END]

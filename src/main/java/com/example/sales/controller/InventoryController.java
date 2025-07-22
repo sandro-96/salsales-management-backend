@@ -2,13 +2,13 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.InventoryType; // Import InventoryType
-import com.example.sales.constant.ShopRole;
+import com.example.sales.constant.InventoryType;
+import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.inventory.InventoryRequest;
-import com.example.sales.dto.inventory.InventoryTransactionResponse; // Import InventoryTransactionResponse
+import com.example.sales.dto.inventory.InventoryTransactionResponse;
 import com.example.sales.security.CustomUserDetails;
-import com.example.sales.security.RequireRole;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.service.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -32,7 +32,7 @@ public class InventoryController {
 
     // ✅ Endpoint để nhập sản phẩm vào kho
     @PostMapping("/import")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF}) // MANAGER/STAFF có thể nhập kho
+    @RequirePermission(Permission.INVENTORY_MANAGE)
     @Operation(summary = "Nhập thêm số lượng sản phẩm vào kho của chi nhánh", description = "Tạo một giao dịch nhập kho cho sản phẩm tại một chi nhánh cụ thể.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Nhập kho thành công, trả về số lượng tồn kho mới"),
@@ -59,7 +59,7 @@ public class InventoryController {
 
     // ✅ Endpoint để xuất sản phẩm khỏi kho
     @PostMapping("/export")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER}) // CASHIER cũng có thể xuất kho (khi bán hàng)
+    @RequirePermission(Permission.INVENTORY_MANAGE)
     @Operation(summary = "Xuất bớt số lượng sản phẩm khỏi kho của chi nhánh", description = "Tạo một giao dịch xuất kho cho sản phẩm tại một chi nhánh cụ thể. Kiểm tra số lượng tồn kho.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Xuất kho thành công, trả về số lượng tồn kho mới"),
@@ -86,7 +86,7 @@ public class InventoryController {
 
     // ✅ Endpoint để điều chỉnh tồn kho
     @PostMapping("/adjust")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF}) // Chỉ các vai trò quản lý/nhân viên có thể điều chỉnh
+    @RequirePermission(Permission.INVENTORY_MANAGE)
     @Operation(summary = "Điều chỉnh số lượng tồn kho của sản phẩm tại chi nhánh", description = "Tạo một giao dịch điều chỉnh tồn kho cho sản phẩm tại một chi nhánh cụ thể. Có thể tăng hoặc giảm.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Điều chỉnh tồn kho thành công, trả về số lượng tồn kho mới"),
@@ -114,7 +114,7 @@ public class InventoryController {
 
     // ✅ Endpoint để lấy lịch sử giao dịch tồn kho
     @GetMapping("/branches/{branchId}/products/{branchProductId}/history")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF}) // OWNER/MANAGER/STAFF có thể xem lịch sử
+    @RequirePermission(Permission.INVENTORY_VIEW)
     @Operation(summary = "Lấy lịch sử giao dịch tồn kho cho một sản phẩm tại chi nhánh", description = "Lấy lịch sử giao dịch tồn kho của một BranchProduct cụ thể với phân trang.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lịch sử giao dịch tồn kho được trả về thành công"),

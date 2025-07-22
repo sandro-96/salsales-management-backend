@@ -43,9 +43,6 @@ public class ProductRequest {
     private String imageUrl;
     private String description;
 
-    @NotBlank(message = "Branch ID không được để trống")
-    private String branchId; // Chi nhánh mà sản phẩm này thuộc về
-
     // active sẽ được ánh xạ tới activeInBranch của BranchProduct
     @Builder.Default
     private boolean active = true;

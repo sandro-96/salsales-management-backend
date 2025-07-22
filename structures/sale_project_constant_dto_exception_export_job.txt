@@ -2,6 +2,9 @@
 // File: src/main/java/com/example/sales/constant/ApiCode.java
 package com.example.sales.constant;
 
+import lombok.Getter;
+
+@Getter
 public enum ApiCode {
     // Success
     SUCCESS("2000", "Operation successful"),
@@ -39,13 +42,8 @@ public enum ApiCode {
     FILE_TYPE_NOT_ALLOWED("5002", "File type not allowed"),
 
     // Business Logic
-    SHOP_REQUIRED("4100", "Shop is required"),
-    ORDER_ALREADY_COMPLETED("4101", "Order already completed"),
     PRODUCT_UPDATED("4102", "Product updated successfully"),
     SHOP_NOT_FOUND("4103", "Shop not found"),
-    TABLE_CREATED("4104", "Table created successfully"),
-    TABLE_LIST("4105", "Table list retrieved"),
-    TABLE_STATUS_UPDATED("4106", "Table status updated"),
     USER_INFO("4107", "User info retrieved"),
     USER_NOT_FOUND("4108", "User not found"),
     BRANCH_NOT_FOUND("4109", "Branch not found"),
@@ -60,6 +58,7 @@ public enum ApiCode {
     ORDER_LIST("4118", "Order list retrieved"),
     ORDER_CANCELLED("4119", "Order cancelled"),
     ORDER_CREATED("4120", "Order created successfully"),
+    ORDER_UPDATED("4120", "Order updated successfully"),
     CUSTOMER_CREATED("4121", "Customer created successfully"),
     CUSTOMER_UPDATED("4122", "Customer updated successfully"),
     CUSTOMER_DELETED("4123", "Customer deleted successfully"),
@@ -88,13 +87,6 @@ public enum ApiCode {
         this.message = message;
     }
 
-    public String getCode() {
-        return code;
-    }
-
-    public String getMessage() {
-        return message;
-    }
 }
 
 // File: src/main/java/com/example/sales/constant/DiscountType.java
@@ -412,9 +404,6 @@ public class OrderRequest {
 
         @Min(value = 1, message = "Số lượng phải lớn hơn 0")
         private int quantity;
-
-        @Min(value = 0, message = "Giá sản phẩm không được âm")
-        private double price; // Giá tại thời điểm đặt hàng (có thể khác giá hiện tại của sản phẩm)
     }
 }
 
@@ -542,9 +531,6 @@ public class ProductRequest {
 
     private String imageUrl;
     private String description;
-
-    @NotBlank(message = "Branch ID không được để trống")
-    private String branchId; // Chi nhánh mà sản phẩm này thuộc về
 
     // active sẽ được ánh xạ tới activeInBranch của BranchProduct
     @Builder.Default
@@ -809,6 +795,9 @@ public class ShopSimpleResponse {
     private String logoUrl;
     private boolean active;
     private ShopRole role; // 👈 vai trò của user trong shop
+    private String branchId;     // ✅ Chi nhánh user thuộc về
+    private String branchName;   // ✅ Tên chi nhánh
+    private String branchAddress;// ✅ Địa chỉ chi nhánh
 }
 
 // File: src/main/java/com/example/sales/dto/shopUser/ShopUserResponse.java
@@ -1473,5 +1462,73 @@ public class InventoryTransactionResponse {
     private String referenceId;     // ID tham chiếu (ví dụ: Order ID)
     private LocalDateTime createdAt;
     private String createdBy;       // ID người dùng thực hiện giao dịch
+}
+
+// File: src/main/java/com/example/sales/cache/OrderCache.java
+package com.example.sales.cache;
+
+import com.example.sales.constant.ApiCode;
+import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Order;
+import com.example.sales.repository.OrderRepository;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Component;
+
+@Component
+public class OrderCache {
+
+    private final OrderRepository orderRepository;
+
+    public OrderCache(OrderRepository orderRepository) {
+        this.orderRepository = orderRepository;
+    }
+
+    @Cacheable(value = "orders", key = "#shopId + ':' + #orderId")
+    public Order getOrderByShop(String orderId, String shopId) {
+        return orderRepository.findByIdAndDeletedFalse(orderId)
+                .filter(o -> o.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
+    }
+}
+
+// File: src/main/java/com/example/sales/constant/Permission.java
+package com.example.sales.constant;
+
+public enum Permission {
+    PRODUCT_CREATE,
+    PRODUCT_UPDATE,
+    PRODUCT_DELETE,
+    ORDER_CREATE,
+    ORDER_UPDATE,
+    ORDER_CANCEL,
+    ORDER_PAYMENT_CONFIRM,
+    ORDER_VIEW,
+    CUSTOMER_VIEW,
+    CUSTOMER_UPDATE,
+    SHOP_MANAGE,
+    CUSTOMER_DELETE,
+    BRANCH_UPDATE,
+    PRODUCT_IMPORT,
+    PRODUCT_EXPORT,
+    PRODUCT_UPDATE_STATUS,
+    PRODUCT_VIEW_LOW_STOCK,
+    PROMOTION_CREATE,
+    PROMOTION_UPDATE,
+    PROMOTION_DELETE,
+    PROMOTION_VIEW,
+    TABLE_CREATE,
+    TABLE_UPDATE,
+    TABLE_DELETE,
+    TABLE_VIEW,
+    SHOP_USER_CREATE,
+    SHOP_USER_UPDATE,
+    SHOP_USER_DELETE,
+    SHOP_USER_BRANCH_DELETE,
+    SHOP_USER_VIEW,
+    BRANCH_MANAGE,
+    BRANCH_VIEW,
+    INVENTORY_VIEW,
+    INVENTORY_MANAGE,
+    REPORT_VIEW
 }
 [END]
