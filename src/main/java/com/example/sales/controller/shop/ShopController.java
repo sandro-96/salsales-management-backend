@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/controller/shop/ShopController.java
 package com.example.sales.controller.shop;
 
+import com.example.sales.cache.ShopCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
@@ -32,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ShopController {
 
     private final ShopService shopService;
+    private final ShopCache shopCache;
     private final ShopUserService shopUserService;
     private final FileUploadService fileUploadService;
 
@@ -61,7 +63,7 @@ public class ShopController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
     })
     public ApiResponseDto<?> getMyShop(@AuthenticationPrincipal CustomUserDetails user) {
-        Shop shop = shopService.getShopByOwner(user.getId());
+        Shop shop = shopCache.getShopByOwner(user.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS, shopService.getShopResponse(user, shop));
     }
 

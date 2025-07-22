@@ -13,6 +13,7 @@ import com.example.sales.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -62,9 +63,13 @@ public class AuthService {
 
     public JwtResponse login(LoginRequest request) {
         // 1. Xác thực tài khoản và mật khẩu
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (BadCredentialsException e) {
+            throw new BusinessException(ApiCode.INVALID_CREDENTIALS); // 👈 định nghĩa code riêng
+        }
         // 2. Lấy user từ DB
         User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));

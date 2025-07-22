@@ -76,7 +76,8 @@ public enum ApiCode {
     TABLE_OCCUPIED("4136", "Table is occupied"),
     USER_ALREADY_IN_SHOP("4137", "User already in shop"),
     CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop"),
-    INSUFFICIENT_STOCK ("4139", "Insufficient stock for product");
+    INSUFFICIENT_STOCK ("4139", "Insufficient stock for product"),
+    INVALID_CREDENTIALS("4011", "Email or password is incorrect");
 
     private final String code;
     private final String message;

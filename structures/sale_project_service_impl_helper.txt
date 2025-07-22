@@ -90,6 +90,7 @@ import com.example.sales.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -139,9 +140,13 @@ public class AuthService {
 
     public JwtResponse login(LoginRequest request) {
         // 1. Xác thực tài khoản và mật khẩu
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (BadCredentialsException e) {
+            throw new BusinessException(ApiCode.INVALID_CREDENTIALS); // 👈 định nghĩa code riêng
+        }
         // 2. Lấy user từ DB
         User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
@@ -424,6 +429,7 @@ public class CustomerService {
 // File: src/main/java/com/example/sales/service/ExcelExportService.java
 package com.example.sales.service;
 
+import com.example.sales.cache.ProductCache;
 import com.example.sales.dto.product.ProductResponse; // Import ProductResponse
 import com.example.sales.export.GenericExcelExporter;
 import lombok.RequiredArgsConstructor;
@@ -436,12 +442,12 @@ import java.io.ByteArrayOutputStream; // Thêm import này
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
+
 @Service
 @RequiredArgsConstructor
 public class ExcelExportService {
-    // Chúng ta sẽ không cần ProductRepository trực tiếp ở đây nữa,
-    // mà sẽ sử dụng ProductService để lấy dữ liệu đã được map sang ProductResponse
-    private final ProductService productService; // Tiêm ProductService
+
+    private final ProductCache productCache;
 
     // Phương thức exportExcel tổng quát có thể giữ nguyên nếu bạn vẫn dùng nó ở nơi khác
     public <T> ResponseEntity<byte[]> exportExcel(String fileName,
@@ -474,7 +480,7 @@ public class ExcelExportService {
         List<ProductResponse> allProducts = new java.util.ArrayList<>();
 
         do {
-            productPage = productService.getAllByShop(shopId, branchId, pageable);
+            productPage = productCache.getAllByShop(shopId, branchId, pageable);
             allProducts.addAll(productPage.getContent());
             if (productPage.hasNext()) {
                 pageable = productPage.nextPageable();
@@ -1507,6 +1513,7 @@ public class ShopService extends BaseService {
         shop.setPhone(request.getPhone());
         shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
+        shop.setCountryCode(request.getCountryCode());
 
         Shop savedShop = shopRepository.save(shop); // Đổi tên biến để rõ ràng hơn
 
@@ -1542,6 +1549,7 @@ public class ShopService extends BaseService {
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
+        shop.setCountryCode(request.getCountryCode());
 
         Shop saved = shopRepository.save(shop);
         auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",

@@ -46,6 +46,7 @@ public class ShopService extends BaseService {
         shop.setPhone(request.getPhone());
         shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
+        shop.setCountryCode(request.getCountryCode());
 
         Shop savedShop = shopRepository.save(shop); // Đổi tên biến để rõ ràng hơn
 
@@ -81,6 +82,7 @@ public class ShopService extends BaseService {
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
+        shop.setCountryCode(request.getCountryCode());
 
         Shop saved = shopRepository.save(shop);
         auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",

@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/controller/SubscriptionController.java
 package com.example.sales.controller;
 
+import com.example.sales.cache.ShopCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.subscription.UpgradePlanRequest;
@@ -27,6 +28,7 @@ import java.util.List;
 public class SubscriptionController {
 
     private final ShopService shopService;
+    private final ShopCache shopCache;
     private final PaymentService paymentService;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
 
@@ -39,7 +41,7 @@ public class SubscriptionController {
     })
     public ApiResponseDto<Shop> getCurrentPlan(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
-        Shop shop = shopService.getShopByOwner(user.getId());
+        Shop shop = shopCache.getShopByOwner(user.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS, shop);
     }
 
@@ -54,7 +56,7 @@ public class SubscriptionController {
     public ApiResponseDto<?> upgrade(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestBody @Valid @Parameter(description = "Thông tin nâng cấp gói dịch vụ") UpgradePlanRequest req) {
-        Shop shop = shopService.getShopByOwner(user.getId());
+        Shop shop = shopCache.getShopByOwner(user.getId());
 
         paymentService.upgradeShopPlan(shop, req.getTargetPlan(), req.getMonths());
         shopService.save(shop);
@@ -71,7 +73,7 @@ public class SubscriptionController {
     })
     public ApiResponseDto<List<SubscriptionHistory>> getHistory(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
-        Shop shop = shopService.getShopByOwner(user.getId());
+        Shop shop = shopCache.getShopByOwner(user.getId());
         List<SubscriptionHistory> history = subscriptionHistoryRepository.findByShopIdOrderByCreatedAtDesc(shop.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS, history);
     }

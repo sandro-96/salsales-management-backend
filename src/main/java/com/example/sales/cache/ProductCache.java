@@ -6,7 +6,6 @@ import com.example.sales.model.BranchProduct;
 import com.example.sales.model.Product;
 import com.example.sales.repository.BranchProductRepository;
 import com.example.sales.repository.ProductRepository;
-import com.example.sales.service.impl.ProductServiceImpl;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -25,14 +24,11 @@ public class ProductCache {
 
     private final BranchProductRepository branchProductRepository;
     private final ProductRepository productRepository;
-    private final ProductServiceImpl productService;
 
     public ProductCache(BranchProductRepository branchProductRepository,
-                        ProductRepository productRepository,
-                        ProductServiceImpl productService) {
+                        ProductRepository productRepository) {
         this.branchProductRepository = branchProductRepository;
         this.productRepository = productRepository;
-        this.productService = productService;
     }
 
     @Cacheable(value = "branch_products_by_shop_branch", key = "#shopId + ':' + #branchId")
@@ -52,9 +48,30 @@ public class ProductCache {
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
         List<ProductResponse> productResponses = branchProductsPage.getContent().stream()
-                .map(bp -> productService.toResponse(bp, productsMap.get(bp.getProductId())))
+                .map(bp -> toResponse(bp, productsMap.get(bp.getProductId())))
                 .collect(Collectors.toList());
 
         return new PageImpl<>(productResponses, pageable, branchProductsPage.getTotalElements());
+    }
+    private ProductResponse toResponse(BranchProduct branchProduct, Product product) {
+        if (branchProduct == null || product == null) {
+            return null; // Handle cases where product might be null (e.g., deleted master product)
+        }
+        return ProductResponse.builder()
+                .id(branchProduct.getId()) // ID của BranchProduct
+                .productId(product.getId()) // ID của Master Product
+                .name(product.getName())
+                .category(product.getCategory())
+                .sku(product.getSku())
+                .quantity(branchProduct.getQuantity())
+                .price(branchProduct.getPrice())
+                .unit(branchProduct.getUnit())
+                .imageUrl(branchProduct.getImageUrl())
+                .description(branchProduct.getDescription())
+                .branchId(branchProduct.getBranchId())
+                .activeInBranch(branchProduct.isActiveInBranch())
+                .createdAt(branchProduct.getCreatedAt()) // createdAt/updatedAt của BranchProduct
+                .updatedAt(branchProduct.getUpdatedAt())
+                .build();
     }
 }

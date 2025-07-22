@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/service/ExcelExportService.java
 package com.example.sales.service;
 
+import com.example.sales.cache.ProductCache;
 import com.example.sales.dto.product.ProductResponse; // Import ProductResponse
 import com.example.sales.export.GenericExcelExporter;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +18,8 @@ import java.util.function.Function;
 @Service
 @RequiredArgsConstructor
 public class ExcelExportService {
-    // Chúng ta sẽ không cần ProductRepository trực tiếp ở đây nữa,
-    // mà sẽ sử dụng ProductService để lấy dữ liệu đã được map sang ProductResponse
-    private final ProductService productService; // Tiêm ProductService
+
+    private final ProductCache productCache;
 
     // Phương thức exportExcel tổng quát có thể giữ nguyên nếu bạn vẫn dùng nó ở nơi khác
     public <T> ResponseEntity<byte[]> exportExcel(String fileName,
@@ -52,7 +52,7 @@ public class ExcelExportService {
         List<ProductResponse> allProducts = new java.util.ArrayList<>();
 
         do {
-            productPage = productService.getAllByShop(shopId, branchId, pageable);
+            productPage = productCache.getAllByShop(shopId, branchId, pageable);
             allProducts.addAll(productPage.getContent());
             if (productPage.hasNext()) {
                 pageable = productPage.nextPageable();

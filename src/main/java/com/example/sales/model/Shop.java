@@ -29,6 +29,7 @@ public class Shop extends BaseEntity {
     private String address;
     private String phone;
     private String logoUrl;
+    private String countryCode;
 
     @Builder.Default
     private boolean active = true;

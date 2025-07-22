@@ -77,7 +77,8 @@ public enum ApiCode {
     TABLE_OCCUPIED("4136", "Table is occupied"),
     USER_ALREADY_IN_SHOP("4137", "User already in shop"),
     CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop"),
-    INSUFFICIENT_STOCK ("4139", "Insufficient stock for product");
+    INSUFFICIENT_STOCK ("4139", "Insufficient stock for product"),
+    INVALID_CREDENTIALS("4011", "Email or password is incorrect");
 
     private final String code;
     private final String message;
@@ -737,7 +738,6 @@ package com.example.sales.dto.shop;
 import com.example.sales.constant.ShopType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -749,11 +749,11 @@ public class ShopRequest {
 
     @NotNull(message = "Loại cửa hàng là bắt buộc")
     private ShopType type;
-
-    @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Số điện thoại không hợp lệ")
     private String phone;
 
     private String address;
+
+    private String countryCode; // Mã quốc gia, ví dụ: "VN" cho Việt Nam
 }
 
 // File: src/main/java/com/example/sales/dto/shop/ShopResponse.java
