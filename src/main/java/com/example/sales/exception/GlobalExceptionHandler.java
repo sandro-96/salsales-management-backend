@@ -63,6 +63,18 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Xử lý lỗi không tìm thấy tài nguyên
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponseDto<String>> handleResourceNotFoundException(
+            ResourceNotFoundException ex, WebRequest request) {
+        log.warn("Resource not found at {}: {}", request.getDescription(false), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponseDto.error(ApiCode.NOT_FOUND, ApiCode.NOT_FOUND.getMessage(), ex.getMessage()));
+    }
+
+    /**
      * Xử lý các lỗi chung (fallback)
      */
     @ExceptionHandler(Exception.class)

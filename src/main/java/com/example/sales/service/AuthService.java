@@ -2,16 +2,20 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.WebSocketMessageType;
 import com.example.sales.dto.JwtResponse;
 import com.example.sales.dto.LoginRequest;
 import com.example.sales.dto.RegisterRequest;
+import com.example.sales.dto.websocket.WebSocketMessage;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,6 +23,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -31,6 +37,8 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final MailService mailService;
     private final TokenService tokenService;
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     @Value("${app.frontend.verify-url}")
     private String verifyUrl;
@@ -62,18 +70,12 @@ public class AuthService {
 
 
     public JwtResponse login(LoginRequest request) {
-        // 1. Xác thực tài khoản và mật khẩu
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-            );
-        } catch (BadCredentialsException e) {
-            throw new BusinessException(ApiCode.INVALID_CREDENTIALS); // 👈 định nghĩa code riêng
-        }
-        // 2. Lấy user từ DB
         User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
-        // 3. Kiểm tra đã xác thực chưa
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BusinessException(ApiCode.INVALID_CREDENTIALS);
+        }
         if (!user.isVerified()) {
             throw new BusinessException(ApiCode.EMAIL_NOT_VERIFIED);
         }
@@ -121,8 +123,11 @@ public class AuthService {
     }
 
     public void verifyEmail(String token) {
-        User user = userRepository.findByVerificationTokenAndDeletedFalse(token)
-                .orElseThrow(() -> new BusinessException(ApiCode.INVALID_TOKEN));
+        Optional<User> optional = userRepository.findByVerificationTokenAndDeletedFalse(token);
+        if (optional.isEmpty()) {
+            throw new BusinessException(ApiCode.INVALID_TOKEN);
+        }
+        User user = optional.get();
 
         if (user.isVerified()) {
             throw new BusinessException(ApiCode.ALREADY_VERIFIED);
@@ -136,6 +141,16 @@ public class AuthService {
         user.setVerificationToken(null);
         user.setVerificationExpiry(null);
         userRepository.save(user);
+        messagingTemplate.convertAndSend(
+                "/topic/verify/" + user.getEmail(),
+                new WebSocketMessage<>(
+                        WebSocketMessageType.EMAIL_VERIFIED,
+                        Map.of(
+                                "userId", user.getId(),
+                                "email", user.getEmail()
+                        )
+                )
+        );
     }
 
 }
