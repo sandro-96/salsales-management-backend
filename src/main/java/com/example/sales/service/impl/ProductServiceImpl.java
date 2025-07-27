@@ -3,7 +3,6 @@ package com.example.sales.service.impl;
 
 import com.example.sales.cache.ProductCache;
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.ShopType;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.exception.BusinessException;
@@ -80,7 +79,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .productId(product.getId())
                 .shopId(shopId)
                 .branchId(branchId)
-                .quantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0)
+                .quantity(shop.getType().isTrackInventory() ? request.getQuantity() : 0)
                 .price(request.getPrice())
                 .unit(request.getUnit())
                 .imageUrl(request.getImageUrl())
@@ -130,7 +129,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Update BranchProduct fields
         branchProduct.setPrice(request.getPrice());
-        branchProduct.setQuantity(requiresInventory(shop.getType()) ? request.getQuantity() : 0);
+        branchProduct.setQuantity(shop.getType().isTrackInventory() ? request.getQuantity() : 0);
         branchProduct.setUnit(request.getUnit());
         branchProduct.setImageUrl(request.getImageUrl());
         branchProduct.setDescription(request.getDescription());
@@ -152,7 +151,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
             auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "PRICE_CHANGED",
                     String.format("Thay đổi giá sản phẩm '%s' từ %.2f → %.2f tại chi nhánh %s", product.getName(), oldPrice, request.getPrice(), branchProduct.getBranchId()));
         }
-        if (requiresInventory(shop.getType()) && oldQuantity != request.getQuantity()) {
+        if (shop.getType().isTrackInventory() && oldQuantity != request.getQuantity()) {
             auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "QUANTITY_CHANGED",
                     String.format("Thay đổi tồn kho sản phẩm '%s' từ %d → %d tại chi nhánh %s", product.getName(), oldQuantity, request.getQuantity(), branchProduct.getBranchId()));
         }
@@ -226,7 +225,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
-        if (!requiresInventory(shop.getType())) {
+        if (!shop.getType().isTrackInventory()) {
             return List.of();
         }
 
@@ -314,12 +313,5 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .createdAt(branchProduct.getCreatedAt()) // createdAt/updatedAt của BranchProduct
                 .updatedAt(branchProduct.getUpdatedAt())
                 .build();
-    }
-
-    private boolean requiresInventory(ShopType type) {
-        return switch (type) {
-            case GROCERY, CONVENIENCE, PHARMACY, RETAIL -> true;
-            case RESTAURANT, CAFE, BAR, OTHER -> false;
-        };
     }
 }
