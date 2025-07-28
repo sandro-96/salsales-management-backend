@@ -5,13 +5,16 @@ import com.example.sales.cache.ShopUserCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.shop.ShopSimpleResponse;
+import com.example.sales.dto.shopUser.ShopStaffResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Branch;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.model.User;
 import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.repository.UserRepository;
 import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -20,7 +23,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +37,7 @@ public class ShopUserService extends BaseService {
     private final AuditLogService auditLogService;
     private final BranchRepository branchRepository;
     private final ShopUserCache shopUserCache;
+    private final UserRepository userRepository;
 
     public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
         ShopRole actual = shopUserCache.getUserRoleInShop(shopId, userId);
@@ -153,6 +160,7 @@ public class ShopUserService extends BaseService {
                             .branchId(branch.getId())
                             .branchName(branch.getName())
                             .branchAddress(branch.getAddress())
+                            .industry(shop.getType().getIndustry())
                             .build();
                 });
     }
@@ -189,6 +197,48 @@ public class ShopUserService extends BaseService {
 
         // Thực hiện logic so sánh
         ensureCanModifyRole(actorRole, targetRole);
+    }
+
+    public Page<ShopStaffResponse> getUsersInShop(String shopId, String userId, String branchId, Pageable pageable) {
+        // Kiểm tra cửa hàng có tồn tại và đang hoạt động
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        if (!shop.isActive()) {
+            throw new BusinessException(ApiCode.SHOP_INACTIVE);
+        }
+
+        // Nếu branchId được cung cấp, kiểm tra chi nhánh có tồn tại
+        if (branchId != null && !branchId.isEmpty()) {
+            branchRepository.findByIdAndDeletedFalse(branchId)
+                    .orElseThrow(() -> new BusinessException(ApiCode.BRANCH_NOT_FOUND));
+        }
+
+        // Lấy danh sách người dùng trong cửa hàng, lọc theo branchId nếu có
+        Page<ShopUser> shopUsers = branchId != null && !branchId.isEmpty()
+                ? shopUserRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
+                : shopUserRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+        List<String> userIds = shopUsers.map(ShopUser::getUserId).toList();
+        Map<String, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+        return shopUsers.map(su -> {
+            Optional<Branch> branchOpt = branchRepository.findByIdAndDeletedFalse(su.getBranchId());
+            String branchName = branchOpt.map(Branch::getName).orElse("Unknown");
+            String branchAddress = branchOpt.map(Branch::getAddress).orElse("Unknown");
+
+            return ShopStaffResponse.builder()
+                    .userId(su.getUserId())
+                    .name(userMap.getOrDefault(su.getUserId(), new User()).getFullName())
+                    .email(userMap.getOrDefault(su.getUserId(), new User()).getEmail())
+                    .phone(userMap.getOrDefault(su.getUserId(), new User()).getPhone())
+                    .avatarUrl(userMap.getOrDefault(su.getUserId(), new User()).getAvatarUrl())
+                    .shopId(su.getShopId())
+                    .shopName(shop.getName())
+                    .role(su.getRole())
+                    .branchId(su.getBranchId())
+                    .branchName(branchName)
+                    .branchAddress(branchAddress)
+                    .build();
+        });
     }
 
 }

@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/dto/shop/ShopSimpleResponse.java
 package com.example.sales.dto.shop;
 
+import com.example.sales.constant.ShopIndustry;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.ShopType;
 import lombok.Builder;
@@ -18,4 +19,5 @@ public class ShopSimpleResponse {
     private String branchId;     // ✅ Chi nhánh user thuộc về
     private String branchName;   // ✅ Tên chi nhánh
     private String branchAddress;// ✅ Địa chỉ chi nhánh
+    private ShopIndustry industry; // ✅ Ngành nghề của shop
 }
