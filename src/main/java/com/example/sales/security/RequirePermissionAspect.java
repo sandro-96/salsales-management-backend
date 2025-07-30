@@ -1,4 +1,3 @@
-// File: src/main/java/com/example/sales/security/RequirePermissionAspect.java
 package com.example.sales.security;
 
 import com.example.sales.constant.ApiCode;
@@ -12,6 +11,8 @@ import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -25,54 +26,82 @@ public class RequirePermissionAspect {
     private final PermissionChecker permissionChecker;
 
     @Before("@annotation(com.example.sales.security.RequirePermission)")
-    public void checkPermission(JoinPoint joinPoint) {
-        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+    public void checkPermission(JoinPoint joinPoint) throws NoSuchMethodException {
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        Method method = signature.getMethod();
+
+        if (method.getDeclaringClass().isInterface()) {
+            method = joinPoint.getTarget().getClass()
+                    .getMethod(method.getName(), method.getParameterTypes());
+        }
+
         RequirePermission annotation = method.getAnnotation(RequirePermission.class);
         Permission requiredPermission = annotation.value();
-
-        CustomUserDetails user = null;
-        String shopId = null;
-        String branchId = null;
 
         Object[] args = joinPoint.getArgs();
         Annotation[][] paramAnnotations = method.getParameterAnnotations();
 
+        ExtractedParams extracted = extractParams(args, paramAnnotations, signature);
+
+        if (extracted.user == null) {
+            log.warn("Thiếu thông tin người dùng: user={}", extracted.user);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        if (extracted.shopId == null) {
+            log.warn("Thiếu tham số shopId: shopId={}", extracted.shopId);
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+
+        boolean hasPermission = permissionChecker.hasPermission(
+                extracted.shopId, extracted.branchId, extracted.user.getId(), requiredPermission);
+
+        if (!hasPermission) {
+            log.warn("User {} bị từ chối quyền {} tại shop={}, branch={}",
+                    extracted.user.getId(), requiredPermission, extracted.shopId, extracted.branchId);
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+    }
+
+    private ExtractedParams extractParams(Object[] args, Annotation[][] paramAnnotations, MethodSignature signature) {
+        CustomUserDetails user = null;
+        String shopId = null;
+        String branchId = null;
+
+        // Lấy tên tham số từ MethodSignature
+        String[] paramNames = signature.getParameterNames();
+
         for (int i = 0; i < args.length; i++) {
-            for (Annotation annotationParam : paramAnnotations[i]) {
-                if (annotationParam instanceof AuthenticationPrincipal) {
-                    assert args[i] instanceof CustomUserDetails;
-                    user = (CustomUserDetails) args[i];
-                }
-                if (annotationParam instanceof org.springframework.web.bind.annotation.PathVariable pv) {
-                    if ("shopId".equals(pv.value())) {
-                        assert args[i] instanceof String;
-                        shopId = (String) args[i];
-                    } else if ("branchId".equals(pv.value())) {
-                        assert args[i] instanceof String;
-                        branchId = (String) args[i];
+            for (Annotation annotation : paramAnnotations[i]) {
+                if (annotation instanceof AuthenticationPrincipal && args[i] instanceof CustomUserDetails details) {
+                    user = details;
+                } else if (annotation instanceof PathVariable pv) {
+                    String value = pv.value();
+                    // Kiểm tra cả value của @PathVariable và tên tham số
+                    if ("shopId".equals(value) || (value.isEmpty() && "shopId".equals(paramNames[i]))) {
+                        shopId = args[i] != null ? String.valueOf(args[i]) : null;
+                    } else if ("branchId".equals(value) || (value.isEmpty() && "branchId".equals(paramNames[i]))) {
+                        branchId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
-                }
-                if (annotationParam instanceof org.springframework.web.bind.annotation.RequestParam rp) {
-                    if ("shopId".equals(rp.value())) {
-                        assert args[i] instanceof String;
-                        shopId = (String) args[i];
-                    } else if ("branchId".equals(rp.value())) {
-                        assert args[i] instanceof String;
-                        branchId = (String) args[i];
+                } else if (annotation instanceof RequestParam rp) {
+                    String value = rp.value();
+                    // Kiểm tra cả value của @RequestParam và tên tham số
+                    if ("shopId".equals(value) || (value.isEmpty() && "shopId".equals(paramNames[i]))) {
+                        shopId = args[i] != null ? String.valueOf(args[i]) : null;
+                    } else if ("branchId".equals(value) || (value.isEmpty() && "branchId".equals(paramNames[i]))) {
+                        branchId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
                 }
             }
         }
 
-        if (user == null || shopId == null || branchId == null) {
-            log.warn("Thiếu tham số khi kiểm tra @RequirePermission: user={}, shopId={}, branchId={}", user, shopId, branchId);
-            throw new BusinessException(ApiCode.UNAUTHORIZED);
-        }
+        // Log chi tiết để debug
+        log.debug("Extracted params: user={}, shopId={}, branchId={}",
+                user != null ? user.getId() : null, shopId, branchId);
 
-        boolean hasPermission = permissionChecker.hasPermission(shopId, branchId, user.getId(), requiredPermission);
-        if (!hasPermission) {
-            log.warn("Người dùng {} KHÔNG có quyền {} tại shop={}, branch={}", user.getId(), requiredPermission, shopId, branchId);
-            throw new BusinessException(ApiCode.ACCESS_DENIED);
-        }
+        return new ExtractedParams(user, shopId, branchId);
+    }
+
+    private record ExtractedParams(CustomUserDetails user, String shopId, String branchId) {
     }
 }

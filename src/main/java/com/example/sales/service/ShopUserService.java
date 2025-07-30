@@ -226,6 +226,7 @@ public class ShopUserService extends BaseService {
             String branchAddress = branchOpt.map(Branch::getAddress).orElse("Unknown");
 
             return ShopStaffResponse.builder()
+                    .id(su.getId())
                     .userId(su.getUserId())
                     .name(userMap.getOrDefault(su.getUserId(), new User()).getFullName())
                     .email(userMap.getOrDefault(su.getUserId(), new User()).getEmail())

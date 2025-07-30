@@ -45,8 +45,16 @@ public class PermissionChecker {
 
 
     public boolean hasPermission(String shopId, String branchId, String userId, Permission permission) {
-        return shopUserRepository.findByUserIdAndShopIdAndBranchIdAndDeletedFalse(shopId, userId, branchId)
-                .map(shopUser -> shopUser.getPermissions() != null && shopUser.getPermissions().contains(permission))
-                .orElse(false);
+        if (branchId != null && !branchId.isEmpty()) {
+            // Kiểm tra quyền ở cấp chi nhánh trước
+            return shopUserRepository.findByUserIdAndShopIdAndBranchIdAndDeletedFalse(shopId, userId, branchId)
+                    .map(shopUser -> shopUser.getPermissions() != null && shopUser.getPermissions().contains(permission))
+                    .orElse(false);
+        } else {
+            // Nếu không có branchId, kiểm tra quyền ở cấp shop
+            return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                    .map(shopUser -> shopUser.getPermissions() != null && shopUser.getPermissions().contains(permission))
+                    .orElse(false);
+        }
     }
 }
