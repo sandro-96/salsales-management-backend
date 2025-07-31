@@ -3,6 +3,7 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.branch.BranchRequest;
@@ -10,6 +11,7 @@ import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequirePlan;
+import com.example.sales.security.RequireRole;
 import com.example.sales.service.BranchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -47,7 +49,7 @@ public class BranchController {
         return ApiResponseDto.success(ApiCode.SUCCESS, branchService.getAll(user.getId(), shopId, pageable));
     }
 
-    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
+    //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
     @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Tạo chi nhánh mới", description = "Tạo một chi nhánh mới cho cửa hàng")

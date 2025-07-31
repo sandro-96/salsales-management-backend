@@ -2,12 +2,16 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
+import com.example.sales.model.ShopUser;
 import com.example.sales.repository.BranchRepository;
+import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +23,7 @@ public class BranchService {
 
     private final BranchRepository branchRepository;
     private final AuditLogService auditLogService;
+    private final ShopUserRepository shopUserRepository;
 
     public Page<BranchResponse> getAll(String userId, String shopId, Pageable pageable) {
         return branchRepository.findByShopIdAndDeletedFalse(shopId, pageable)
@@ -35,6 +40,17 @@ public class BranchService {
                 .build();
 
         Branch saved = branchRepository.save(branch);
+
+        // ✅ Cập nhật ShopUser để liên kết với chi nhánh đã tạo
+        ShopUser shopUser = ShopUser.builder()
+                .shopId(shopId)
+                .userId(userId)
+                .role(ShopRole.OWNER)
+                .branchId(saved.getId())
+                .permissions(PermissionUtils.getDefaultPermissions(ShopRole.OWNER))
+                .build();
+        shopUserRepository.save(shopUser);
+
         auditLogService.log(userId, shopId, saved.getId(), "BRANCH", "CREATED",
                 String.format("Tạo chi nhánh: %s - %s", saved.getName(), saved.getAddress()));
         return toResponse(saved);
