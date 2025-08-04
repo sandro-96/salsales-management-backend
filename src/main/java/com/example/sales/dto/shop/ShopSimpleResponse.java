@@ -14,10 +14,11 @@ public class ShopSimpleResponse {
     private String name;
     private ShopType type;
     private String logoUrl;
+    private String countryCode;
+    private String phone;
+    private String address;
     private boolean active;
-    private ShopRole role; // 👈 vai trò của user trong shop
-    private String branchId;     // ✅ Chi nhánh user thuộc về
-    private String branchName;   // ✅ Tên chi nhánh
-    private String branchAddress;// ✅ Địa chỉ chi nhánh
-    private ShopIndustry industry; // ✅ Ngành nghề của shop
+    private boolean isTrackInventory;
+    private ShopRole role;
+    private ShopIndustry industry;
 }

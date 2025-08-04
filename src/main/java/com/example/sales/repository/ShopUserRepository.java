@@ -13,9 +13,9 @@ public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
     Optional<ShopUser> findByIdAndDeletedFalse(String id);
     Optional<ShopUser> findByShopIdAndUserIdAndDeletedFalse(String shopId, String userId);
     Page<ShopUser> findByUserIdAndDeletedFalse(String userId, Pageable pageable);
-    Optional<ShopUser> findByShopIdAndUserIdAndBranchId(String shopId, String userId, String branchId);
+    Optional<ShopUser> findByShopIdAndUserId(String shopId, String userId);
     Optional<ShopUser> findByUserIdAndShopIdAndBranchIdAndDeletedFalse(String shopId, String userId, String branchId);
     List<ShopUser> findByUserIdAndShopIdAndDeletedFalse(String userId, String shopId);
     Page<ShopUser> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId, Pageable pageable);
-    Page<ShopUser> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+    Page<ShopUser> findByShopId(String shopId, Pageable pageable);
 }

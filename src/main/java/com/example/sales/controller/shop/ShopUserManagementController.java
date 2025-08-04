@@ -28,25 +28,24 @@ public class ShopUserManagementController {
     private final ShopUserService shopUserService;
 
     @GetMapping("/{shopId}/users")
-    @RequirePermission(Permission.SHOP_USER_VIEW)
-    @Operation(summary = "Lấy danh sách người dùng của cửa hàng",
-            description = "Trả về danh sách tất cả người dùng trong một cửa hàng cụ thể với phân trang. " +
-                    "Có thể lọc theo chi nhánh bằng tham số branchId. Chỉ dành cho các vai trò có quyền quản lý (OWNER hoặc ADMIN).")
+    @RequireRole(ShopRole.OWNER)
+    @Operation(summary = "Lấy danh sách thành viên của cửa hàng",
+            description = "Trả về danh sách tất cả thành viên trong một cửa hàng cụ thể với phân trang. " +
+                    "Chỉ dành cho vai trò có quyền quản lý OWNER.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập"),
-            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng hoặc chi nhánh")
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
     })
     public ApiResponseDto<?> getUsersInShop(
             @Parameter(description = "ID của cửa hàng") @PathVariable String shopId,
-            @Parameter(description = "ID của chi nhánh (tùy chọn, để lọc người dùng theo chi nhánh)") @RequestParam(required = false) String branchId,
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") @RequestParam(required = false) Pageable pageable
     ) {
         return ApiResponseDto.success(
                 ApiCode.SUCCESS,
-                shopUserService.getUsersInShop(shopId, customUserDetails.getId(), branchId, pageable)
+                shopUserService.getUsersInShop(shopId, customUserDetails.getId(), pageable)
         );
     }
 }

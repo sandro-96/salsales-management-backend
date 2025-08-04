@@ -34,10 +34,6 @@ public class Shop extends BaseEntity {
     @Builder.Default
     private boolean active = true;
 
-    // ====== Nâng cao (SS) ======
-    @Builder.Default
-    private boolean trackInventory = true;
-
     @Builder.Default
     private String currency = "VND";
 
@@ -51,5 +47,9 @@ public class Shop extends BaseEntity {
     private SubscriptionPlan plan = SubscriptionPlan.FREE;
 
     private LocalDateTime planExpiry;
+
+    public boolean isTrackInventory() {
+        return type != null && type.isTrackInventory();
+    }
 }
 

@@ -24,7 +24,6 @@ public class ShopUser extends BaseEntity {
     private String shopId;
     private String userId;
     private ShopRole role;
-    private String branchId;
     private Set<Permission> permissions;
 }
 

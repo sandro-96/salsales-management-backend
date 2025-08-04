@@ -48,29 +48,32 @@ public class ShopService extends BaseService {
         shop.setOwnerId(userId);
         shop.setCountryCode(request.getCountryCode());
 
-        Shop savedShop = shopRepository.save(shop); // Đổi tên biến để rõ ràng hơn
+        Shop savedShop = shopRepository.save(shop);
 
-        // ✅ Tạo chi nhánh mặc định
+        auditLogService.log(userId, savedShop.getId(), savedShop.getId(), "SHOP", "CREATED",
+                String.format("Tạo cửa hàng: %s (%s)", savedShop.getName(), savedShop.getType()));
+
         Branch defaultBranch = Branch.builder()
                 .shopId(savedShop.getId())
-                .name("Chi nhánh chính") // Tên chi nhánh mặc định
-                .address(request.getAddress()) // Lấy địa chỉ từ request của shop
-                .phone(request.getPhone()) // Lấy số điện thoại từ request của shop
+                .name("DEFAULT_BRANCH")
+                .address(request.getAddress())
+                .phone(request.getPhone())
                 .build();
-        Branch savedBranch = branchRepository.save(defaultBranch); // Lưu chi nhánh
+        branchRepository.save(defaultBranch);
 
-        // ✅ Cập nhật ShopUser để liên kết với chi nhánh mặc định
+        auditLogService.log(userId, defaultBranch.getId(), savedShop.getId(), "BRANCH", "CREATED",
+                String.format("Tạo chi nhánh mặc định: %s cho cửa hàng %s", defaultBranch.getName(), savedShop.getName()));
+
         ShopUser shopUser = ShopUser.builder()
                 .shopId(savedShop.getId())
                 .userId(userId)
                 .role(ShopRole.OWNER)
-                .branchId(savedBranch.getId())
                 .permissions(PermissionUtils.getDefaultPermissions(ShopRole.OWNER))
                 .build();
         shopUserRepository.save(shopUser);
 
-        auditLogService.log(userId, savedShop.getId(), savedShop.getId(), "SHOP", "CREATED",
-                String.format("Tạo cửa hàng: %s (%s)", savedShop.getName(), savedShop.getType()));
+        auditLogService.log(userId, shopUser.getId(), savedShop.getId(), "SHOP_USER", "CREATED",
+                String.format("Thêm người dùng: %s với vai trò %s vào cửa hàng %s", userId, shopUser.getRole(), savedShop.getName()));
 
         return savedShop;
     }
