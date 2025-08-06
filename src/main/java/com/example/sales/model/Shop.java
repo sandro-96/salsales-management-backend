@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/model/Shop.java
 package com.example.sales.model;
 
+import com.example.sales.constant.BusinessModel;
 import com.example.sales.constant.ShopType;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.model.base.BaseEntity;
@@ -26,6 +27,7 @@ public class Shop extends BaseEntity {
     private String name;
     private String ownerId;
     private ShopType type;
+    private BusinessModel businessModel;
     private String address;
     private String phone;
     private String logoUrl;

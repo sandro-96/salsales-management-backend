@@ -1,7 +1,6 @@
 // File: src/main/java/com/example/sales/controller/shop/ShopController.java
 package com.example.sales.controller.shop;
 
-import com.example.sales.cache.ShopCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;

@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/dto/shop/ShopRequest.java
 package com.example.sales.dto.shop;
 
+import com.example.sales.constant.BusinessModel;
 import com.example.sales.constant.ShopType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -15,9 +16,12 @@ public class ShopRequest {
 
     @NotNull(message = "Loại cửa hàng là bắt buộc")
     private ShopType type;
+
+    private BusinessModel businessModel;
+
     private String phone;
 
     private String address;
 
-    private String countryCode; // Mã quốc gia, ví dụ: "VN" cho Việt Nam
+    private String countryCode;
 }

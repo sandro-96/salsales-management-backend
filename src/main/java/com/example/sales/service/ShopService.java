@@ -2,10 +2,7 @@
 package com.example.sales.service;
 
 import com.example.sales.cache.ShopCache;
-import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.AppConstants;
-import com.example.sales.constant.ShopRole;
-import com.example.sales.constant.UserRole;
+import com.example.sales.constant.*;
 import com.example.sales.dto.shop.ShopAdminResponse;
 import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopResponse;
@@ -48,6 +45,10 @@ public class ShopService extends BaseService {
         shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
         shop.setCountryCode(request.getCountryCode());
+        BusinessModel model = request.getBusinessModel() != null
+                ? request.getBusinessModel()
+                : request.getType().getDefaultBusinessModel();
+        shop.setBusinessModel(model);
 
         Shop savedShop = shopRepository.save(shop);
 
@@ -88,6 +89,10 @@ public class ShopService extends BaseService {
         shop.setPhone(request.getPhone());
         shop.setCountryCode(request.getCountryCode());
 
+        if (request.getBusinessModel() != null) {
+            request.setBusinessModel(request.getBusinessModel());
+        }
+
         if (logoUrl != null) {
             shop.setLogoUrl(logoUrl);
         }
@@ -121,6 +126,8 @@ public class ShopService extends BaseService {
                     .id(shop.getId())
                     .name(shop.getName())
                     .type(shop.getType())
+                    .businessModel(shop.getBusinessModel())
+                    .countryCode(shop.getCountryCode())
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
                     .logoUrl(shop.getLogoUrl())
@@ -136,6 +143,8 @@ public class ShopService extends BaseService {
                     .id(shop.getId())
                     .name(shop.getName())
                     .type(shop.getType())
+                    .businessModel(shop.getBusinessModel())
+                    .countryCode(shop.getCountryCode())
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
                     .logoUrl(shop.getLogoUrl())

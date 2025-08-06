@@ -1,35 +1,32 @@
-// File: src/main/java/com/example/sales/constant/ShopType.java
 package com.example.sales.constant;
 
 import lombok.Getter;
 
 @Getter
 public enum ShopType {
-    RESTAURANT(ShopIndustry.FNB, BusinessModel.DINE_IN, false),
-    CAFE(ShopIndustry.FNB, BusinessModel.DINE_IN, false),
-    BAR(ShopIndustry.FNB, BusinessModel.DINE_IN, false),
+    RESTAURANT(ShopIndustry.FNB, false, "Nhà hàng", BusinessModel.DINE_IN),
+    CAFE(ShopIndustry.FNB, false, "Quán cafe", BusinessModel.DINE_IN),
+    BAR(ShopIndustry.FNB, false, "Quán bar", BusinessModel.DINE_IN),
 
-    GROCERY(ShopIndustry.RETAIL, BusinessModel.PHYSICAL_STORE, true),
-    CONVENIENCE(ShopIndustry.RETAIL, BusinessModel.PHYSICAL_STORE, true),
-    PHARMACY(ShopIndustry.HEALTHCARE, BusinessModel.PHYSICAL_STORE, true),
-    RETAIL(ShopIndustry.RETAIL, BusinessModel.PHYSICAL_STORE, true),
+    GROCERY(ShopIndustry.RETAIL, true, "Tạp hóa", BusinessModel.PHYSICAL_STORE),
+    CONVENIENCE(ShopIndustry.RETAIL, true, "Cửa hàng tiện lợi", BusinessModel.PHYSICAL_STORE),
+    PHARMACY(ShopIndustry.HEALTHCARE, true, "Hiệu thuốc", BusinessModel.PHYSICAL_STORE),
+    RETAIL(ShopIndustry.RETAIL, true, "Cửa hàng bán lẻ", BusinessModel.PHYSICAL_STORE),
 
-    SALON(ShopIndustry.SERVICE, BusinessModel.APPOINTMENT_BASED, false),
-    TUTORING_CENTER(ShopIndustry.EDUCATION, BusinessModel.APPOINTMENT_BASED, false),
+    SALON(ShopIndustry.SERVICE, false, "Salon", BusinessModel.APPOINTMENT_BASED),
+    TUTORING_CENTER(ShopIndustry.EDUCATION, false, "Trung tâm dạy học", BusinessModel.APPOINTMENT_BASED),
 
-    OTHER(ShopIndustry.OTHER, BusinessModel.PHYSICAL_STORE, false);
+    OTHER(ShopIndustry.OTHER, false, "Khác", BusinessModel.HYBRID);
 
     private final ShopIndustry industry;
-    private final BusinessModel businessModel;
     private final boolean trackInventory;
+    private final String label;
+    private final BusinessModel defaultBusinessModel; // 👈 Thêm field
 
-    ShopType(ShopIndustry industry, BusinessModel businessModel, boolean trackInventory) {
+    ShopType(ShopIndustry industry, boolean trackInventory, String label, BusinessModel defaultBusinessModel) {
         this.industry = industry;
-        this.businessModel = businessModel;
         this.trackInventory = trackInventory;
+        this.label = label;
+        this.defaultBusinessModel = defaultBusinessModel;
     }
 }
-
-
-
-
