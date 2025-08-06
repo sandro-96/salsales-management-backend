@@ -11,7 +11,7 @@ import static com.example.sales.constant.Permission.*;
 public class PermissionUtils {
 
     private static final Set<Permission> COMMON_VIEW = Set.of(
-            ORDER_VIEW, PROMOTION_VIEW, TABLE_VIEW, BRANCH_VIEW, INVENTORY_VIEW
+            ORDER_VIEW, PROMOTION_VIEW, TABLE_VIEW, BRANCH_VIEW, INVENTORY_VIEW, SHOP_VIEW
     );
 
     private static final Set<Permission> ORDER_PERMS = Set.of(
@@ -35,20 +35,24 @@ public class PermissionUtils {
             TABLE_CREATE, TABLE_UPDATE, TABLE_DELETE, TABLE_VIEW
     );
 
+    private static final Set<Permission> SHOP_FULL = Set.of(
+            SHOP_UPDATE, SHOP_DELETE, SHOP_VIEW
+    );
+
     private static final Set<Permission> SHOP_USER_FULL = Set.of(
-            SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_DELETE, SHOP_USER_VIEW, SHOP_USER_BRANCH_DELETE
+            SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_DELETE, SHOP_USER_VIEW
     );
 
     public static Set<Permission> getDefaultPermissions(ShopRole role) {
         return switch (role) {
             case OWNER -> merge(
-                    PRODUCT_BASE, ORDER_PERMS, CUSTOMER_FULL,
+                    PRODUCT_BASE, ORDER_PERMS, CUSTOMER_FULL, SHOP_FULL,
                     Set.of(BRANCH_UPDATE, SHOP_MANAGE, REPORT_VIEW, BRANCH_MANAGE, INVENTORY_MANAGE, INVENTORY_VIEW),
                     PROMOTION_FULL, TABLE_FULL, SHOP_USER_FULL
             );
             case MANAGER -> merge(
                     PRODUCT_BASE, ORDER_PERMS, CUSTOMER_FULL,
-                    Set.of(SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_VIEW, SHOP_USER_BRANCH_DELETE, BRANCH_VIEW, REPORT_VIEW, INVENTORY_MANAGE, INVENTORY_VIEW),
+                    Set.of(SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_VIEW, BRANCH_VIEW, REPORT_VIEW, INVENTORY_MANAGE, INVENTORY_VIEW, SHOP_UPDATE, SHOP_VIEW, BRANCH_MANAGE),
                     PROMOTION_FULL, TABLE_FULL
             );
             case ADMIN -> merge(

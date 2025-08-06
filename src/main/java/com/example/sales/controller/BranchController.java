@@ -4,13 +4,11 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
-import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
-import com.example.sales.security.RequirePlan;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.BranchService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,7 +33,7 @@ public class BranchController {
 
     @GetMapping
     @RequirePermission(Permission.BRANCH_VIEW)
-    @Operation(summary = "Lấy danh sách chi nhánh", description = "Lấy danh sách chi nhánh của cửa hàng với phân trang")
+    @Operation(summary = "Lấy danh sách chi nhánh", description = "Lấy danh sách chi nhánh của cửa hàng với phân trang, lọc trạng thái, tìm kiếm theo tên hoặc địa chỉ")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách chi nhánh được trả về thành công"),
             @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
@@ -45,8 +43,12 @@ public class BranchController {
     public ApiResponseDto<Page<BranchResponse>> getAll(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam(required = false) @Parameter(description = "Trạng thái hoạt động của chi nhánh") Boolean active,
+            @RequestParam(required = false) @Parameter(description = "Từ khóa tìm kiếm theo tên hoặc địa chỉ") String keyword,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.getAll(user.getId(), shopId, pageable));
+
+        return ApiResponseDto.success(ApiCode.SUCCESS,
+                branchService.getAll(user.getId(), shopId, active, keyword, pageable));
     }
 
     //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
@@ -86,7 +88,7 @@ public class BranchController {
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(Permission.BRANCH_MANAGE)
+    @RequireRole(ShopRole.OWNER)
     @Operation(summary = "Xóa chi nhánh", description = "Xóa mềm một chi nhánh của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Chi nhánh được xóa thành công"),

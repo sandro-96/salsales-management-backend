@@ -65,6 +65,7 @@ public class User extends BaseEntity {
     private String resetToken;
 
     private Date resetTokenExpiry;
+    @Builder.Default
     private boolean active = true;
     private Date lastLoginAt;
     private Date birthDate;

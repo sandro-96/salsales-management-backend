@@ -43,7 +43,7 @@ public class InventoryServiceImpl implements InventoryService {
 
         if (!isInventoryManagementRequired(shopId)) {
             log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác nhập.", shopId);
-            return -1; // Hoặc trả về số lượng hiện tại nếu muốn
+            return -1;
         }
 
         BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
@@ -159,7 +159,7 @@ public class InventoryServiceImpl implements InventoryService {
     public boolean isInventoryManagementRequired(String shopId) {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-        return !shop.getType().isTrackInventory(); // Ví dụ: Cửa hàng dịch vụ không quản lý tồn kho
+        return shop.getType().isTrackInventory(); // Ví dụ: Cửa hàng dịch vụ không quản lý tồn kho
     }
 
     private BranchProduct findBranchProduct(String shopId, String branchId, String branchProductId) {

@@ -44,21 +44,21 @@ public class RequirePermissionAspect {
         ExtractedParams extracted = extractParams(args, paramAnnotations, signature);
 
         if (extracted.user == null) {
-            log.warn("Thiếu thông tin người dùng: user={}", extracted.user);
+            log.warn("Thiếu thông tin người dùng: user={}", (Object) null);
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
         if (extracted.shopId == null) {
-            log.warn("Thiếu tham số shopId: shopId={}", extracted.shopId);
+            log.warn("Thiếu tham số shopId: shopId={}", (Object) null);
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
         boolean hasPermission = permissionChecker.hasPermission(
-                extracted.shopId, extracted.branchId, extracted.user.getId(), requiredPermission);
+                extracted.shopId, extracted.user.getId(), requiredPermission);
 
         if (!hasPermission) {
-            log.warn("User {} bị từ chối quyền {} tại shop={}, branch={}",
-                    extracted.user.getId(), requiredPermission, extracted.shopId, extracted.branchId);
+            log.warn("User {} bị từ chối quyền {} tại shop={}",
+                    extracted.user.getId(), requiredPermission, extracted.shopId);
             throw new BusinessException(ApiCode.ACCESS_DENIED);
         }
     }
@@ -66,9 +66,7 @@ public class RequirePermissionAspect {
     private ExtractedParams extractParams(Object[] args, Annotation[][] paramAnnotations, MethodSignature signature) {
         CustomUserDetails user = null;
         String shopId = null;
-        String branchId = null;
 
-        // Lấy tên tham số từ MethodSignature
         String[] paramNames = signature.getParameterNames();
 
         for (int i = 0; i < args.length; i++) {
@@ -77,31 +75,24 @@ public class RequirePermissionAspect {
                     user = details;
                 } else if (annotation instanceof PathVariable pv) {
                     String value = pv.value();
-                    // Kiểm tra cả value của @PathVariable và tên tham số
                     if ("shopId".equals(value) || (value.isEmpty() && "shopId".equals(paramNames[i]))) {
                         shopId = args[i] != null ? String.valueOf(args[i]) : null;
-                    } else if ("branchId".equals(value) || (value.isEmpty() && "branchId".equals(paramNames[i]))) {
-                        branchId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
                 } else if (annotation instanceof RequestParam rp) {
                     String value = rp.value();
-                    // Kiểm tra cả value của @RequestParam và tên tham số
                     if ("shopId".equals(value) || (value.isEmpty() && "shopId".equals(paramNames[i]))) {
                         shopId = args[i] != null ? String.valueOf(args[i]) : null;
-                    } else if ("branchId".equals(value) || (value.isEmpty() && "branchId".equals(paramNames[i]))) {
-                        branchId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
                 }
             }
         }
 
-        // Log chi tiết để debug
-        log.debug("Extracted params: user={}, shopId={}, branchId={}",
-                user != null ? user.getId() : null, shopId, branchId);
+        log.debug("Extracted params: user={}, shopId={}",
+                user != null ? user.getId() : null, shopId);
 
-        return new ExtractedParams(user, shopId, branchId);
+        return new ExtractedParams(user, shopId);
     }
 
-    private record ExtractedParams(CustomUserDetails user, String shopId, String branchId) {
+    private record ExtractedParams(CustomUserDetails user, String shopId) {
     }
 }

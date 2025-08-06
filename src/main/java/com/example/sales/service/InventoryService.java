@@ -51,7 +51,7 @@ public interface InventoryService {
     /**
      * Lấy lịch sử giao dịch tồn kho cho một sản phẩm cụ thể.
      *
-     * @param productId ID của BranchProduct (sản phẩm chi nhánh).
+     * @param branchProductId ID của BranchProduct (sản phẩm chi nhánh).
      * @param pageable Thông tin phân trang.
      * @return Trang chứa danh sách các giao dịch tồn kho.
      */

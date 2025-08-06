@@ -3,6 +3,7 @@ package com.example.sales.service;
 
 import com.example.sales.cache.ShopCache;
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.AppConstants;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.UserRole;
 import com.example.sales.dto.shop.ShopAdminResponse;
@@ -55,7 +56,7 @@ public class ShopService extends BaseService {
 
         Branch defaultBranch = Branch.builder()
                 .shopId(savedShop.getId())
-                .name("DEFAULT_BRANCH")
+                .name(AppConstants.DEFAULT_BRANCH_NAME)
                 .address(request.getAddress())
                 .phone(request.getPhone())
                 .build();
@@ -78,14 +79,18 @@ public class ShopService extends BaseService {
         return savedShop;
     }
 
-    public Shop updateShop(String ownerId, ShopRequest request) {
-        Shop shop = shopCache.getShopByOwner(ownerId);
+    public Shop updateShop(String shopId, ShopRequest request, CustomUserDetails user, String logoUrl) {
+        Shop shop = shopCache.getShopById(shopId);
 
         shop.setName(request.getName());
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
         shop.setCountryCode(request.getCountryCode());
+
+        if (logoUrl != null) {
+            shop.setLogoUrl(logoUrl);
+        }
 
         Shop saved = shopRepository.save(shop);
         auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",

@@ -3,12 +3,14 @@ package com.example.sales.controller.shop;
 
 import com.example.sales.cache.ShopCache;
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.model.Shop;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.security.RequirePermission;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ShopService;
@@ -54,31 +56,39 @@ public class ShopController {
         return ApiResponseDto.success(ApiCode.SUCCESS, shopService.createShop(user.getId(), request, logoUrl));
     }
 
-    @GetMapping("/me")
-    @RequireRole(ShopRole.OWNER)
-    @Operation(summary = "Lấy thông tin cửa hàng hiện tại", description = "Trả về thông tin chi tiết của cửa hàng mà người dùng hiện tại sở hữu")
+    @GetMapping("/{shopId}")
+    @RequirePermission(Permission.SHOP_VIEW)
+    @Operation(summary = "Lấy thông tin cửa hàng theo ID", description = "Trả về thông tin chi tiết của cửa hàng theo shopId")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Trả về thông tin cửa hàng thành công"),
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
     })
-    public ApiResponseDto<?> getMyShop(@AuthenticationPrincipal CustomUserDetails user) {
-        Shop shop = shopCache.getShopByOwner(user.getId());
+    public ApiResponseDto<?> getShopById(@AuthenticationPrincipal CustomUserDetails user,
+                                         @PathVariable("shopId") String shopId) {
+        Shop shop = shopService.getShopById(shopId);
         return ApiResponseDto.success(ApiCode.SUCCESS, shopService.getShopResponse(user, shop));
     }
 
-    @PutMapping("/me")
-    @RequireRole(ShopRole.OWNER)
-    @Operation(summary = "Cập nhật thông tin cửa hàng", description = "Cập nhật tên, địa chỉ, số điện thoại hoặc logo của cửa hàng")
+    @PutMapping(path = "/{shopId}", consumes = "multipart/form-data")
+    @RequirePermission(Permission.SHOP_UPDATE)
+    @Operation(summary = "Cập nhật thông tin cửa hàng", description = "Cập nhật tên, địa chỉ, số điện thoại hoặc logo của cửa hàng theo shopId")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
             @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
     })
-    public ApiResponseDto<Shop> update(@AuthenticationPrincipal CustomUserDetails user,
-                                       @RequestBody @Valid ShopRequest request) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.updateShop(user.getId(), request));
+    public ApiResponseDto<Shop> updateShopById(@AuthenticationPrincipal CustomUserDetails user,
+                                               @PathVariable("shopId") String shopId,
+                                               @RequestPart("shop") @Valid ShopRequest request,
+                                               @RequestPart(value = "file", required = false) MultipartFile file)
+    {
+        String logoUrl = null;
+        if (file != null && !file.isEmpty()) {
+            logoUrl = fileUploadService.upload(file);
+        }
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.updateShop(shopId, request, user, logoUrl));
     }
 
     @GetMapping("/my")

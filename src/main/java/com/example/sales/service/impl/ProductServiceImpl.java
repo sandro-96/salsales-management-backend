@@ -44,8 +44,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
-        // 1. Find or Create Master Product
-        // Generate SKU if not provided or if it's blank
         String sku = StringUtils.hasText(request.getSku())
                 ? request.getSku()
                 : UUID.randomUUID().toString();
@@ -54,12 +52,10 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Product product;
         if (existingProduct.isPresent()) {
             product = existingProduct.get();
-            // Update master product details if provided in request
             product.setName(request.getName());
             product.setCategory(request.getCategory());
             productRepository.save(product);
         } else {
-            // Create a new master product definition
             product = Product.builder()
                     .shopId(shopId)
                     .name(request.getName())
@@ -69,8 +65,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
             product = productRepository.save(product);
         }
 
-        // 2. Create BranchProduct
-        // Check if BranchProduct already exists for this productId and branchId
         if (branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), branchId).isPresent()) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
