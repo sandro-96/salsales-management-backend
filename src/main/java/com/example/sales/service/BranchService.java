@@ -26,10 +26,9 @@ public class BranchService {
 
     private final BranchRepository branchRepository;
     private final AuditLogService auditLogService;
-    private final ShopUserRepository shopUserRepository;
     private final MongoTemplate mongoTemplate;
 
-    public Page<BranchResponse> getAll(String userId, String shopId, Boolean active, String keyword, Pageable pageable) {
+    public Page<BranchResponse> getAll(String shopId, Boolean active, String keyword, Pageable pageable) {
         Query query = new Query();
         query.addCriteria(Criteria.where("shopId").is(shopId).and("deleted").is(false));
 

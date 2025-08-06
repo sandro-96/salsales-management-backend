@@ -15,7 +15,6 @@ import java.util.Set;
 public class PermissionChecker {
 
     private final ShopUserRepository shopUserRepository;
-    private final BranchRepository branchRepository;
 
     public boolean hasRole(String shopId, String userId, ShopRole... roles) {
         Set<ShopRole> allowed = Set.of(roles);

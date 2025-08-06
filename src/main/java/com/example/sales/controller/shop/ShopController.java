@@ -35,7 +35,6 @@ import org.springframework.web.multipart.MultipartFile;
 public class ShopController {
 
     private final ShopService shopService;
-    private final ShopCache shopCache;
     private final ShopUserService shopUserService;
     private final FileUploadService fileUploadService;
 
@@ -88,7 +87,7 @@ public class ShopController {
         if (file != null && !file.isEmpty()) {
             logoUrl = fileUploadService.upload(file);
         }
-        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.updateShop(shopId, request, user, logoUrl));
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.updateShopById(shopId, request, user, logoUrl));
     }
 
     @GetMapping("/my")

@@ -41,14 +41,13 @@ public class BranchController {
             @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
     })
     public ApiResponseDto<Page<BranchResponse>> getAll(
-            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam(required = false) @Parameter(description = "Trạng thái hoạt động của chi nhánh") Boolean active,
             @RequestParam(required = false) @Parameter(description = "Từ khóa tìm kiếm theo tên hoặc địa chỉ") String keyword,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
 
         return ApiResponseDto.success(ApiCode.SUCCESS,
-                branchService.getAll(user.getId(), shopId, active, keyword, pageable));
+                branchService.getAll(shopId, active, keyword, pageable));
     }
 
     //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})

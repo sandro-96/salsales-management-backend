@@ -41,7 +41,7 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (!isInventoryManagementRequired(shopId)) {
+        if (isInventoryManagementRequired(shopId)) {
             log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác nhập.", shopId);
             return -1;
         }
@@ -76,7 +76,7 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (!isInventoryManagementRequired(shopId)) {
+        if (isInventoryManagementRequired(shopId)) {
             log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác xuất.", shopId);
             return -1;
         }
@@ -117,7 +117,7 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (!isInventoryManagementRequired(shopId)) {
+        if (isInventoryManagementRequired(shopId)) {
             log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác điều chỉnh.", shopId);
             return -1;
         }
@@ -159,7 +159,7 @@ public class InventoryServiceImpl implements InventoryService {
     public boolean isInventoryManagementRequired(String shopId) {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-        return shop.getType().isTrackInventory(); // Ví dụ: Cửa hàng dịch vụ không quản lý tồn kho
+        return !shop.getType().isTrackInventory(); // Ví dụ: Cửa hàng dịch vụ không quản lý tồn kho
     }
 
     private BranchProduct findBranchProduct(String shopId, String branchId, String branchProductId) {
@@ -186,6 +186,9 @@ public class InventoryServiceImpl implements InventoryService {
                 .referenceId(referenceId)
                 .build();
         inventoryTransactionRepository.save(transaction);
+        auditLogService.log(userId, shopId, branchProductId, "INVENTORY_TRANSACTION", type.name(),
+                String.format("Giao dịch tồn kho: %s - %s, Số lượng: %d, Tồn kho hiện tại: %d, Ghi chú: %s, Tham chiếu: %s",
+                        productName, type.name(), quantity, currentStock, note, referenceId));
     }
 
     private InventoryTransactionResponse mapToInventoryTransactionResponse(InventoryTransaction transaction) {

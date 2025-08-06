@@ -61,7 +61,6 @@ public class PermissionUtils {
             case STAFF -> merge(
                     Set.of(ORDER_CREATE, ORDER_UPDATE, CUSTOMER_VIEW), COMMON_VIEW
             );
-            default -> Set.of();
         };
     }
 

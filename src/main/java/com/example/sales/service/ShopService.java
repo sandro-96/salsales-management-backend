@@ -79,7 +79,7 @@ public class ShopService extends BaseService {
         return savedShop;
     }
 
-    public Shop updateShop(String shopId, ShopRequest request, CustomUserDetails user, String logoUrl) {
+    public Shop updateShopById(String shopId, ShopRequest request, CustomUserDetails user, String logoUrl) {
         Shop shop = shopCache.getShopById(shopId);
 
         shop.setName(request.getName());
@@ -93,7 +93,7 @@ public class ShopService extends BaseService {
         }
 
         Shop saved = shopRepository.save(shop);
-        auditLogService.log(null, saved.getId(), saved.getId(), "SHOP", "UPDATED",
+        auditLogService.log(user.getId(), saved.getId(), saved.getId(), "SHOP", "UPDATED",
                 String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
         return saved;
     }
