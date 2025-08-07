@@ -41,6 +41,7 @@ public class BranchController {
             @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
     })
     public ApiResponseDto<Page<BranchResponse>> getAll(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam(required = false) @Parameter(description = "Trạng thái hoạt động của chi nhánh") Boolean active,
             @RequestParam(required = false) @Parameter(description = "Từ khóa tìm kiếm theo tên hoặc địa chỉ") String keyword,

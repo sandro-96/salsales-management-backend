@@ -46,12 +46,12 @@ public class PermissionUtils {
     public static Set<Permission> getDefaultPermissions(ShopRole role) {
         return switch (role) {
             case OWNER -> merge(
-                    PRODUCT_BASE, ORDER_PERMS, CUSTOMER_FULL, SHOP_FULL,
+                    PRODUCT_BASE, ORDER_PERMS, CUSTOMER_FULL, SHOP_FULL, COMMON_VIEW,
                     Set.of(BRANCH_UPDATE, SHOP_MANAGE, REPORT_VIEW, BRANCH_MANAGE, INVENTORY_MANAGE, INVENTORY_VIEW),
                     PROMOTION_FULL, TABLE_FULL, SHOP_USER_FULL
             );
             case MANAGER -> merge(
-                    PRODUCT_BASE, ORDER_PERMS, CUSTOMER_FULL,
+                    PRODUCT_BASE, ORDER_PERMS, CUSTOMER_FULL, COMMON_VIEW,
                     Set.of(SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_VIEW, BRANCH_VIEW, REPORT_VIEW, INVENTORY_MANAGE, INVENTORY_VIEW, SHOP_UPDATE, SHOP_VIEW, BRANCH_MANAGE),
                     PROMOTION_FULL, TABLE_FULL
             );
