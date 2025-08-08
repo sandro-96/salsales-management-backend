@@ -1,4 +1,3 @@
-// File: src/main/java/com/example/sales/service/FileUploadService.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
@@ -19,8 +18,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FileUploadService {
 
-    @Value("${app.upload.temp-dir:uploads/temp/}")
-    private String tempDir;
+    @Value("${app.upload.base-dir}")
+    private String baseDir;
+
+    @Value("${app.upload.public-url:/uploads/}")
+    private String publicUrl;
 
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
     private static final List<String> ALLOWED_MIME_TYPES = List.of(
@@ -29,38 +31,27 @@ public class FileUploadService {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
 
-    public String upload(MultipartFile file) {
+    public String uploadTemp(MultipartFile file) {
+        return upload(file, "temp");
+    }
+
+    public String upload(MultipartFile file, String folder) {
         try {
-            log.info("Bắt đầu upload file: tên gốc = {}", file.getOriginalFilename());
-
-            if (file.isEmpty()) {
-                throw new BusinessException(ApiCode.VALIDATION_ERROR);
-            }
-
-            if (file.getSize() > MAX_FILE_SIZE) {
-                throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
-            }
+            if (file.isEmpty()) throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            if (file.getSize() > MAX_FILE_SIZE) throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
 
             String contentType = file.getContentType();
-            if (!ALLOWED_MIME_TYPES.contains(contentType)) {
-                throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
-            }
+            if (!ALLOWED_MIME_TYPES.contains(contentType)) throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
 
-            // Tạo tên file ngẫu nhiên
             String filename = UUID.randomUUID() + "_" + sanitize(file.getOriginalFilename());
 
-            // Đường dẫn thư mục uploads/temp/
-            Path uploadPath = Path.of(tempDir).toAbsolutePath();
+            Path uploadPath = Path.of(baseDir, folder).toAbsolutePath();
             Files.createDirectories(uploadPath);
-            log.debug("Thư mục upload: {}", uploadPath);
 
-            // Ghi file vào disk
             Path filePath = uploadPath.resolve(filename);
-            file.transferTo(filePath);
-            log.info("File đã được lưu tại: {}", filePath);
+            file.transferTo(filePath.toFile());
 
-            // Trả về URL public
-            return "/uploads/temp/" + filename;
+            return publicUrl + folder + "/" + filename;
 
         } catch (BusinessException e) {
             throw e;
@@ -70,43 +61,30 @@ public class FileUploadService {
         }
     }
 
-    // Dọn tên file cho an toàn
-    private String sanitize(String original) {
-        String sanitized = original.replaceAll("[^a-zA-Z0-9._-]", "_");
-        log.debug("Sanitize tên file: {} -> {}", original, sanitized);
-        return sanitized;
-    }
-
-    public String moveToProduct(String imageUrl) {
+    public String move(String imageUrl, String targetFolder) {
         try {
-            log.info("Di chuyển file từ temp sang product: {}", imageUrl);
-
-            // Chỉ xử lý nếu là ảnh trong uploads/temp
-            if (imageUrl == null || !imageUrl.startsWith("/uploads/temp/")) {
-                log.warn("Bỏ qua file không thuộc temp: {}", imageUrl);
-                return imageUrl; // đã là ảnh final hoặc ảnh CDN thì bỏ qua
+            if (imageUrl == null || !imageUrl.startsWith(publicUrl + "temp/")) {
+                return imageUrl;
             }
 
             String filename = Path.of(imageUrl).getFileName().toString();
+            Path sourcePath = Path.of(baseDir, "temp", filename).toAbsolutePath();
+            Path targetDir = Path.of(baseDir, targetFolder).toAbsolutePath();
+            Files.createDirectories(targetDir);
 
-            Path tempPath = Path.of(tempDir).resolve(filename).toAbsolutePath();
-            Path productDir = Path.of("uploads/product").toAbsolutePath();
-            Files.createDirectories(productDir);
-            Path targetPath = productDir.resolve(filename);
-
-            if (Files.exists(tempPath)) {
-                Files.move(tempPath, targetPath);
-                log.info("Đã chuyển file: {} -> {}", tempPath, targetPath);
-            } else {
-                log.warn("File không tồn tại tại tempPath: {}", tempPath);
+            Path targetPath = targetDir.resolve(filename);
+            if (Files.exists(sourcePath)) {
+                Files.move(sourcePath, targetPath);
             }
 
-            return "/uploads/product/" + filename;
+            return publicUrl + targetFolder + "/" + filename;
 
         } catch (Exception e) {
-            log.error("Lỗi khi di chuyển ảnh từ temp sang product", e);
-            throw new RuntimeException("Không thể chuyển ảnh từ temp sang product", e);
+            throw new RuntimeException("Không thể di chuyển file", e);
         }
     }
 
+    private String sanitize(String original) {
+        return original.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
 }

@@ -40,28 +40,29 @@ public class AuthService {
     private String verifyUrl;
 
     public void register(RegisterRequest request) {
-        if (userRepository.findByEmailAndDeletedFalse(request.getEmail()).isPresent()) {
-            throw new BusinessException(ApiCode.EMAIL_EXISTS);
+        Optional<User> existingUserOpt = userRepository.findByEmailAndDeletedFalse(request.getEmail());
+
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            if (existingUser.isVerified()) {
+                throw new BusinessException(ApiCode.EMAIL_EXISTS);
+            } else {
+                // Nếu chưa xác thực → cập nhật lại token + expiry, gửi lại email
+                String token = UUID.randomUUID().toString();
+                existingUser.setVerificationToken(token);
+                existingUser.setVerificationExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000));
+                existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+                userRepository.save(existingUser);
+
+                String verifyLink = verifyUrl + "?token=" + token;
+                String html = "<p>Xin chào,</p>" +
+                        "<p>Vui lòng xác thực tài khoản của bạn bằng cách nhấn vào liên kết bên dưới:</p>" +
+                        "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
+                        "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
+
+                mailService.send(existingUser.getEmail(), "Xác thực tài khoản - Sandro Sales", html);
+            }
         }
-
-        User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        String token = UUID.randomUUID().toString();
-        user.setVerificationToken(token);
-        user.setVerificationExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000));
-        user.setVerified(false);
-
-        userRepository.save(user);
-
-        String verifyLink = verifyUrl + "?token=" + token;
-        String html = "<p>Xin chào,</p>" +
-                "<p>Vui lòng xác thực tài khoản của bạn bằng cách nhấn vào liên kết bên dưới:</p>" +
-                "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
-                "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
-
-        mailService.send(user.getEmail(), "Xác thực tài khoản - Sandro Sales", html);
     }
 
 

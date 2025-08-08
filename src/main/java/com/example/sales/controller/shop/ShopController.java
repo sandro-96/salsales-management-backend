@@ -49,7 +49,8 @@ public class ShopController {
                                        @RequestPart(value = "file", required = false) MultipartFile file) {
         String logoUrl = null;
         if (file != null && !file.isEmpty()) {
-            logoUrl = fileUploadService.upload(file);
+            logoUrl = fileUploadService.uploadTemp(file);
+            logoUrl = fileUploadService.move(logoUrl, "shop");
         }
         return ApiResponseDto.success(ApiCode.SUCCESS, shopService.createShop(user.getId(), request, logoUrl));
     }
@@ -84,7 +85,8 @@ public class ShopController {
     {
         String logoUrl = null;
         if (file != null && !file.isEmpty()) {
-            logoUrl = fileUploadService.upload(file);
+            logoUrl = fileUploadService.uploadTemp(file);
+            logoUrl = fileUploadService.move(logoUrl, "shop");
         }
         return ApiResponseDto.success(ApiCode.SUCCESS, shopService.updateShopById(shopId, request, user, logoUrl));
     }
