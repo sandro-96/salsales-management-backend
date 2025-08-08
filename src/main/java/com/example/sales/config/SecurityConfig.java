@@ -42,7 +42,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/ws/**", // ← thêm dòng này
+                                "/ws/**",
+                                "/uploads/**",
                                 "/api/auth/**", "/api/webhook/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
