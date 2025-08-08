@@ -28,6 +28,8 @@ public class FileUploadService {
     private static final List<String> ALLOWED_MIME_TYPES = List.of(
             "image/jpeg",
             "image/png",
+            "image/jpg",
+            "image/webp",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
 
