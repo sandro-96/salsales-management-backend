@@ -169,7 +169,6 @@ public class ShopUserService extends BaseService {
                 .id(su.getId())
                 .userId(su.getUserId())
                 .fullName(userMap.getOrDefault(su.getUserId(), new User()).getFullName())
-                .cname(userMap.getOrDefault(su.getUserId(), new User()).getCname())
                 .address(userMap.getOrDefault(su.getUserId(), new User()).getAddress())
                 .email(userMap.getOrDefault(su.getUserId(), new User()).getEmail())
                 .phone(userMap.getOrDefault(su.getUserId(), new User()).getPhone())

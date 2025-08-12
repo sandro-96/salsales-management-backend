@@ -47,6 +47,18 @@ public class AuthController {
         return ApiResponseDto.success(ApiCode.SUCCESS, token);
     }
 
+    @PostMapping("/login/google")
+    @Operation(summary = "Đăng nhập bằng Google", description = "Xác thực người dùng qua Google ID token và trả về token JWT.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đăng nhập Google thành công"),
+            @ApiResponse(responseCode = "400", description = "ID token không hợp lệ")
+    })
+    public ApiResponseDto<JwtResponse> loginWithGoogle(
+            @RequestBody @Valid @Parameter(description = "Google ID token") GoogleLoginRequest request) {
+        JwtResponse token = authService.loginWithGoogle(request);
+        return ApiResponseDto.success(ApiCode.SUCCESS, token);
+    }
+
     @PostMapping("/forgot-password")
     @Operation(summary = "Quên mật khẩu", description = "Gửi email chứa liên kết đặt lại mật khẩu.")
     @ApiResponses({

@@ -1,10 +1,11 @@
-// File: src/main/java/com/example/sales/service/AuthService.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.UserRole;
 import com.example.sales.constant.WebSocketMessageType;
 import com.example.sales.dto.JwtResponse;
 import com.example.sales.dto.LoginRequest;
+import com.example.sales.dto.GoogleLoginRequest;
 import com.example.sales.dto.RegisterRequest;
 import com.example.sales.dto.websocket.WebSocketMessage;
 import com.example.sales.exception.BusinessException;
@@ -12,6 +13,10 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.security.JwtUtil;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,10 +24,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -33,16 +36,22 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
     private final TokenService tokenService;
+    private final AuditLogService auditLogService;
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
     @Value("${app.frontend.verify-url}")
     private String verifyUrl;
 
+    @Value("${app.reset-token.expiry-minutes}")
+    private long resetTokenExpiryMinutes;
+
+    @Value("${app.google.client-id}")
+    private String googleClientId;
+
     public void register(RegisterRequest request) {
         Optional<User> existingUserOpt = userRepository.findByEmailAndDeletedFalse(request.getEmail());
         String token = UUID.randomUUID().toString();
-        Date expiry = new Date(System.currentTimeMillis() + 15 * 60 * 1000);
 
         User user;
         if (existingUserOpt.isPresent()) {
@@ -61,7 +70,7 @@ public class AuthService {
             // Set other fields from RegisterRequest as needed
         }
         user.setVerificationToken(token);
-        user.setVerificationExpiry(expiry);
+        user.setVerificationExpiry(Instant.now().plusSeconds(resetTokenExpiryMinutes * 60));
         userRepository.save(user);
 
         String verifyLink = verifyUrl + "?token=" + token;
@@ -72,7 +81,6 @@ public class AuthService {
 
         mailService.send(user.getEmail(), "Xác thực tài khoản - Sandro Sales", html);
     }
-
 
     public JwtResponse login(LoginRequest request) {
         User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
@@ -86,7 +94,59 @@ public class AuthService {
         }
         String accessToken = jwtUtil.generateToken(user);
         String refreshToken = tokenService.createRefreshToken(user).getToken();
+        user.setLastLoginAt(Instant.now());
+        userRepository.save(user);
         return new JwtResponse(accessToken, refreshToken);
+    }
+
+    public JwtResponse loginWithGoogle(GoogleLoginRequest request) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken idToken = verifier.verify(request.getIdToken());
+            if (idToken == null) {
+                throw new BusinessException(ApiCode.INVALID_TOKEN);
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String googleId = payload.getSubject();
+            String email = payload.getEmail();
+            String firstName = (String) payload.get("given_name");
+            String lastName = (String) payload.get("family_name");
+
+            Optional<User> existingUserOpt = userRepository.findByGoogleIdAndDeletedFalse(googleId);
+            User user;
+
+            if (existingUserOpt.isPresent()) {
+                user = existingUserOpt.get();
+            } else {
+                existingUserOpt = userRepository.findByEmailAndDeletedFalse(email);
+                if (existingUserOpt.isPresent()) {
+                    user = existingUserOpt.get();
+                    user.setGoogleId(googleId);
+                } else {
+                    user = new User();
+                    user.setEmail(email);
+                    user.setGoogleId(googleId);
+                    user.setFirstName(firstName);
+                    user.setLastName(lastName);
+                    user.setVerified(true);
+                    user.setRole(UserRole.ROLE_USER);
+                }
+                user.setPassword(null);
+                userRepository.save(user);
+            }
+
+            String accessToken = jwtUtil.generateToken(user);
+            String refreshToken = tokenService.createRefreshToken(user).getToken();
+            user.setLastLoginAt(Instant.now());
+            userRepository.save(user);
+            return new JwtResponse(accessToken, refreshToken);
+        } catch (Exception e) {
+            throw new BusinessException(ApiCode.INVALID_TOKEN);
+        }
     }
 
     public void forgotPassword(String email) {
@@ -95,7 +155,7 @@ public class AuthService {
 
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
-        user.setResetTokenExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000)); // 15 phút
+        user.setResetTokenExpiry(Instant.now().plusSeconds(resetTokenExpiryMinutes * 60));
         userRepository.save(user);
 
         System.out.println("Gửi email tới " + email + ": Token đặt lại mật khẩu: " + token);
@@ -112,7 +172,7 @@ public class AuthService {
         // Tạo token mới và cập nhật expiry
         String newToken = UUID.randomUUID().toString();
         user.setVerificationToken(newToken);
-        user.setVerificationExpiry(new Date(System.currentTimeMillis() + 15 * 60 * 1000));
+        user.setVerificationExpiry(Instant.now().plusSeconds(resetTokenExpiryMinutes * 60));
 
         userRepository.save(user);
 
@@ -138,7 +198,7 @@ public class AuthService {
             throw new BusinessException(ApiCode.ALREADY_VERIFIED);
         }
 
-        if (user.getVerificationExpiry().before(new Date())) {
+        if (user.getVerificationExpiry() == null || user.getVerificationExpiry().isBefore(Instant.now())) {
             throw new BusinessException(ApiCode.TOKEN_EXPIRED);
         }
 
@@ -157,5 +217,4 @@ public class AuthService {
                 )
         );
     }
-
 }

@@ -5,8 +5,11 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.ChangePasswordRequest;
 import com.example.sales.dto.UpdateProfileRequest;
+import com.example.sales.dto.shop.ShopRequest;
+import com.example.sales.dto.user.UserResponse;
 import com.example.sales.model.User;
 import com.example.sales.security.CustomUserDetails;
+import com.example.sales.service.FileUploadService;
 import com.example.sales.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/user")
@@ -25,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final FileUploadService fileUploadService;
 
     @GetMapping("/me")
     @Operation(summary = "Lấy thông tin người dùng hiện tại", description = "Trả về thông tin chi tiết của người dùng đang đăng nhập.")
@@ -32,22 +37,29 @@ public class UserController {
             @ApiResponse(responseCode = "200", description = "Lấy thông tin thành công"),
             @ApiResponse(responseCode = "401", description = "Chưa xác thực hoặc token không hợp lệ")
     })
-    public ApiResponseDto<User> getCurrentUser(
+    public ApiResponseDto<UserResponse> getCurrentUser(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
         return ApiResponseDto.success(ApiCode.USER_INFO, userService.getCurrentUser(user.getId()));
     }
 
-    @PutMapping("/update-profile")
-    @Operation(summary = "Cập nhật thông tin người dùng", description = "Cập nhật họ tên, số điện thoại và loại hình kinh doanh của người dùng.")
+    @PutMapping(path = "/update-profile", consumes = "multipart/form-data")
+    @Operation(summary = "Cập nhật thông tin người dùng", description = "Cập nhật thông tin hồ sơ của người dùng bao gồm họ, tên, tên đệm, số điện thoại, địa chỉ, thành phố, bang/tỉnh, mã bưu điện, ảnh đại diện, giới tính và mã quốc gia.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
             @ApiResponse(responseCode = "401", description = "Chưa xác thực hoặc token không hợp lệ")
     })
-    public ApiResponseDto<User> updateProfile(
+    public ApiResponseDto<UserResponse> updateProfile(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
-            @RequestBody @Valid @Parameter(description = "Thông tin cập nhật hồ sơ") UpdateProfileRequest request) {
-        User updated = userService.updateProfile(user.getId(), request.getFullName(), request.getPhone(), request.getBusinessType());
+            @RequestPart("user") @Valid @Parameter(description = "Thông tin cập nhật hồ sơ") UpdateProfileRequest request,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+        String avatarUrl = null;
+        if (file != null && !file.isEmpty()) {
+            avatarUrl = fileUploadService.uploadTemp(file);
+            avatarUrl = fileUploadService.move(avatarUrl, "avatar");
+            request.setAvatarUrl(avatarUrl);
+        }
+        UserResponse updated = userService.updateProfile(user.getId(), request);
         return ApiResponseDto.success(ApiCode.USER_UPDATED, updated);
     }
 

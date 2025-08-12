@@ -34,7 +34,6 @@ public class JwtUtil {
         return Jwts.builder()
                 .setSubject(user.getId())
                 .claim("email", user.getEmail())
-                .claim("businessType", user.getBusinessType())
                 .claim("role", user.getRole().name())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))

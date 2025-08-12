@@ -1,9 +1,11 @@
 package com.example.sales.dto.shopUser;
 
+import com.example.sales.constant.Gender;
 import com.example.sales.constant.ShopRole;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
 
@@ -12,7 +14,6 @@ import java.util.Date;
 public class ShopMemberResponse {
     private String id;
     private String fullName;
-    private String cname;
     private String email;
     private String address;
     private String city;
@@ -20,8 +21,8 @@ public class ShopMemberResponse {
     private String phone;
     private String avatarUrl;
     private String userId;
-    private Date birthDate;
-    private String gender;
+    private LocalDate birthDate;
+    private Gender gender;
     private ShopRole role;
     private LocalDateTime createdAt;
 }
