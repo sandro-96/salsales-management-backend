@@ -59,16 +59,16 @@ public class AuthService {
             if (user.isVerified()) {
                 throw new BusinessException(ApiCode.EMAIL_EXISTS);
             }
-            // Update unverified user
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
         } else {
             // Create new user
             user = new User();
             user.setEmail(request.getEmail());
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
             user.setVerified(false);
-            // Set other fields from RegisterRequest as needed
+            user.setFirstName(request.getFirstName());
+            user.setLastName(request.getLastName());
+            user.setMiddleName(request.getMiddleName());
         }
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setVerificationToken(token);
         user.setVerificationExpiry(Instant.now().plusSeconds(resetTokenExpiryMinutes * 60));
         userRepository.save(user);

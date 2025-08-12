@@ -53,7 +53,7 @@ public class UserController {
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestPart("user") @Valid @Parameter(description = "Thông tin cập nhật hồ sơ") UpdateProfileRequest request,
             @RequestPart(value = "file", required = false) MultipartFile file) {
-        String avatarUrl = null;
+        String avatarUrl;
         if (file != null && !file.isEmpty()) {
             avatarUrl = fileUploadService.uploadTemp(file);
             avatarUrl = fileUploadService.move(avatarUrl, "avatar");

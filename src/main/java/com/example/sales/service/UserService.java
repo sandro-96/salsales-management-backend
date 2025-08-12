@@ -92,7 +92,9 @@ public class UserService {
             Country.fromCode(request.getCountryCode()); // Validate country code
             user.setCountryCode(request.getCountryCode());
         }
-
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
         return buildUserResponse(userRepository.save(user));
     }
 
