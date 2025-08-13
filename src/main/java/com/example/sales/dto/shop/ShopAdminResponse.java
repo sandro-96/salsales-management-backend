@@ -2,6 +2,7 @@
 package com.example.sales.dto.shop;
 
 import com.example.sales.constant.BusinessModel;
+import com.example.sales.constant.Country;
 import com.example.sales.constant.ShopType;
 import com.example.sales.constant.SubscriptionPlan;
 import lombok.Builder;
@@ -16,7 +17,7 @@ public class ShopAdminResponse {
     private String name;
     private ShopType type;
     private BusinessModel businessModel;
-    private String countryCode;
+    private Country countryCode;
     private String address;
     private String phone;
     private String logoUrl;

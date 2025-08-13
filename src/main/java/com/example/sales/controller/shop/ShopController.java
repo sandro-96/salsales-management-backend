@@ -78,7 +78,7 @@ public class ShopController {
             @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
     })
-    public ApiResponseDto<Shop> updateShopById(@AuthenticationPrincipal CustomUserDetails user,
+    public ApiResponseDto<?> updateShopById(@AuthenticationPrincipal CustomUserDetails user,
                                                @PathVariable("shopId") String shopId,
                                                @RequestPart("shop") @Valid ShopRequest request,
                                                @RequestPart(value = "file", required = false) MultipartFile file)

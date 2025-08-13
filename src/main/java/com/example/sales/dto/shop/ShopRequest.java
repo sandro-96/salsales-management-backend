@@ -2,6 +2,7 @@
 package com.example.sales.dto.shop;
 
 import com.example.sales.constant.BusinessModel;
+import com.example.sales.constant.Country;
 import com.example.sales.constant.ShopType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,5 +24,7 @@ public class ShopRequest {
 
     private String address;
 
-    private String countryCode;
+    private Country countryCode;
+
+    private boolean active = true;
 }

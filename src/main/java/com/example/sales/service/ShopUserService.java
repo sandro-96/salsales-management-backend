@@ -10,7 +10,6 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
 import com.example.sales.model.User;
-import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.repository.UserRepository;
@@ -36,7 +35,6 @@ public class ShopUserService extends BaseService {
     private final ShopUserRepository shopUserRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
-    private final BranchRepository branchRepository;
     private final ShopUserCache shopUserCache;
     private final UserRepository userRepository;
 
@@ -120,6 +118,7 @@ public class ShopUserService extends BaseService {
                             .isTrackInventory(shop.isTrackInventory())
                             .role(su.getRole())
                             .industry(shop.getType().getIndustry())
+                            .businessModel(shop.getBusinessModel())
                             .build();
                 });
     }
@@ -181,5 +180,4 @@ public class ShopUserService extends BaseService {
                 .role(su.getRole())
                 .build());
     }
-
 }

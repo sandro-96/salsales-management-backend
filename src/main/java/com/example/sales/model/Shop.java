@@ -2,6 +2,7 @@
 package com.example.sales.model;
 
 import com.example.sales.constant.BusinessModel;
+import com.example.sales.constant.Country;
 import com.example.sales.constant.ShopType;
 import com.example.sales.constant.SubscriptionPlan;
 import com.example.sales.model.base.BaseEntity;
@@ -31,7 +32,7 @@ public class Shop extends BaseEntity {
     private String address;
     private String phone;
     private String logoUrl;
-    private String countryCode;
+    private Country countryCode;
 
     @Builder.Default
     private boolean active = true;

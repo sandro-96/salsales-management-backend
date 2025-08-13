@@ -6,6 +6,7 @@ import com.example.sales.constant.*;
 import com.example.sales.dto.shop.ShopAdminResponse;
 import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.shop.ShopResponse;
+import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Branch;
 import com.example.sales.model.Shop;
@@ -80,7 +81,7 @@ public class ShopService extends BaseService {
         return savedShop;
     }
 
-    public Shop updateShopById(String shopId, ShopRequest request, CustomUserDetails user, String logoUrl) {
+    public ShopSimpleResponse updateShopById(String shopId, ShopRequest request, CustomUserDetails user, String logoUrl) {
         Shop shop = shopCache.getShopById(shopId);
 
         shop.setName(request.getName());
@@ -88,6 +89,8 @@ public class ShopService extends BaseService {
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
         shop.setCountryCode(request.getCountryCode());
+        shop.setBusinessModel(request.getBusinessModel());
+        shop.setActive(request.isActive());
 
         if (request.getBusinessModel() != null) {
             request.setBusinessModel(request.getBusinessModel());
@@ -100,7 +103,7 @@ public class ShopService extends BaseService {
         Shop saved = shopRepository.save(shop);
         auditLogService.log(user.getId(), saved.getId(), saved.getId(), "SHOP", "UPDATED",
                 String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
-        return saved;
+        return getShopSimpleResponse(saved);
     }
 
     public void deleteShop(String ownerId) {
@@ -153,5 +156,21 @@ public class ShopService extends BaseService {
                     .currency(shop.getCurrency())
                     .build();
         }
+    }
+
+    public ShopSimpleResponse getShopSimpleResponse(Shop shop) {
+        return ShopSimpleResponse.builder()
+                .id(shop.getId())
+                .name(shop.getName())
+                .type(shop.getType())
+                .logoUrl(shop.getLogoUrl())
+                .countryCode(shop.getCountryCode())
+                .address(shop.getAddress())
+                .phone(shop.getPhone())
+                .active(shop.isActive())
+                .isTrackInventory(shop.isTrackInventory())
+                .industry(shop.getType().getIndustry())
+                .businessModel(shop.getBusinessModel())
+                .build();
     }
 }

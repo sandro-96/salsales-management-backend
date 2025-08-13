@@ -1,9 +1,7 @@
 // File: src/main/java/com/example/sales/dto/shop/ShopSimpleResponse.java
 package com.example.sales.dto.shop;
 
-import com.example.sales.constant.ShopIndustry;
-import com.example.sales.constant.ShopRole;
-import com.example.sales.constant.ShopType;
+import com.example.sales.constant.*;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,11 +12,12 @@ public class ShopSimpleResponse {
     private String name;
     private ShopType type;
     private String logoUrl;
-    private String countryCode;
+    private Country countryCode;
     private String phone;
     private String address;
     private boolean active;
     private boolean isTrackInventory;
+    private BusinessModel businessModel;
     private ShopRole role;
     private ShopIndustry industry;
 }
