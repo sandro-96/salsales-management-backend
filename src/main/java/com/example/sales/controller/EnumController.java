@@ -2,6 +2,7 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.*;
 import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.dto.CountryOption;
 import com.example.sales.dto.ShopTypeOption;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +18,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class EnumController {
 
-    @GetMapping("/shop/all")
+    @GetMapping("/all")
     public ApiResponseDto<Map<String, Object>> getAllShopEnums() {
         List<ShopTypeOption> shopTypes = Arrays.stream(ShopType.values())
                 .map(ShopTypeOption::from)
@@ -30,9 +31,14 @@ public class EnumController {
                 ))
                 .toList();
 
+        List<CountryOption> countryOptions = Arrays.stream(Country.values())
+                .map(CountryOption::from)
+                .toList();
+
         return ApiResponseDto.success(ApiCode.SUCCESS, Map.of(
                 "shopTypes", shopTypes,
-                "businessModels", businessModels
+                "businessModels", businessModels,
+                "countries", countryOptions
         ));
     }
 }
