@@ -14,4 +14,5 @@ public interface BranchRepository extends MongoRepository<Branch, String> {
     Page<Branch> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
     Optional<Branch> findByIdAndDeletedFalse(String id);
     long countByShopIdAndDeletedFalse(String shopId);
+    Optional<Branch> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
 }

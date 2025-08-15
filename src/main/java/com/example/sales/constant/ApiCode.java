@@ -69,6 +69,7 @@ public enum ApiCode {
     PRODUCT_STATUS_UPDATED("4129", "Product status updated successfully"),
     PRODUCT_LOW_STOCK("4130", "Low stock products retrieved"),
     PRODUCT_SEARCH_RESULTS("4131", "Product search results retrieved"),
+    PRODUCT_EXISTS_IN_BRANCH("4132", "Product already exists in branch"),
     SHOP_NAME_EXISTS("4132", "Shop name already exists"),
     SHOP_INACTIVE("4133", "Shop is inactive"),
     INVALID_CAPACITY("4134", "Invalid capacity"),
@@ -78,7 +79,8 @@ public enum ApiCode {
     CANNOT_DELETE_ONLY_BRANCH("4138", "Cannot delete the only branch of the shop"),
     INSUFFICIENT_STOCK ("4139", "Insufficient stock for product"),
     INVALID_PHONE_NUMBER("4140", "Invalid phone number format"),
-    INVALID_CREDENTIALS("4011", "Email or password is incorrect");
+    INVALID_CREDENTIALS("4011", "Email or password is incorrect"),
+    CATEGORY_NOT_FOUND("4141", "Category not found");
 
     private final String code;
     private final String message;

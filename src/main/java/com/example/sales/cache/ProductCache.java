@@ -55,22 +55,36 @@ public class ProductCache {
     }
     private ProductResponse toResponse(BranchProduct branchProduct, Product product) {
         if (branchProduct == null || product == null) {
-            return null; // Handle cases where product might be null (e.g., deleted master product)
+            return null;
         }
         return ProductResponse.builder()
-                .id(branchProduct.getId()) // ID của BranchProduct
-                .productId(product.getId()) // ID của Master Product
+                .id(branchProduct.getId())
+                .productId(product.getId())
                 .name(product.getName())
-                .category(product.getCategory())
+                .nameTranslations(product.getNameTranslations())
+                .categoryId(product.getCategoryId())
                 .sku(product.getSku())
+                .costPrice(product.getCostPrice())
+                .defaultPrice(product.getDefaultPrice())
+                .unit(product.getUnit())
+                .description(product.getDescription())
+                .images(product.getImages())
+                .barcode(product.getBarcode())
+                .supplierId(product.getSupplierId())
+                .variants(product.getVariants())
+                .priceHistory(product.getPriceHistory())
+                .active(product.isActive())
                 .quantity(branchProduct.getQuantity())
+                .minQuantity(branchProduct.getMinQuantity())
                 .price(branchProduct.getPrice())
-                .unit(branchProduct.getUnit())
-                .imageUrl(branchProduct.getImageUrl())
-                .description(branchProduct.getDescription())
+                .branchCostPrice(branchProduct.getBranchCostPrice())
+                .discountPrice(branchProduct.getDiscountPrice())
+                .discountPercentage(branchProduct.getDiscountPercentage())
+                .expiryDate(branchProduct.getExpiryDate())
+                .branchVariants(branchProduct.getVariants())
                 .branchId(branchProduct.getBranchId())
                 .activeInBranch(branchProduct.isActiveInBranch())
-                .createdAt(branchProduct.getCreatedAt()) // createdAt/updatedAt của BranchProduct
+                .createdAt(branchProduct.getCreatedAt())
                 .updatedAt(branchProduct.getUpdatedAt())
                 .build();
     }

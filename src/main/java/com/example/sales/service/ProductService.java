@@ -20,10 +20,8 @@ public interface ProductService {
     // id ở đây là id của BranchProduct
     ProductResponse getProduct(String shopId, String branchId, String id);
 
-    // productId ở đây là id của BranchProduct để toggle activeInBranch
+    // branchProductId ở đây là id của BranchProduct để toggle activeInBranch
     ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId);
 
     List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold);
-
-    Page<ProductResponse> searchProducts(String shopId, String branchId, String keyword, Pageable pageable);
 }

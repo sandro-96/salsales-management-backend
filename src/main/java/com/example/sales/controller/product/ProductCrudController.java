@@ -1,4 +1,3 @@
-// File: src/main/java/com/example/sales/controller/product/ProductCrudController.java
 package com.example.sales.controller.product;
 
 import com.example.sales.cache.ProductCache;
@@ -24,8 +23,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Controller xử lý các thao tác CRUD cho sản phẩm tại cửa hàng và chi nhánh.
+ * Sử dụng ProductRequest/ProductResponse để quản lý thông tin chung (Product) và đặc thù (BranchProduct).
+ */
 @RestController
-@RequestMapping("/api") // Base path for more granular control with shopId/branchId
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class ProductCrudController {
 
@@ -42,7 +45,7 @@ public class ProductCrudController {
     @RequirePermission(Permission.PRODUCT_CREATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
-            @RequestParam(required = false) String branchId,
+            @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.createProduct(shopId, branchId, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
@@ -91,8 +94,7 @@ public class ProductCrudController {
     public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
-            Pageable pageable) {
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<ProductResponse> response = productCache.getAllByShop(shopId, branchId, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
     }
@@ -109,20 +111,5 @@ public class ProductCrudController {
             @Parameter(description = "ID sản phẩm (BranchProduct ID)") @PathVariable String id) {
         ProductResponse response = productService.getProduct(shopId, branchId, id);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_FOUND, response));
-    }
-
-    @Operation(summary = "Tìm kiếm sản phẩm theo từ khóa cho một cửa hàng hoặc chi nhánh")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm khớp từ khóa")
-    })
-    @GetMapping("/shops/{shopId}/products/search")
-    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> search(
-            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
-            @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
-            @Parameter(description = "Từ khóa tìm kiếm") @RequestParam String keyword,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
-            Pageable pageable) {
-        Page<ProductResponse> response = productService.searchProducts(shopId, branchId, keyword, pageable);
-        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_SEARCH_RESULTS, response));
     }
 }

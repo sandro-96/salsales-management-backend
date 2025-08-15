@@ -1,12 +1,16 @@
-// File: src/main/java/com/example/sales/model/Product.java
 package com.example.sales.model;
 
 import com.example.sales.model.base.BaseEntity;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -16,7 +20,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @AllArgsConstructor
 @NoArgsConstructor
 @Document("products")
-// Đảm bảo SKU là duy nhất trong phạm vi mỗi shop
 @CompoundIndex(def = "{'shopId': 1, 'sku': 1}", unique = true)
 public class Product extends BaseEntity {
     @Id
@@ -25,11 +28,37 @@ public class Product extends BaseEntity {
     @NotBlank(message = "Tên sản phẩm không được để trống")
     private String name;
 
-    @NotBlank(message = "Danh mục không được để trống")
-    private String category;
+    private Map<String, String> nameTranslations; // Hỗ trợ đa ngôn ngữ
+
+    private String categoryId;
 
     @NotBlank(message = "SKU không được để trống")
-    private String sku; // Mã sản phẩm SKU (duy nhất trong shop)
+    private String sku;
 
-    private String shopId; // Shop mà định nghĩa sản phẩm này thuộc về
+    @NotBlank(message = "Shop ID không được để trống")
+    private String shopId;
+
+    @DecimalMin(value = "0.0", message = "Giá nhập không được âm")
+    private double costPrice; // Giá nhập mặc định
+
+    @DecimalMin(value = "0.0", inclusive = false, message = "Giá bán mặc định phải lớn hơn 0")
+    private double defaultPrice; // Giá bán mặc định
+
+    @NotBlank(message = "Đơn vị không được để trống")
+    private String unit; // Đơn vị đo lường (kg, lít, cái, v.v.)
+
+    private String description; // Mô tả sản phẩm
+    private List<String> images; // Danh sách URL hình ảnh
+
+    @Builder.Default
+    private boolean active = true; // Trạng thái sản phẩm
+
+    private String barcode; // Mã vạch (cho bán lẻ)
+    private String supplierId; // ID nhà cung cấp
+
+    private List<ProductVariant> variants; // Biến thể sản phẩm
+    private List<PriceHistory> priceHistory; // Lịch sử giá
+
+    @DBRef
+    private Category category;
 }

@@ -63,13 +63,11 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         product = existingProduct.get();
                         // Cập nhật thông tin chung nếu có thay đổi
                         product.setName(name);
-                        product.setCategory(category);
                         productRepository.save(product);
                     } else {
                         product = Product.builder()
                                 .shopId(shopId)
                                 .name(name)
-                                .category(category)
                                 .sku(sku)
                                 .build();
                         product = productRepository.save(product);
@@ -82,9 +80,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         branchProduct = existingBranchProduct.get();
                         branchProduct.setQuantity(quantity);
                         branchProduct.setPrice(price);
-                        branchProduct.setUnit(unit);
-                        branchProduct.setImageUrl(imageUrl);
-                        branchProduct.setDescription(description);
                         branchProduct.setActiveInBranch(true); // Mặc định kích hoạt khi nhập
                         branchProductRepository.save(branchProduct);
                         log.info("Cập nhật BranchProduct cho SKU '{}' tại chi nhánh '{}'", sku, branchId);
@@ -95,9 +90,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                 .branchId(branchId)
                                 .quantity(quantity)
                                 .price(price)
-                                .unit(unit)
-                                .imageUrl(imageUrl)
-                                .description(description)
                                 .activeInBranch(true) // Mặc định kích hoạt khi nhập
                                 .build();
                         branchProductRepository.save(branchProduct);

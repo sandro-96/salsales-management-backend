@@ -72,12 +72,10 @@ public class ExcelExportService {
         Function<ProductResponse, List<String>> rowMapper = p -> List.of(
                 p.getSku(),
                 p.getName(),
-                p.getCategory(),
                 p.getBranchId(),
                 String.valueOf(p.getQuantity()),
                 String.valueOf(p.getPrice()),
                 p.getUnit(),
-                p.getImageUrl() != null ? p.getImageUrl() : "",
                 p.getDescription() != null ? p.getDescription() : "",
                 p.isActiveInBranch() ? "Có" : "Không"
         );
