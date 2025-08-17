@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -45,7 +46,7 @@ public class FileUploadService {
             String contentType = file.getContentType();
             if (!ALLOWED_MIME_TYPES.contains(contentType)) throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
 
-            String filename = UUID.randomUUID() + "_" + sanitize(file.getOriginalFilename());
+            String filename = UUID.randomUUID() + "_" + sanitize(Objects.requireNonNull(file.getOriginalFilename()));
 
             Path uploadPath = Path.of(baseDir, folder).toAbsolutePath();
             Files.createDirectories(uploadPath);

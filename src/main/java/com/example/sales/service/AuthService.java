@@ -13,20 +13,24 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.security.JwtUtil;
+import com.example.sales.util.FileUtil;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -37,6 +41,7 @@ public class AuthService {
     private final MailService mailService;
     private final TokenService tokenService;
     private final AuditLogService auditLogService;
+    private final FileUploadService fileUploadService;
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
@@ -115,6 +120,7 @@ public class AuthService {
             String email = payload.getEmail();
             String firstName = (String) payload.get("given_name");
             String lastName = (String) payload.get("family_name");
+            String avatarUrl = (String) payload.get("picture");
 
             Optional<User> existingUserOpt = userRepository.findByGoogleIdAndDeletedFalse(googleId);
             User user;
@@ -134,6 +140,14 @@ public class AuthService {
                     user.setLastName(lastName);
                     user.setVerified(true);
                     user.setRole(UserRole.ROLE_USER);
+                    try {
+                        MultipartFile avatarFile = FileUtil.downloadImageAsMultipartFile(avatarUrl, googleId);
+                        String savedAvatar = fileUploadService.uploadTemp(avatarFile);
+                        savedAvatar = fileUploadService.move(savedAvatar, "avatar");
+                        user.setAvatarUrl(savedAvatar);
+                    } catch (Exception e) {
+                        log.error("Lỗi khi tải ảnh đại diện từ Google", e);
+                    }
                 }
                 user.setPassword(null);
                 userRepository.save(user);
