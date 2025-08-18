@@ -34,9 +34,6 @@ public class ShopService extends BaseService {
         if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
             throw new BusinessException(ApiCode.SHOP_NAME_EXISTS);
         }
-        if (shopRepository.findByOwnerIdAndDeletedFalse(userId).isPresent()) {
-            throw new BusinessException(ApiCode.SHOP_ALREADY_EXISTS);
-        }
 
         Shop shop = new Shop();
         shop.setName(request.getName());
