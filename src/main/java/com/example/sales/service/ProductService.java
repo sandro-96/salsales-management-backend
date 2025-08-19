@@ -24,4 +24,6 @@ public interface ProductService {
     ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId);
 
     List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold);
+
+    String getSuggestedSku(String shopId, String industry, String categoryId);
 }

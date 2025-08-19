@@ -6,17 +6,16 @@ import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.BranchProduct;
-import com.example.sales.model.Category;
 import com.example.sales.model.Product;
 import com.example.sales.model.Shop;
 import com.example.sales.repository.BranchProductRepository;
 import com.example.sales.repository.BranchRepository;
-import com.example.sales.repository.CategoryRepository;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.AuditLogService;
 import com.example.sales.service.BaseService;
 import com.example.sales.service.ProductService;
+import com.example.sales.service.SequenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -35,9 +34,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final BranchProductRepository branchProductRepository;
     private final ShopRepository shopRepository;
     private final BranchRepository branchRepository;
-    private final CategoryRepository categoryRepository;
     private final AuditLogService auditLogService;
     private final ProductCache productCache;
+    private final SequenceService sequenceService;
 
     @Override
     public ProductResponse createProduct(String shopId, String branchId, ProductRequest request) {
@@ -51,16 +50,13 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                     .orElseThrow(() -> new BusinessException(ApiCode.BRANCH_NOT_FOUND));
         }
 
-        // Kiểm tra categoryId nếu có
-        if (StringUtils.hasText(request.getCategoryId())) {
-            categoryRepository.findByIdAndShopIdAndDeletedFalse(request.getCategoryId(), shopId)
-                    .orElseThrow(() -> new BusinessException(ApiCode.CATEGORY_NOT_FOUND));
-        }
+        String prefix = StringUtils.hasText(request.getCategory())
+                ? String.format("%s_%s", shop.getType().getIndustry().name().toUpperCase(), request.getCategory().toUpperCase())
+                : shop.getType().getIndustry().name().toUpperCase();
 
-        // Tạo hoặc cập nhật Product
         String sku = StringUtils.hasText(request.getSku())
                 ? request.getSku()
-                : UUID.randomUUID().toString();
+                : sequenceService.getNextCode(shopId, prefix, "SKU");
 
         Optional<Product> existingProduct = productRepository.findByShopIdAndSkuAndDeletedFalse(shopId, sku);
         Product product;
@@ -69,7 +65,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
             // Cập nhật thông tin chung
             product.setName(request.getName());
             product.setNameTranslations(request.getNameTranslations());
-            product.setCategoryId(request.getCategoryId());
+            product.setCategory(request.getCategory());
             product.setCostPrice(request.getCostPrice());
             product.setDefaultPrice(request.getDefaultPrice());
             product.setUnit(request.getUnit());
@@ -80,20 +76,13 @@ public class ProductServiceImpl extends BaseService implements ProductService {
             product.setVariants(request.getVariants());
             product.setPriceHistory(request.getPriceHistory());
             product.setActive(request.isActive());
-            if (StringUtils.hasText(request.getCategoryId())) {
-                Category category = categoryRepository.findById(request.getCategoryId())
-                        .orElseThrow(() -> new BusinessException(ApiCode.CATEGORY_NOT_FOUND));
-                product.setCategory(category);
-            } else {
-                product.setCategory(null);
-            }
             productRepository.save(product);
         } else {
             product = Product.builder()
                     .shopId(shopId)
                     .name(request.getName())
                     .nameTranslations(request.getNameTranslations())
-                    .categoryId(request.getCategoryId())
+                    .category(request.getCategory())
                     .sku(sku)
                     .costPrice(request.getCostPrice())
                     .defaultPrice(request.getDefaultPrice())
@@ -106,12 +95,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                     .priceHistory(request.getPriceHistory())
                     .active(request.isActive())
                     .build();
-            if (StringUtils.hasText(request.getCategoryId())) {
-                Category category = categoryRepository.findById(request.getCategoryId())
-                        .orElseThrow(() -> new BusinessException(ApiCode.CATEGORY_NOT_FOUND));
-                product.setCategory(category);
-            }
             product = productRepository.save(product);
+            sequenceService.updateNextSequence(shopId, prefix, "SKU");
         }
 
         // Tạo BranchProduct nếu có branchId
@@ -155,12 +140,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         branchRepository.findByIdAndShopIdAndDeletedFalse(branchId, shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.BRANCH_NOT_FOUND));
 
-        // Kiểm tra categoryId nếu có
-        if (StringUtils.hasText(request.getCategoryId())) {
-            categoryRepository.findByIdAndShopIdAndDeletedFalse(request.getCategoryId(), shopId)
-                    .orElseThrow(() -> new BusinessException(ApiCode.CATEGORY_NOT_FOUND));
-        }
-
         // Tìm BranchProduct
         BranchProduct branchProduct = branchProductRepository.findByIdAndShopIdAndBranchIdAndDeletedFalse(id, shopId, branchId)
                 .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
@@ -171,7 +150,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Lưu giá trị cũ cho audit log
         String oldName = product.getName();
-        String oldCategoryId = product.getCategoryId();
+        String oldCategory = product.getCategory();
         double oldPrice = branchProduct.getPrice();
         int oldQuantity = branchProduct.getQuantity();
         boolean oldActiveInBranch = branchProduct.isActiveInBranch();
@@ -182,7 +161,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Cập nhật Product
         product.setName(request.getName());
         product.setNameTranslations(request.getNameTranslations());
-        product.setCategoryId(request.getCategoryId());
+        product.setCategory(request.getCategory());
         product.setCostPrice(request.getCostPrice());
         product.setDefaultPrice(request.getDefaultPrice());
         product.setUnit(request.getUnit());
@@ -193,13 +172,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         product.setVariants(request.getVariants());
         product.setPriceHistory(request.getPriceHistory());
         product.setActive(request.isActive());
-        if (StringUtils.hasText(request.getCategoryId())) {
-            Category category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new BusinessException(ApiCode.CATEGORY_NOT_FOUND));
-            product.setCategory(category);
-        } else {
-            product.setCategory(null);
-        }
         product = productRepository.save(product);
 
         // Cập nhật BranchProduct
@@ -218,6 +190,12 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         branchProduct = branchProductRepository.save(branchProduct);
 
         // Audit log
+        auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "UPDATED",
+                String.format("Cập nhật sản phẩm '%s' (SKU: %s) tại chi nhánh %s. ID BranchProduct: %s. " +
+                                "Thông tin cũ - Tên: %s, Danh mục: %s, Giá: %.2f, Số lượng: %d, Kích hoạt: %b, Giá nhập: %.2f, Giảm giá: %.2f%%",
+                        product.getName(), product.getSku(), branchId, branchProduct.getId(),
+                        oldName, oldCategory, oldPrice, oldQuantity, oldActiveInBranch,
+                        oldBranchCostPrice, oldDiscountPercentage != null ? oldDiscountPercentage : 0.0));
         auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "UPDATED",
                 String.format("Cập nhật sản phẩm '%s' (SKU: %s) tại chi nhánh %s. ID BranchProduct: %s",
                         product.getName(), product.getSku(), branchId, branchProduct.getId()));
@@ -317,6 +295,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public String getSuggestedSku(String shopId, String industry, String categoryId) {
+        String prefix = StringUtils.hasText(categoryId)
+                ? String.format("%s_%s", industry.toUpperCase(), categoryId.toUpperCase())
+                : industry.toUpperCase();
+        return sequenceService.getNextCode(shopId, prefix, "SKU");
+    }
+
     public ProductResponse toResponse(BranchProduct branchProduct, Product product) {
         if (branchProduct == null && product == null) {
             return null;
@@ -327,7 +313,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                     .productId(product.getId())
                     .name(product.getName())
                     .nameTranslations(product.getNameTranslations())
-                    .categoryId(product.getCategoryId())
+                    .category(product.getCategory())
                     .sku(product.getSku())
                     .costPrice(product.getCostPrice())
                     .defaultPrice(product.getDefaultPrice())
@@ -349,7 +335,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .productId(product.getId())
                 .name(product.getName())
                 .nameTranslations(product.getNameTranslations())
-                .categoryId(product.getCategoryId())
+                .category(product.getCategory())
                 .sku(product.getSku())
                 .costPrice(product.getCostPrice())
                 .defaultPrice(product.getDefaultPrice())

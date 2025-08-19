@@ -62,7 +62,7 @@ public class ProductCache {
                 .productId(product.getId())
                 .name(product.getName())
                 .nameTranslations(product.getNameTranslations())
-                .categoryId(product.getCategoryId())
+                .category(product.getCategory())
                 .sku(product.getSku())
                 .costPrice(product.getCostPrice())
                 .defaultPrice(product.getDefaultPrice())

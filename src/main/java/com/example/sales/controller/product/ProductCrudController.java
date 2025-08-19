@@ -112,4 +112,18 @@ public class ProductCrudController {
         ProductResponse response = productService.getProduct(shopId, branchId, id);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_FOUND, response));
     }
+
+    @Operation(summary = "Lấy mã gợi ý cho sản phẩm (SKU)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trả về mã gợi ý"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
+    })
+    @GetMapping("/shops/{shopId}/suggested-sku")
+    public ResponseEntity<ApiResponseDto<String>> getSuggestedSku(
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "Ngành hàng") @RequestParam String industry,
+            @Parameter(description = "ID danh mục") @RequestParam String categoryId) {
+        String suggestedCode = productService.getSuggestedSku(shopId, industry, categoryId);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.SUCCESS, suggestedCode));
+    }
 }

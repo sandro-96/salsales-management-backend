@@ -30,7 +30,7 @@ public class Product extends BaseEntity {
 
     private Map<String, String> nameTranslations; // Hỗ trợ đa ngôn ngữ
 
-    private String categoryId;
+    private String category;
 
     @NotBlank(message = "SKU không được để trống")
     private String sku;
@@ -58,7 +58,4 @@ public class Product extends BaseEntity {
 
     private List<ProductVariant> variants; // Biến thể sản phẩm
     private List<PriceHistory> priceHistory; // Lịch sử giá
-
-    @DBRef
-    private Category category;
 }

@@ -32,7 +32,7 @@ public class ProductResponse {
     // Các trường từ Product (định nghĩa chung)
     private String name;
     private Map<String, String> nameTranslations;
-    private String categoryId;
+    private String category;
     private String sku;
     private double costPrice;
     private double defaultPrice;

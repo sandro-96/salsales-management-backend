@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * DTO dùng để tạo hoặc cập nhật thông tin sản phẩm tại một chi nhánh cụ thể.
- * Các trường như name, categoryId, sku, costPrice, defaultPrice, unit, description, images, barcode, supplierId, variants, recipe, priceHistory sẽ ảnh hưởng đến định nghĩa sản phẩm chung (Product).
+ * Các trường như name, category, sku, costPrice, defaultPrice, unit, description, images, barcode, supplierId, variants, recipe, priceHistory sẽ ảnh hưởng đến định nghĩa sản phẩm chung (Product).
  * Các trường như price, quantity, branchCostPrice, discountPrice, discountPercentage, expiryDate, minQuantity, active sẽ ảnh hưởng đến BranchProduct.
  */
 @Data
@@ -33,7 +33,7 @@ public class ProductRequest {
 
     private Map<String, String> nameTranslations; // Hỗ trợ đa ngôn ngữ
 
-    private String categoryId; // Thay vì category string, sử dụng ID tham chiếu đến Category (tùy chọn)
+    private String category;
 
     @NotBlank(message = "SKU không được để trống")
     private String sku; // SKU là duy nhất trong phạm vi shop, dùng để tìm/tạo Product chính
