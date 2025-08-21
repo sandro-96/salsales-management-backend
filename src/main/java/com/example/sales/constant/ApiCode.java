@@ -80,7 +80,8 @@ public enum ApiCode {
     INSUFFICIENT_STOCK ("4139", "Insufficient stock for product"),
     INVALID_PHONE_NUMBER("4140", "Invalid phone number format"),
     INVALID_CREDENTIALS("4011", "Email or password is incorrect"),
-    CATEGORY_NOT_FOUND("4141", "Category not found");
+    CATEGORY_NOT_FOUND("4141", "Category not found"),
+    BARCODE_EXISTS("4142", "Barcode already exists");
 
     private final String code;
     private final String message;

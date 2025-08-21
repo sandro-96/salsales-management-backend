@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -15,4 +16,5 @@ public interface BranchRepository extends MongoRepository<Branch, String> {
     Optional<Branch> findByIdAndDeletedFalse(String id);
     long countByShopIdAndDeletedFalse(String shopId);
     Optional<Branch> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
+    List<Branch> findAllByShopIdAndDeletedFalse(String shopId);
 }

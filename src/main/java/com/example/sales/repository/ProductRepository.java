@@ -16,6 +16,9 @@ public interface ProductRepository extends MongoRepository<Product, String> {
     // Tìm Product theo ShopId và SKU
     Optional<Product> findByShopIdAndSkuAndDeletedFalse(String shopId, String sku);
 
+    // Tìm Product theo ShopId và Barcode
+    Optional<Product> findByShopIdAndBarcodeAndDeletedFalse(String shopId, String barcode);
+
     // Kiểm tra sự tồn tại của Product theo ShopId và SKU
     boolean existsByShopIdAndSkuAndDeletedFalse(String shopId, String sku);
 

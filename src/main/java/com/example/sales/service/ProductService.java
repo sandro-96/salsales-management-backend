@@ -3,16 +3,14 @@ package com.example.sales.service;
 
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
 public interface ProductService {
-    ProductResponse createProduct(String shopId, String branchId, ProductRequest request);
+    ProductResponse createProduct(String shopId, List<String> branchIds, ProductRequest request);
 
     // id ở đây là id của BranchProduct
-    ProductResponse updateProduct(String userId, String shopId, String branchId, String id, ProductRequest request);
+    ProductResponse updateProduct(String userId, String shopId, List<String> branchIds, String id, ProductRequest request);
 
     // id ở đây là id của BranchProduct
     void deleteProduct(String userId, String shopId, String branchId, String id);
@@ -25,5 +23,7 @@ public interface ProductService {
 
     List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold);
 
-    String getSuggestedSku(String shopId, String industry, String categoryId);
+    String getSuggestedSku(String shopId, String industry, String category);
+
+    String getSuggestedBarcode(String shopId, String industry, String category);
 }

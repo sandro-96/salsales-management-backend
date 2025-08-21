@@ -3,6 +3,7 @@ package com.example.sales.model;
 import com.example.sales.model.base.BaseEntity;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -21,6 +22,7 @@ import java.util.Map;
 @NoArgsConstructor
 @Document("products")
 @CompoundIndex(def = "{'shopId': 1, 'sku': 1}", unique = true)
+@CompoundIndex(def = "{'shopId': 1, 'barcode': 1}", unique = true)
 public class Product extends BaseEntity {
     @Id
     private String id;
@@ -33,6 +35,7 @@ public class Product extends BaseEntity {
     private String category;
 
     @NotBlank(message = "SKU không được để trống")
+    @Pattern(regexp = "^[A-Z0-9_]*$", message = "SKU chỉ chứa chữ in hoa, số và dấu _")
     private String sku;
 
     @NotBlank(message = "Shop ID không được để trống")
@@ -53,6 +56,7 @@ public class Product extends BaseEntity {
     @Builder.Default
     private boolean active = true; // Trạng thái sản phẩm
 
+    @Pattern(regexp = "^([A-Z0-9_]*|[0-9]{12,13})$", message = "Barcode phải là chữ in hoa, số, dấu _ hoặc 12-13 chữ số")
     private String barcode; // Mã vạch (cho bán lẻ)
     private String supplierId; // ID nhà cung cấp
 
