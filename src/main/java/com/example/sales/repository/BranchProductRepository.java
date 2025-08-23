@@ -40,4 +40,6 @@ public interface BranchProductRepository extends MongoRepository<BranchProduct, 
     Page<BranchProduct> findByProductIdInAndShopIdAndDeletedFalse(Set<String> productIds, String shopId, Pageable pageable);
 
     List<BranchProduct> findByProductIdAndBranchIdInAndDeletedFalse(String productId, List<String> branchIds);
+
+    Optional<BranchProduct> findByIdAndDeletedFalse(String id);
 }

@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Controller xử lý các thao tác CRUD cho sản phẩm tại cửa hàng và chi nhánh.
- * Sử dụng ProductRequest/ProductResponse để quản lý thông tin chung (Product) và đặc thù (BranchProduct).
+ * Controller xử lý CRUD cho sản phẩm tại shop và chi nhánh.
+ * Hỗ trợ tạo sản phẩm từ shop (với tùy chọn branchIds) hoặc từ chi nhánh (tạo Product và BranchProduct).
  */
 @RestController
 @RequestMapping("/api")
@@ -53,6 +53,23 @@ public class ProductCrudController {
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
+    @Operation(summary = "Tạo sản phẩm mới từ chi nhánh (tạo Product cho shop và BranchProduct cho chi nhánh)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tạo sản phẩm thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền tạo"),
+            @ApiResponse(responseCode = "404", description = "Chi nhánh không tồn tại")
+    })
+    @PostMapping("/shops/{shopId}/branches/{branchId}/products")
+    @RequirePermission(Permission.PRODUCT_CREATE)
+    public ResponseEntity<ApiResponseDto<ProductResponse>> createFromBranch(
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "ID chi nhánh") @PathVariable String branchId,
+            @Valid @RequestBody ProductRequest request) {
+        ProductResponse response = productService.createBranchProduct(shopId, branchId, request);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
+    }
+
     @Operation(summary = "Cập nhật sản phẩm tại một cửa hàng và các chi nhánh cụ thể")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật sản phẩm thành công"),
@@ -64,7 +81,7 @@ public class ProductCrudController {
     @RequirePermission(Permission.PRODUCT_UPDATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> update(
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
-            @Parameter(description = "ID sản phẩm") @PathVariable String id,
+            @Parameter(description = "ID sản phẩm (BranchProduct ID)") @PathVariable String id,
             @Parameter(description = "Danh sách ID chi nhánh (tùy chọn)") @RequestParam(required = false) List<String> branchIds,
             @Valid @RequestBody ProductRequest request,
             @Parameter(hidden = true) @RequestHeader("X-User-Id") String userId) {
@@ -116,6 +133,23 @@ public class ProductCrudController {
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_FOUND, response));
     }
 
+    @Operation(summary = "Bật/tắt trạng thái active của sản phẩm tại chi nhánh")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật trạng thái thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật")
+    })
+    @PatchMapping("/shops/{shopId}/branches/{branchId}/products/{branchProductId}/toggle-active")
+    @RequirePermission(Permission.PRODUCT_UPDATE)
+    public ResponseEntity<ApiResponseDto<ProductResponse>> toggleActive(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "ID chi nhánh") @PathVariable String branchId,
+            @Parameter(description = "ID BranchProduct") @PathVariable String branchProductId) {
+        ProductResponse response = productService.toggleActive(user.getId(), shopId, branchId, branchProductId);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_UPDATED, response));
+    }
+
     @Operation(summary = "Lấy mã gợi ý cho sản phẩm (SKU)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trả về mã gợi ý"),
@@ -130,15 +164,16 @@ public class ProductCrudController {
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.SUCCESS, suggestedCode));
     }
 
-    @Operation (summary = "Lấy mã vạch gợi ý cho sản phẩm")
+    @Operation(summary = "Lấy mã vạch gợi ý cho sản phẩm")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trả về mã vạch gợi ý"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
     })
     @GetMapping("/shops/{shopId}/suggested-barcode")
-    public ResponseEntity<ApiResponseDto<String>> getSuggestedBarcode(@PathVariable String shopId,
-                                                      @RequestParam String industry,
-                                                      @RequestParam String category) {
+    public ResponseEntity<ApiResponseDto<String>> getSuggestedBarcode(
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "Ngành hàng") @RequestParam String industry,
+            @Parameter(description = "ID danh mục") @RequestParam String category) {
         String suggestedCode = productService.getSuggestedBarcode(shopId, industry, category);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.SUCCESS, suggestedCode));
     }

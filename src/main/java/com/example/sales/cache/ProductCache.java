@@ -1,4 +1,3 @@
-// File: src/main/java/com/example/sales/cache/ProductCache.java
 package com.example.sales.cache;
 
 import com.example.sales.dto.product.ProductResponse;
@@ -6,6 +5,8 @@ import com.example.sales.model.BranchProduct;
 import com.example.sales.model.Product;
 import com.example.sales.repository.BranchProductRepository;
 import com.example.sales.repository.ProductRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -19,20 +20,33 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Cache layer for product-related data, handling caching of ProductResponse lists and individual items.
+ * Supports create/update/delete operations to keep cache in sync with database.
+ */
 @Component
 public class ProductCache {
 
     private final BranchProductRepository branchProductRepository;
     private final ProductRepository productRepository;
+    private final ProductMapper productMapper;
 
     public ProductCache(BranchProductRepository branchProductRepository,
-                        ProductRepository productRepository) {
+                        ProductRepository productRepository,
+                        ProductMapper productMapper) {
         this.branchProductRepository = branchProductRepository;
         this.productRepository = productRepository;
+        this.productMapper = productMapper;
     }
 
-    @Cacheable(value = "branch_products_by_shop_branch", key = "#shopId + ':' + #branchId")
+    /**
+     * Get paginated list of products for a shop, optionally filtered by branch.
+     * Cache result based on shopId and branchId (if provided).
+     */
+    @Cacheable(value = "branch_products_by_shop_branch", key = "#shopId + ':' + (#branchId != null ? #branchId : 'all')")
     public Page<ProductResponse> getAllByShop(String shopId, String branchId, Pageable pageable) {
+        String cacheKey = shopId + ":" + (branchId != null ? branchId : "all");
+        System.out.println("Generated cache key: branch_products_by_shop_branch:" + cacheKey);
         Page<BranchProduct> branchProductsPage;
         if (StringUtils.hasText(branchId)) {
             branchProductsPage = branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
@@ -48,44 +62,45 @@ public class ProductCache {
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
         List<ProductResponse> productResponses = branchProductsPage.getContent().stream()
-                .map(bp -> toResponse(bp, productsMap.get(bp.getProductId())))
+                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId())))
                 .collect(Collectors.toList());
 
         return new PageImpl<>(productResponses, pageable, branchProductsPage.getTotalElements());
     }
-    private ProductResponse toResponse(BranchProduct branchProduct, Product product) {
-        if (branchProduct == null || product == null) {
-            return null;
-        }
-        return ProductResponse.builder()
-                .id(branchProduct.getId())
-                .productId(product.getId())
-                .name(product.getName())
-                .nameTranslations(product.getNameTranslations())
-                .category(product.getCategory())
-                .sku(product.getSku())
-                .costPrice(product.getCostPrice())
-                .defaultPrice(product.getDefaultPrice())
-                .unit(product.getUnit())
-                .description(product.getDescription())
-                .images(product.getImages())
-                .barcode(product.getBarcode())
-                .supplierId(product.getSupplierId())
-                .variants(product.getVariants())
-                .priceHistory(product.getPriceHistory())
-                .active(product.isActive())
-                .quantity(branchProduct.getQuantity())
-                .minQuantity(branchProduct.getMinQuantity())
-                .price(branchProduct.getPrice())
-                .branchCostPrice(branchProduct.getBranchCostPrice())
-                .discountPrice(branchProduct.getDiscountPrice())
-                .discountPercentage(branchProduct.getDiscountPercentage())
-                .expiryDate(branchProduct.getExpiryDate())
-                .branchVariants(branchProduct.getVariants())
-                .branchId(branchProduct.getBranchId())
-                .activeInBranch(branchProduct.isActiveInBranch())
-                .createdAt(branchProduct.getCreatedAt())
-                .updatedAt(branchProduct.getUpdatedAt())
-                .build();
+
+    /**
+     * Update cache with new ProductResponse for a specific branchProductId.
+     */
+    @CachePut(value = "branch_products_by_shop_branch", key = "#result.branchId != null ? #result.shopId + ':' + #result.branchId : #result.shopId + ':all'")
+    public ProductResponse update(String branchProductId, ProductResponse productResponse) {
+        return productResponse;
+    }
+
+    /**
+     * Remove product from cache for a specific branchProductId.
+     * Invalidates cache for the corresponding shopId:branchId key.
+     */
+    @CacheEvict(value = "branch_products_by_shop_branch", key = "#result != null ? #result.shopId + ':' + (#result.branchId != null ? #result.branchId : 'all') : 'unknown'")
+    public BranchProduct remove(String branchProductId) {
+        BranchProduct branchProduct = branchProductRepository.findByIdAndDeletedFalse(branchProductId)
+                .orElse(null);
+        return branchProduct; // Return BranchProduct to generate correct cache key
+    }
+
+    /**
+     * Remove product from cache for a specific shopId and branchId.
+     * Invalidates entire cache for shopId:branchId or shopId:all.
+     */
+    @CacheEvict(value = "branch_products_by_shop_branch", key = "#shopId + ':' + (#branchId != null ? #branchId : 'all')")
+    public void remove(String shopId, String branchId) {
+        // Cache eviction handled by annotation
+    }
+
+    /**
+     * Clear all cache entries manually (useful for debugging or cache reset in local dev).
+     */
+    @CacheEvict(value = "branch_products_by_shop_branch", allEntries = true)
+    public void clear() {
+        // Clear all Redis cache entries, handled by annotation
     }
 }

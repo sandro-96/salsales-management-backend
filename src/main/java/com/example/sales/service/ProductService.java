@@ -12,6 +12,8 @@ public interface ProductService {
     // id ở đây là id của BranchProduct
     ProductResponse updateProduct(String userId, String shopId, List<String> branchIds, String id, ProductRequest request);
 
+    ProductResponse createBranchProduct(String shopId, String branchId, ProductRequest request);
+
     // id ở đây là id của BranchProduct
     void deleteProduct(String userId, String shopId, String branchId, String id);
 
