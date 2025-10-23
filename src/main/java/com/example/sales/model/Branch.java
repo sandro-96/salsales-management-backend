@@ -23,7 +23,8 @@ public class Branch extends BaseEntity {
     private String name;
     private String address;
     private String phone;
-
+    @Builder.Default
+    private boolean isDefault = false;
     @Builder.Default
     private boolean active = true;
 }

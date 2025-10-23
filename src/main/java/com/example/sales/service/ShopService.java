@@ -58,6 +58,7 @@ public class ShopService extends BaseService {
                 .name(AppConstants.DEFAULT_BRANCH_NAME)
                 .address(request.getAddress())
                 .phone(request.getPhone())
+                .isDefault(true)
                 .build();
         branchRepository.save(defaultBranch);
 
