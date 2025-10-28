@@ -33,6 +33,7 @@ public class Shop extends BaseEntity {
     private String phone;
     private String logoUrl;
     private Country countryCode;
+    private String slug;
 
     @Builder.Default
     private boolean active = true;

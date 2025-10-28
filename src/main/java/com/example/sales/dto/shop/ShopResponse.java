@@ -22,4 +22,5 @@ public class ShopResponse {
     private boolean active;
     private SubscriptionPlan plan;
     private String currency;
+    private String slug;
 }

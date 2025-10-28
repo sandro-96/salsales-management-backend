@@ -29,4 +29,10 @@ public class ShopCache extends BaseService {
         return shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
     }
+
+    @Cacheable(value = "shops", key = "#slug")
+    public Shop getShopBySlug(String slug) {
+        return shopRepository.findBySlugAndDeletedFalse(slug)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
 }

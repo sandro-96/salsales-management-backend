@@ -116,5 +116,15 @@ public class ShopController {
         shopService.deleteShop(user.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
+
+    @GetMapping("/by-slug/{slug}")
+    @Operation(summary = "Lấy thông tin cửa hàng theo slug", description = "Trả về thông tin chi tiết của cửa hàng theo slug")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Trả về thông tin cửa hàng thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
+    })
+    public ApiResponseDto<ShopSimpleResponse> getShopBySlug(@PathVariable("slug") String slug) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, shopService.getShopBySlug(slug));
+    }
 }
 

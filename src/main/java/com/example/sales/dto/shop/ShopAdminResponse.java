@@ -27,4 +27,5 @@ public class ShopAdminResponse {
     private String timezone;
     private String orderPrefix;
     private LocalDateTime planExpiry;
+    private String slug;
 }

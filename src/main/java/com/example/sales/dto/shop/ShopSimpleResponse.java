@@ -15,6 +15,7 @@ public class ShopSimpleResponse {
     private Country countryCode;
     private String phone;
     private String address;
+    private String slug;
     private boolean active;
     private boolean isTrackInventory;
     private BusinessModel businessModel;

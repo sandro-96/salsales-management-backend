@@ -16,6 +16,7 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.PermissionUtils;
+import com.example.sales.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,7 @@ public class ShopService extends BaseService {
                 ? request.getBusinessModel()
                 : request.getType().getDefaultBusinessModel();
         shop.setBusinessModel(model);
+        shop.setSlug(SlugUtils.toSlug(request.getName()));
 
         Shop savedShop = shopRepository.save(shop);
 
@@ -112,6 +114,12 @@ public class ShopService extends BaseService {
                 String.format("Xoá mềm cửa hàng: %s", shop.getName()));
     }
 
+    public ShopSimpleResponse getShopBySlug(String slug) {
+        Shop shop = shopRepository.findBySlugAndDeletedFalse(slug)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        return getShopSimpleResponse(shop);
+    }
+
     @Cacheable(value = "shops", key = "#shopId")
     public Shop getShopById(String shopId) {
         return checkShopExists(shopRepository, shopId);
@@ -138,6 +146,7 @@ public class ShopService extends BaseService {
                     .timezone(shop.getTimezone())
                     .orderPrefix(shop.getOrderPrefix())
                     .planExpiry(shop.getPlanExpiry())
+                    .slug(shop.getSlug())
                     .build();
         } else {
             return ShopResponse.builder()
@@ -152,6 +161,7 @@ public class ShopService extends BaseService {
                     .active(shop.isActive())
                     .plan(shop.getPlan())
                     .currency(shop.getCurrency())
+                    .slug(shop.getSlug())
                     .build();
         }
     }
@@ -164,6 +174,7 @@ public class ShopService extends BaseService {
                 .logoUrl(shop.getLogoUrl())
                 .countryCode(shop.getCountryCode())
                 .address(shop.getAddress())
+                .slug(shop.getSlug())
                 .phone(shop.getPhone())
                 .active(shop.isActive())
                 .isTrackInventory(shop.isTrackInventory())

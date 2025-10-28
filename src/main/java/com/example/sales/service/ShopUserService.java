@@ -119,6 +119,7 @@ public class ShopUserService extends BaseService {
                             .role(su.getRole())
                             .industry(shop.getType().getIndustry())
                             .businessModel(shop.getBusinessModel())
+                            .slug(shop.getSlug())
                             .build();
                 });
     }
