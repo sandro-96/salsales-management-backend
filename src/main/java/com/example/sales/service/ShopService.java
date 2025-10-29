@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ShopService extends BaseService {
@@ -30,6 +32,7 @@ public class ShopService extends BaseService {
     private final ShopUserRepository shopUserRepository;
     private final BranchRepository branchRepository;
     private final ShopCache shopCache;
+    private final ShopUserService shopUserService;
 
     public Shop createShop(String userId, ShopRequest request, String logoUrl) {
         if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
@@ -106,17 +109,17 @@ public class ShopService extends BaseService {
         return getShopSimpleResponse(saved);
     }
 
-    public void deleteShop(String ownerId) {
-        Shop shop = shopCache.getShopByOwner(ownerId);
+    public void deleteShop(String ownerId, String shopId) {
+        Shop shop = shopCache.getShopById(shopId);
         shop.setDeleted(true);
         shopRepository.save(shop);
-        auditLogService.log(null, shop.getId(), shop.getId(), "SHOP", "DELETED",
+        shopUserService.markDeletedByShopId(shopId);
+        auditLogService.log(ownerId, shop.getId(), shop.getId(), "SHOP", "DELETED",
                 String.format("Xoá mềm cửa hàng: %s", shop.getName()));
     }
 
     public ShopSimpleResponse getShopBySlug(String slug) {
-        Shop shop = shopRepository.findBySlugAndDeletedFalse(slug)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        Shop shop = shopCache.getShopBySlug(slug);
         return getShopSimpleResponse(shop);
     }
 

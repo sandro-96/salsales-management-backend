@@ -18,6 +18,7 @@ public interface ShopRepository extends MongoRepository<Shop, String> {
     Optional<Shop> findBySlugAndDeletedFalse(String slug);
     List<Shop> findByPlanExpiryBeforeAndPlanNot(LocalDateTime date, SubscriptionPlan plan);
     List<Shop> findByPlanExpiryBetween(LocalDateTime start, LocalDateTime end);
+    List<Shop> findByIdInAndDeletedFalse(List<String> ids);
     boolean existsByNameAndDeletedFalse(String name);
     @Query("{ 'deleted': false, $or: [ { 'name': { $regex: ?0, $options: 'i' } }, { 'address': { $regex: ?0, $options: 'i' } } ] }")
     Page<Shop> findByKeyword(String keyword, Pageable pageable);

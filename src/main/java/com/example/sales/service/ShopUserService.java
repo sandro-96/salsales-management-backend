@@ -15,16 +15,10 @@ import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -100,12 +94,24 @@ public class ShopUserService extends BaseService {
         Sort sort = pageable.getSort().and(Sort.by("createdAt").descending());
         pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
 
-        return shopUserRepository.findByUserIdAndDeletedFalse(userId, pageable)
-                .map(su -> {
-                    Optional<Shop> shopOpt = shopRepository.findByIdAndDeletedFalse(su.getShopId());
-                    if (shopOpt.isEmpty()) return null;
+        Page<ShopUser> shopUsers = shopUserRepository.findByUserIdAndDeletedFalse(userId, pageable);
+        List<String> shopIds = shopUsers.getContent().stream()
+                .map(ShopUser::getShopId)
+                .toList();
 
-                    Shop shop = shopOpt.get();
+        List<Shop> shops = shopRepository.findByIdInAndDeletedFalse(shopIds);
+        Map<String, Shop> shopMap = shops.stream()
+                .collect(Collectors.toMap(Shop::getId, Function.identity()));
+
+        List<ShopSimpleResponse> shopResponses = shopUsers.getContent().stream()
+                .map(su -> shopMap.get(su.getShopId()))
+                .filter(Objects::nonNull)
+                .map(shop -> {
+                    ShopUser su = shopUsers.getContent().stream()
+                            .filter(u -> Objects.equals(u.getShopId(), shop.getId()))
+                            .findFirst()
+                            .orElse(null);
+
                     return ShopSimpleResponse.builder()
                             .id(shop.getId())
                             .name(shop.getName())
@@ -116,12 +122,15 @@ public class ShopUserService extends BaseService {
                             .phone(shop.getPhone())
                             .active(shop.isActive())
                             .isTrackInventory(shop.isTrackInventory())
-                            .role(su.getRole())
+                            .role(su != null ? su.getRole() : null)
                             .industry(shop.getType().getIndustry())
                             .businessModel(shop.getBusinessModel())
                             .slug(shop.getSlug())
                             .build();
-                });
+                })
+                .toList();
+
+        return new PageImpl<>(shopResponses, pageable, shopUsers.getTotalElements());
     }
 
     private void ensureCanModifyRole(ShopRole actorRole, ShopRole targetRole) {
@@ -180,5 +189,13 @@ public class ShopUserService extends BaseService {
                 .gender(userMap.getOrDefault(su.getUserId(), new User()).getGender())
                 .role(su.getRole())
                 .build());
+    }
+
+    public void markDeletedByShopId(String shopId) {
+        List<ShopUser> shopUsers = shopUserRepository.findByShopId(shopId, Pageable.unpaged()).getContent();
+        for (ShopUser shopUser : shopUsers) {
+            shopUser.setDeleted(true);
+        }
+        shopUserRepository.saveAll(shopUsers);
     }
 }

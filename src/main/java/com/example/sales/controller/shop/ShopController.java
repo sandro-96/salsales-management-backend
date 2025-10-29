@@ -104,16 +104,16 @@ public class ShopController {
         return ApiResponseDto.success(ApiCode.SUCCESS, shopUserService.getShopsForUser(user.getId(), pageable));
     }
 
-    @DeleteMapping
+    @DeleteMapping("/{shopId}")
     @RequireRole(ShopRole.OWNER)
-    @Operation(summary = "Xóa cửa hàng hiện tại", description = "Xóa cửa hàng mà người dùng hiện tại đang sở hữu. Thao tác không thể hoàn tác.")
+    @Operation(summary = "Xóa cửa hàng theo ID", description = "Xóa cửa hàng theo shopId")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Xóa thành công"),
             @ApiResponse(responseCode = "403", description = "Không có quyền xóa"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy cửa hàng")
     })
-    public ApiResponseDto<?> deleteShop(@AuthenticationPrincipal CustomUserDetails user) {
-        shopService.deleteShop(user.getId());
+    public ApiResponseDto<?> deleteShop(@AuthenticationPrincipal CustomUserDetails user, @PathVariable String shopId) {
+        shopService.deleteShop(user.getId(), shopId);
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 
