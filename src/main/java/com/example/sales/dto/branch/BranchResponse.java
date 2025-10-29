@@ -12,5 +12,6 @@ public class BranchResponse {
     private String address;
     private String phone;
     private boolean active;
+    private boolean isDefault;
     private String createdAt;
 }

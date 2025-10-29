@@ -23,6 +23,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/branches")
 @RequiredArgsConstructor
@@ -33,22 +35,19 @@ public class BranchController {
 
     @GetMapping
     @RequirePermission(Permission.BRANCH_VIEW)
-    @Operation(summary = "Lấy danh sách chi nhánh", description = "Lấy danh sách chi nhánh của cửa hàng với phân trang, lọc trạng thái, tìm kiếm theo tên hoặc địa chỉ")
+    @Operation(summary = "Lấy danh sách chi nhánh", description = "Lấy danh sách chi nhánh của cửa hàng")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách chi nhánh được trả về thành công"),
             @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
             @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
     })
-    public ApiResponseDto<Page<BranchResponse>> getAll(
+    public ApiResponseDto<List<BranchResponse>> getAll(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
-            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
-            @RequestParam(required = false) @Parameter(description = "Trạng thái hoạt động của chi nhánh") Boolean active,
-            @RequestParam(required = false) @Parameter(description = "Từ khóa tìm kiếm theo tên hoặc địa chỉ") String keyword,
-            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId) {
 
         return ApiResponseDto.success(ApiCode.SUCCESS,
-                branchService.getAll(shopId, active, keyword, pageable));
+                branchService.getAll(shopId));
     }
 
     //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})

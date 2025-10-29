@@ -28,26 +28,10 @@ public class BranchService {
     private final AuditLogService auditLogService;
     private final MongoTemplate mongoTemplate;
 
-    public Page<BranchResponse> getAll(String shopId, Boolean active, String keyword, Pageable pageable) {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("shopId").is(shopId).and("deleted").is(false));
 
-        if (active != null) {
-            query.addCriteria(Criteria.where("active").is(active));
-        }
-
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            String regex = ".*" + keyword.trim().toLowerCase() + ".*";
-            query.addCriteria(new Criteria().orOperator(
-                    Criteria.where("name").regex(regex, "i"),
-                    Criteria.where("address").regex(regex, "i")
-            ));
-        }
-        query.with(pageable);
-        List<Branch> branches = mongoTemplate.find(query, Branch.class);
-        return PageableExecutionUtils.getPage(branches, pageable, () ->
-                mongoTemplate.count(Query.of(query).limit(-1).skip(-1), Branch.class)
-        ).map(this::toResponse);
+    public List<BranchResponse> getAll(String shopId) {
+        List<Branch> branches = branchRepository.findAllByShopIdAndDeletedFalse(shopId);
+        return branches.stream().map(this::toResponse).toList();
     }
 
     public BranchResponse create(String userId, String shopId, BranchRequest req) {
@@ -105,6 +89,7 @@ public class BranchService {
                 .phone(branch.getPhone())
                 .active(branch.isActive())
                 .createdAt(branch.getCreatedAt() != null ? branch.getCreatedAt().toString() : null)
+                .isDefault(branch.isDefault())
                 .build();
     }
 }
