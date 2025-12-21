@@ -60,7 +60,7 @@ public class ShopService extends BaseService {
 
         Branch defaultBranch = Branch.builder()
                 .shopId(savedShop.getId())
-                .name(AppConstants.DEFAULT_BRANCH_NAME)
+                .name(savedShop.getName())
                 .address(request.getAddress())
                 .phone(request.getPhone())
                 .isDefault(true)
