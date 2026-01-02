@@ -81,6 +81,13 @@ public class BranchService {
                 String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
     }
 
+    public BranchResponse getById(String id) {
+        Branch branch = branchRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
+
+        return toResponse(branch);
+    }
+
     private BranchResponse toResponse(Branch branch) {
         return BranchResponse.builder()
                 .id(branch.getId())

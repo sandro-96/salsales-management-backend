@@ -102,4 +102,29 @@ public class BranchController {
         branchService.delete(user.getId(), shopId, id);
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
+
+    @GetMapping("/{id}")
+    @Operation(
+            summary = "Lấy thông tin chi nhánh",
+            description = "Lấy chi tiết thông tin một chi nhánh theo ID"
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lấy chi nhánh thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Chi nhánh hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<BranchResponse> getById(
+            @AuthenticationPrincipal
+            @Parameter(description = "Thông tin người dùng hiện tại")
+            CustomUserDetails user,
+            @PathVariable
+            @Parameter(description = "ID của chi nhánh")
+            String id
+    ) {
+        return ApiResponseDto.success(
+                ApiCode.SUCCESS,
+                branchService.getById(id)
+        );
+    }
 }
