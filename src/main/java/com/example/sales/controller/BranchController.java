@@ -5,6 +5,8 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.dto.branch.BranchDetailResponse;
+import com.example.sales.dto.branch.BranchListResponse;
 import com.example.sales.dto.branch.BranchRequest;
 import com.example.sales.dto.branch.BranchResponse;
 import com.example.sales.security.CustomUserDetails;
@@ -42,7 +44,7 @@ public class BranchController {
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
             @ApiResponse(responseCode = "404", description = "Cửa hàng không tìm thấy")
     })
-    public ApiResponseDto<List<BranchResponse>> getAll(
+    public ApiResponseDto<List<BranchListResponse>> getBranches(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId) {
 
@@ -104,6 +106,7 @@ public class BranchController {
     }
 
     @GetMapping("/{id}")
+    @RequirePermission(Permission.BRANCH_VIEW)
     @Operation(
             summary = "Lấy thông tin chi nhánh",
             description = "Lấy chi tiết thông tin một chi nhánh theo ID"
@@ -114,10 +117,11 @@ public class BranchController {
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
             @ApiResponse(responseCode = "404", description = "Chi nhánh hoặc cửa hàng không tìm thấy")
     })
-    public ApiResponseDto<BranchResponse> getById(
+    public ApiResponseDto<BranchDetailResponse> getBranchDetail(
             @AuthenticationPrincipal
             @Parameter(description = "Thông tin người dùng hiện tại")
             CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @PathVariable
             @Parameter(description = "ID của chi nhánh")
             String id
@@ -126,5 +130,19 @@ public class BranchController {
                 ApiCode.SUCCESS,
                 branchService.getById(id)
         );
+    }
+
+    @GetMapping("/by-slug/{slug}")
+    @RequirePermission(Permission.BRANCH_VIEW)
+    @Operation(summary = "Lấy thông tin chi nhánh theo slug", description = "Trả về thông tin chi tiết của chi nhánh theo slug")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Trả về thông tin chi nhánh thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy chi nhánh")
+    })
+    public ApiResponseDto<BranchDetailResponse> getBranchBySlug(
+            @PathVariable("slug") String slug,
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.getBySlug(shopId, slug));
     }
 }

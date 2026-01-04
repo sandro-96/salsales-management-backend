@@ -33,6 +33,7 @@ public class ShopService extends BaseService {
     private final BranchRepository branchRepository;
     private final ShopCache shopCache;
     private final ShopUserService shopUserService;
+    private final BranchService branchService;
 
     public Shop createShop(String userId, ShopRequest request, String logoUrl) {
         if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
@@ -51,7 +52,8 @@ public class ShopService extends BaseService {
                 ? request.getBusinessModel()
                 : request.getType().getDefaultBusinessModel();
         shop.setBusinessModel(model);
-        shop.setSlug(SlugUtils.toSlug(request.getName()));
+        String baseSlug = SlugUtils.toSlug(request.getName());
+        shop.setSlug(generateUniqueShopSlug(baseSlug));
 
         Shop savedShop = shopRepository.save(shop);
 
@@ -63,6 +65,10 @@ public class ShopService extends BaseService {
                 .name(savedShop.getName())
                 .address(request.getAddress())
                 .phone(request.getPhone())
+                .slug(branchService.generateUniqueBranchSlug(
+                    savedShop.getId(),
+                    savedShop.getName()
+                ))
                 .isDefault(true)
                 .build();
         branchRepository.save(defaultBranch);
@@ -122,6 +128,17 @@ public class ShopService extends BaseService {
         Shop shop = shopCache.getShopBySlug(slug);
         return getShopSimpleResponse(shop);
     }
+
+    private String generateUniqueShopSlug(String baseSlug) {
+        String slug = baseSlug;
+        int counter = 1;
+
+        while (shopRepository.existsBySlugAndDeletedFalse(slug)) {
+            slug = baseSlug + "-" + counter++;
+        }
+        return slug;
+    }
+
 
     @Cacheable(value = "shops", key = "#shopId")
     public Shop getShopById(String shopId) {

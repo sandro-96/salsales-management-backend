@@ -1,4 +1,4 @@
-// File: src/main/java/com/example/sales/dto/branch/BranchResponse.java
+// File: src/main/java/com/example/sales/dto/branch/BranchDetailResponse.java
 package com.example.sales.dto.branch;
 
 import lombok.Builder;
@@ -10,7 +10,7 @@ import java.time.LocalTime;
 
 @Data
 @Builder
-public class BranchResponse {
+public class BranchDetailResponse {
 
     private String id;
     private String shopId;

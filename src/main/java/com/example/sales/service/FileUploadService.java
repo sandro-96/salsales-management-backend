@@ -40,11 +40,13 @@ public class FileUploadService {
 
     public String upload(MultipartFile file, String folder) {
         try {
-            if (file.isEmpty()) throw new BusinessException(ApiCode.VALIDATION_ERROR);
-            if (file.getSize() > MAX_FILE_SIZE) throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
+            if (file.isEmpty()) throw new BusinessException(ApiCode.FILE_EMPTY);
+            if (file.getSize() > MAX_FILE_SIZE) throw new BusinessException(ApiCode.FILE_TOO_LARGE);
 
             String contentType = file.getContentType();
-            if (!ALLOWED_MIME_TYPES.contains(contentType)) throw new BusinessException(ApiCode.VALIDATION_FILE_ERROR);
+            if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType)) {
+                throw new BusinessException(ApiCode.INVALID_FILE_TYPE);
+            }
 
             String filename = UUID.randomUUID() + "_" + sanitize(Objects.requireNonNull(file.getOriginalFilename()));
 
@@ -62,6 +64,13 @@ public class FileUploadService {
             log.error("Lỗi khi upload file", e);
             throw new RuntimeException("Không thể upload file", e);
         }
+    }
+
+    private boolean isValidExtension(String filename, String mime) {
+        if (mime.equals("image/png")) return filename.endsWith(".png");
+        if (mime.equals("image/jpeg")) return filename.endsWith(".jpg") || filename.endsWith(".jpeg");
+        if (mime.equals("image/webp")) return filename.endsWith(".webp");
+        return true;
     }
 
     public String move(String imageUrl, String targetFolder) {
@@ -88,6 +97,8 @@ public class FileUploadService {
     }
 
     private String sanitize(String original) {
-        return original.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String name = original.toLowerCase();
+        name = name.replaceAll("[^a-z0-9._-]", "_");
+        return name.length() > 100 ? name.substring(0, 100) : name;
     }
 }

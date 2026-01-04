@@ -4,6 +4,7 @@ package com.example.sales.model;
 import com.example.sales.model.base.BaseEntity;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ public class Branch extends BaseEntity {
     private String id;
 
     private String shopId;
+    private String slug;
     private String name;
     private String address;
     private String phone;

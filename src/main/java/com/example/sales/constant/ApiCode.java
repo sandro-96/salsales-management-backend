@@ -82,7 +82,10 @@ public enum ApiCode {
     INVALID_CREDENTIALS("4011", "Email or password is incorrect"),
     CATEGORY_NOT_FOUND("4141", "Category not found"),
     BARCODE_EXISTS("4142", "Barcode already exists"),
-    SKU_EXISTS("4143", "SKU already exists");
+    SKU_EXISTS("4143", "SKU already exists"),
+    FILE_TOO_LARGE("4144", "File size exceeds limit"),
+    FILE_EMPTY("4145", "File is empty"),
+    INVALID_FILE_TYPE("4146", "Invalid file type");
 
     private final String code;
     private final String message;

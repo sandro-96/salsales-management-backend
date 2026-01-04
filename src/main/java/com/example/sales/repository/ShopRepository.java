@@ -22,4 +22,5 @@ public interface ShopRepository extends MongoRepository<Shop, String> {
     boolean existsByNameAndDeletedFalse(String name);
     @Query("{ 'deleted': false, $or: [ { 'name': { $regex: ?0, $options: 'i' } }, { 'address': { $regex: ?0, $options: 'i' } } ] }")
     Page<Shop> findByKeyword(String keyword, Pageable pageable);
+    boolean existsBySlugAndDeletedFalse(String slug);
 }

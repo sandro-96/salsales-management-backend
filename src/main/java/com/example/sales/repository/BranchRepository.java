@@ -17,4 +17,7 @@ public interface BranchRepository extends MongoRepository<Branch, String> {
     long countByShopIdAndDeletedFalse(String shopId);
     Optional<Branch> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
     List<Branch> findAllByShopIdAndDeletedFalse(String shopId);
+    boolean existsByShopIdAndSlugAndDeletedFalse(String shopId, String slug);
+    Optional<Branch> findByShopIdAndSlugAndDeletedFalse(String shopId, String slug);
+
 }
