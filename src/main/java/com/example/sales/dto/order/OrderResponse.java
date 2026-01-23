@@ -2,6 +2,7 @@
 package com.example.sales.dto.order;
 
 import com.example.sales.constant.OrderStatus;
+import com.example.sales.model.tax.OrderTaxSnapshot;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +30,7 @@ public class OrderResponse {
     private double totalAmount;     // Tổng số lượng sản phẩm (ví dụ: tổng số lượng items)
     private double totalPrice;      // Tổng giá trị đơn hàng sau chiết khấu
     private List<OrderItemResponse> items; // Danh sách các mục trong đơn hàng
+    private OrderTaxSnapshot taxSnapshot; // Thông tin thuế tại thời điểm tạo đơn hàng
 
     // OrderItemResponse đã được định nghĩa trong OrderService trước đó, nhưng ta có thể định nghĩa lại tại đây cho rõ ràng.
     // Nếu bạn muốn giữ nó là inner class trong OrderService.java (như trong OrderService.java bạn đã cung cấp),

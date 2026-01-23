@@ -85,7 +85,9 @@ public enum ApiCode {
     SKU_EXISTS("4143", "SKU already exists"),
     FILE_TOO_LARGE("4144", "File size exceeds limit"),
     FILE_EMPTY("4145", "File is empty"),
-    INVALID_FILE_TYPE("4146", "Invalid file type");
+    INVALID_FILE_TYPE("4146", "Invalid file type"),
+    TAX_POLICY_NOT_FOUND("4147", "Tax policy not found"),
+    TAX_POLICY_OVERLAP("4148", "Tax policy date range overlaps with existing policy");
 
     private final String code;
     private final String message;

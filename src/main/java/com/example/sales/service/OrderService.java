@@ -14,6 +14,7 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.*;
 import com.example.sales.repository.*;
+import com.example.sales.service.tax.OrderTaxApplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +39,7 @@ public class OrderService extends BaseService {
     private final ShopRepository shopRepository;
     private final InventoryService inventoryService;
     private final OrderCache orderCache;
+    private final OrderTaxApplier orderTaxApplier;
 
     @Transactional
     public OrderResponse createOrder(String userId, String branchId, String shopId, OrderRequest request) {
@@ -105,8 +107,8 @@ public class OrderService extends BaseService {
         }).toList();
 
         order.setItems(orderItems);
-        order.setTotalAmount(totals[0]);
         order.setTotalPrice(totals[1]);
+        orderTaxApplier.applyTax(order);
 
         Order created = orderRepository.save(order);
 
@@ -330,8 +332,8 @@ public class OrderService extends BaseService {
             }).toList();
 
             order.setItems(updatedItems);
-            order.setTotalAmount(totals[0]);
             order.setTotalPrice(totals[1]);
+            orderTaxApplier.applyTax(order);
         }
 
         Order updated = orderRepository.save(order);
@@ -353,6 +355,7 @@ public class OrderService extends BaseService {
                 .totalAmount(order.getTotalAmount())
                 .totalPrice(order.getTotalPrice())
                 .items(order.getItems().stream().map(this::toItemResponse).toList())
+                .taxSnapshot(order.getTaxSnapshot())
                 .build();
     }
 

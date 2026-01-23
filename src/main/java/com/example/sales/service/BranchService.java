@@ -10,15 +10,9 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
 import com.example.sales.repository.BranchRepository;
-import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

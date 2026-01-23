@@ -3,6 +3,7 @@ package com.example.sales.model;
 
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.model.base.BaseEntity;
+import com.example.sales.model.tax.OrderTaxSnapshot;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -29,8 +30,20 @@ public class Order extends BaseEntity {
 
     private List<OrderItem> items;
 
+    /**
+     * Tổng tiền hàng (chưa thuế nếu priceIncludesTax = false)
+     */
     private double totalPrice;
+
+    /**
+     * Tổng tiền phải trả (luôn = totalPrice + taxTotal)
+     */
     private double totalAmount;
+
+    /**
+     * Snapshot thuế tại thời điểm tạo order
+     */
+    private OrderTaxSnapshot taxSnapshot;
 
     @Builder.Default
     private OrderStatus status = OrderStatus.PENDING;
