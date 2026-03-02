@@ -46,8 +46,10 @@ public class ProductCrudController {
     @PostMapping("/shops/{shopId}/products")
     @RequirePermission(Permission.PRODUCT_CREATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "Danh sách ID chi nhánh (tùy chọn)") @RequestParam(required = false) List<String> branchIds,
+
             @Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.createProduct(shopId, branchIds, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
@@ -63,6 +65,7 @@ public class ProductCrudController {
     @PostMapping("/shops/{shopId}/branches/{branchId}/products")
     @RequirePermission(Permission.PRODUCT_CREATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> createFromBranch(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID chi nhánh") @PathVariable String branchId,
             @Valid @RequestBody ProductRequest request) {
@@ -80,6 +83,7 @@ public class ProductCrudController {
     @PutMapping("/shops/{shopId}/products/{id}")
     @RequirePermission(Permission.PRODUCT_UPDATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> update(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID sản phẩm (BranchProduct ID)") @PathVariable String id,
             @Parameter(description = "Danh sách ID chi nhánh (tùy chọn)") @RequestParam(required = false) List<String> branchIds,

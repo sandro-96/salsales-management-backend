@@ -78,6 +78,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Product product = createNewProduct(shopId, sku, request);
         product = productRepository.save(product);
         sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
+        sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
 
         // Create BranchProducts (if branchIds provided)
         List<BranchProduct> branchProducts = createBranchProducts(shop, product, branchIds, validBranches, request);
