@@ -71,7 +71,7 @@ public class ProductCache {
     /**
      * Update cache with new ProductResponse for a specific branchProductId.
      */
-    @CachePut(value = "branch_products_by_shop_branch", key = "#result.branchId != null ? #result.shopId + ':' + #result.branchId : #result.shopId + ':all'")
+    @CachePut(value = "branch_products_by_shop_branch", key = "#productResponse.shopId + ':' + (#productResponse.branchId != null ? #productResponse.branchId : 'all')")
     public ProductResponse update(String branchProductId, ProductResponse productResponse) {
         return productResponse;
     }

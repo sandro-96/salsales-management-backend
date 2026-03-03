@@ -3,6 +3,7 @@ package com.example.sales.constant;
 
 public enum Permission {
     PRODUCT_CREATE,
+    PRODUCT_VIEW,
     PRODUCT_UPDATE,
     PRODUCT_DELETE,
     ORDER_CREATE,

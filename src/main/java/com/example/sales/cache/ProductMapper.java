@@ -17,6 +17,7 @@ public class ProductMapper {
         }
         ProductResponse.ProductResponseBuilder builder = ProductResponse.builder()
                 .productId(product.getId())
+                .shopId(product.getShopId())
                 .name(product.getName())
                 .nameTranslations(product.getNameTranslations())
                 .category(product.getCategory())

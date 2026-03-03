@@ -87,7 +87,8 @@ public enum ApiCode {
     FILE_EMPTY("4145", "File is empty"),
     INVALID_FILE_TYPE("4146", "Invalid file type"),
     TAX_POLICY_NOT_FOUND("4147", "Tax policy not found"),
-    TAX_POLICY_OVERLAP("4148", "Tax policy date range overlaps with existing policy");
+    TAX_POLICY_OVERLAP("4148", "Tax policy date range overlaps with existing policy"),
+    PRODUCT_SHOP_INACTIVE("4149", "Cannot activate branch product because product is disabled at shop level");
 
     private final String code;
     private final String message;

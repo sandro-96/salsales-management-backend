@@ -11,7 +11,7 @@ import static com.example.sales.constant.Permission.*;
 public class PermissionUtils {
 
     private static final Set<Permission> COMMON_VIEW = Set.of(
-            ORDER_VIEW, PROMOTION_VIEW, TABLE_VIEW, BRANCH_VIEW, INVENTORY_VIEW, SHOP_VIEW
+            ORDER_VIEW, PROMOTION_VIEW, TABLE_VIEW, BRANCH_VIEW, INVENTORY_VIEW, SHOP_VIEW, PRODUCT_VIEW
     );
 
     private static final Set<Permission> ORDER_PERMS = Set.of(
@@ -19,7 +19,8 @@ public class PermissionUtils {
     );
 
     private static final Set<Permission> PRODUCT_BASE = Set.of(
-            PRODUCT_CREATE, PRODUCT_UPDATE, PRODUCT_IMPORT,
+            PRODUCT_VIEW,
+            PRODUCT_CREATE, PRODUCT_UPDATE, PRODUCT_DELETE, PRODUCT_IMPORT,
             PRODUCT_EXPORT, PRODUCT_UPDATE_STATUS, PRODUCT_VIEW_LOW_STOCK
     );
 

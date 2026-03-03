@@ -29,6 +29,9 @@ public class ProductResponse {
     // ID của định nghĩa sản phẩm chung (từ Product)
     private String productId;
 
+    // ID của shop (dùng cho cache key)
+    private String shopId;
+
     // Các trường từ Product (định nghĩa chung)
     private String name;
     private Map<String, String> nameTranslations;

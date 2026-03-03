@@ -1,27 +1,41 @@
 // File: src/main/java/com/example/sales/service/ProductService.java
 package com.example.sales.service;
 
+import com.example.sales.dto.product.BranchProductRequest;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.dto.product.ProductSearchRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
 public interface ProductService {
     ProductResponse createProduct(String shopId, List<String> branchIds, ProductRequest request);
 
-    // id ở đây là id của BranchProduct
-    ProductResponse updateProduct(String userId, String shopId, List<String> branchIds, String id, ProductRequest request);
+    // id ở đây là id của Product
+    ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request);
+
+    // Cập nhật thông tin BranchProduct (giá, tồn kho, discount...) tại một chi nhánh cụ thể
+    ProductResponse updateBranchProduct(String userId, String shopId, String branchId, String branchProductId, BranchProductRequest request);
 
     ProductResponse createBranchProduct(String shopId, String branchId, ProductRequest request);
 
-    // id ở đây là id của BranchProduct
-    void deleteProduct(String userId, String shopId, String branchId, String id);
+
+    // productId là id của Product — xóa sản phẩm khỏi toàn bộ shop (Product + tất cả BranchProduct)
+    void deleteProductFromShop(String userId, String shopId, String productId);
 
     // id ở đây là id của BranchProduct
     ProductResponse getProduct(String shopId, String branchId, String id);
 
-    // branchProductId ở đây là id của BranchProduct để toggle activeInBranch
-    ProductResponse toggleActive(String userId, String shopId, String branchId, String branchProductId);
+    // Toggle activeInBranch của BranchProduct tại một chi nhánh cụ thể
+    ProductResponse toggleActiveInBranch(String userId, String shopId, String branchId, String branchProductId);
+
+    // Toggle Product.active ở cấp shop — khi false sẽ sync tắt activeInBranch toàn bộ chi nhánh, khi true thì chỉ bật lại Product.active
+    ProductResponse toggleActiveShop(String userId, String shopId, String productId);
+
+    // Tìm kiếm sản phẩm theo keyword, category, price range, active...
+    Page<ProductResponse> searchProducts(String shopId, String branchId, ProductSearchRequest request, Pageable pageable);
 
     List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold);
 
@@ -29,3 +43,4 @@ public interface ProductService {
 
     String getSuggestedBarcode(String shopId, String industry, String category);
 }
+
