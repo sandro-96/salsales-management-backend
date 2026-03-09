@@ -5,9 +5,7 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.ChangePasswordRequest;
 import com.example.sales.dto.UpdateProfileRequest;
-import com.example.sales.dto.shop.ShopRequest;
 import com.example.sales.dto.user.UserResponse;
-import com.example.sales.model.User;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.FileUploadService;
 import com.example.sales.service.UserService;
@@ -53,10 +51,8 @@ public class UserController {
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestPart("user") @Valid @Parameter(description = "Thông tin cập nhật hồ sơ") UpdateProfileRequest request,
             @RequestPart(value = "file", required = false) MultipartFile file) {
-        String avatarUrl;
         if (file != null && !file.isEmpty()) {
-            avatarUrl = fileUploadService.uploadTemp(file);
-            avatarUrl = fileUploadService.move(avatarUrl, "avatar");
+            String avatarUrl = fileUploadService.upload(file, "avatar");
             request.setAvatarUrl(avatarUrl);
         }
         UserResponse updated = userService.updateProfile(user.getId(), request);

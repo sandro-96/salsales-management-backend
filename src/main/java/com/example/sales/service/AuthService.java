@@ -142,8 +142,7 @@ public class AuthService {
                     user.setRole(UserRole.ROLE_USER);
                     try {
                         MultipartFile avatarFile = FileUtil.downloadImageAsMultipartFile(avatarUrl, googleId);
-                        String savedAvatar = fileUploadService.uploadTemp(avatarFile);
-                        savedAvatar = fileUploadService.move(savedAvatar, "avatar");
+                        String savedAvatar = fileUploadService.upload(avatarFile, "avatar");
                         user.setAvatarUrl(savedAvatar);
                     } catch (Exception e) {
                         log.error("Lỗi khi tải ảnh đại diện từ Google", e);

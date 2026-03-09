@@ -7,9 +7,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -19,11 +21,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FileUploadService {
 
-    @Value("${app.upload.base-dir}")
-    private String baseDir;
+    private final S3Client s3Client;
 
-    @Value("${app.upload.public-url:/uploads/}")
-    private String publicUrl;
+    @Value("${aws.s3.bucket}")
+    private String bucket;
+
+    @Value("${aws.s3.region}")
+    private String region;
 
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
     private static final List<String> ALLOWED_MIME_TYPES = List.of(
@@ -34,10 +38,9 @@ public class FileUploadService {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
 
-    public String uploadTemp(MultipartFile file) {
-        return upload(file, "temp");
-    }
-
+    /**
+     * Upload file lên S3 vào folder chỉ định, trả về public URL.
+     */
     public String upload(MultipartFile file, String folder) {
         try {
             if (file.isEmpty()) throw new BusinessException(ApiCode.FILE_EMPTY);
@@ -49,51 +52,56 @@ public class FileUploadService {
             }
 
             String filename = UUID.randomUUID() + "_" + sanitize(Objects.requireNonNull(file.getOriginalFilename()));
+            String key = folder + "/" + filename;
 
-            Path uploadPath = Path.of(baseDir, folder).toAbsolutePath();
-            Files.createDirectories(uploadPath);
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .contentType(contentType)
+                    .contentLength(file.getSize())
+                    .build();
 
-            Path filePath = uploadPath.resolve(filename);
-            file.transferTo(filePath.toFile());
+            s3Client.putObject(putRequest, RequestBody.fromBytes(file.getBytes()));
 
-            return publicUrl + folder + "/" + filename;
+            return getPublicUrl(key);
 
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Lỗi khi upload file", e);
+            log.error("Lỗi khi upload file lên S3", e);
             throw new RuntimeException("Không thể upload file", e);
         }
     }
 
-    private boolean isValidExtension(String filename, String mime) {
-        if (mime.equals("image/png")) return filename.endsWith(".png");
-        if (mime.equals("image/jpeg")) return filename.endsWith(".jpg") || filename.endsWith(".jpeg");
-        if (mime.equals("image/webp")) return filename.endsWith(".webp");
-        return true;
+    /**
+     * Xóa file trên S3 theo URL đầy đủ.
+     */
+    public void delete(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) return;
+        try {
+            String key = extractKeyFromUrl(fileUrl);
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .build());
+        } catch (Exception e) {
+            log.warn("Không thể xóa file trên S3: {}", fileUrl, e);
+        }
     }
 
-    public String move(String imageUrl, String targetFolder) {
-        try {
-            if (imageUrl == null || !imageUrl.startsWith(publicUrl + "temp/")) {
-                return imageUrl;
-            }
+    // ─── helpers ───────────────────────────────────────────────────────────
 
-            String filename = Path.of(imageUrl).getFileName().toString();
-            Path sourcePath = Path.of(baseDir, "temp", filename).toAbsolutePath();
-            Path targetDir = Path.of(baseDir, targetFolder).toAbsolutePath();
-            Files.createDirectories(targetDir);
+    private String getPublicUrl(String key) {
+        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
+    }
 
-            Path targetPath = targetDir.resolve(filename);
-            if (Files.exists(sourcePath)) {
-                Files.move(sourcePath, targetPath);
-            }
-
-            return publicUrl + targetFolder + "/" + filename;
-
-        } catch (Exception e) {
-            throw new RuntimeException("Không thể di chuyển file", e);
+    private String extractKeyFromUrl(String url) {
+        // https://bucket.s3.region.amazonaws.com/folder/filename
+        String prefix = "https://" + bucket + ".s3." + region + ".amazonaws.com/";
+        if (url.startsWith(prefix)) {
+            return url.substring(prefix.length());
         }
+        return url;
     }
 
     private String sanitize(String original) {
