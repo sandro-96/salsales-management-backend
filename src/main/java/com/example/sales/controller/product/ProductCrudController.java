@@ -53,8 +53,7 @@ public class ProductCrudController {
     // ─────────────────────────────────────────────────────────────────
 
     @Operation(summary = "Tạo sản phẩm mới",
-            description = "Tạo Product (thông tin chung) và tự động tạo BranchProduct cho tất cả chi nhánh " +
-                    "hoặc chỉ các chi nhánh được chỉ định qua query param branchIds. " +
+            description = "Tạo Product (thông tin chung) và tự động tạo BranchProduct cho tất cả chi nhánh của shop. " +
                     "Giá và tồn kho khởi tạo lấy từ defaultPrice/costPrice, " +
                     "cập nhật riêng từng chi nhánh bằng PUT /branches/{branchId}/products/{branchProductId}. " +
                     "Có thể đính kèm ảnh ngay khi tạo qua part 'files' (tùy chọn, tối đa 10 ảnh).")
@@ -68,18 +67,15 @@ public class ProductCrudController {
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
-            @Parameter(description = "Danh sách ID chi nhánh (tùy chọn, mặc định: tất cả chi nhánh)")
-            @RequestParam(required = false) List<String> branchIds,
             @RequestPart("product") @Valid ProductRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
-        // Upload ảnh trước nếu có, gắn URL vào request
         if (files != null && !files.isEmpty()) {
             List<String> imageUrls = files.stream()
                     .map(f -> fileUploadService.upload(f, "products/" + shopId))
                     .collect(java.util.stream.Collectors.toList());
             request.setImages(imageUrls);
         }
-        ProductResponse response = productService.createProduct(shopId, branchIds, request);
+        ProductResponse response = productService.createProduct(shopId, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
@@ -87,17 +83,30 @@ public class ProductCrudController {
     // READ
     // ─────────────────────────────────────────────────────────────────
 
-    @Operation(summary = "Lấy danh sách sản phẩm với phân trang",
-            description = "Lấy tất cả sản phẩm của shop, tùy chọn lọc theo chi nhánh.")
+    @Operation(summary = "Lấy danh sách sản phẩm toàn shop",
+            description = "Lấy tất cả sản phẩm của shop trên mọi chi nhánh (gộp chung).")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm")})
     @GetMapping("/shops/{shopId}/products")
     @RequirePermission(Permission.PRODUCT_VIEW)
-    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAll(
+    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAllByShop(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
-            @Parameter(description = "ID chi nhánh (tùy chọn)") @RequestParam(required = false) String branchId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<ProductResponse> response = productCache.getAllByShop(shopId, branchId, pageable);
+        Page<ProductResponse> response = productCache.getAllByShop(shopId, pageable);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
+    }
+
+    @Operation(summary = "Lấy danh sách sản phẩm theo chi nhánh",
+            description = "Lấy tất cả sản phẩm tại một chi nhánh cụ thể.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Trả về danh sách sản phẩm")})
+    @GetMapping("/shops/{shopId}/branches/{branchId}/products")
+    @RequirePermission(Permission.PRODUCT_VIEW)
+    public ResponseEntity<ApiResponseDto<Page<ProductResponse>>> getAllByBranch(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "ID chi nhánh") @PathVariable String branchId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<ProductResponse> response = productCache.getAllByBranch(shopId, branchId, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
     }
 

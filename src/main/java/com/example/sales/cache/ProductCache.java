@@ -12,7 +12,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -23,13 +22,11 @@ import java.util.stream.Collectors;
 /**
  * Cache layer for product-related data.
  *
- * Key pattern: "branch_products_by_shop_branch" :: "{shopId}:{branchId|all}"
+ * Key pattern: "branch_products_by_shop_branch" :: "{shopId}:all:p{page}:s{size}:{sort}"
+ *                                                   "{shopId}:{branchId}:p{page}:s{size}:{sort}"
  *
- * Vấn đề cũ: remove(shopId, null) chỉ evict key "shopId:all",
- * bỏ sót các key "shopId:branchId1", "shopId:branchId2"...
- *
- * Fix: evictByShop(shopId) dùng CacheManager để scan và xóa tất cả entries
- * có prefix "shopId:" — đảm bảo cache luôn nhất quán sau create/update/delete.
+ * Paging info được đưa vào key để mỗi trang có entry riêng biệt trong cache.
+ * evictByShop(shopId) scan prefix "{shopId}:" để xóa toàn bộ entries của shop.
  */
 @Component
 public class ProductCache {
@@ -52,17 +49,28 @@ public class ProductCache {
     }
 
     /**
-     * Lấy danh sách sản phẩm có phân trang theo shop, tùy chọn lọc theo branch.
-     * Cache key: "{shopId}:{branchId}" hoặc "{shopId}:all"
+     * Lấy danh sách sản phẩm toàn shop (gộp tất cả chi nhánh).
+     * Cache key: "{shopId}:all:p{page}:s{size}:{sort}"
      */
-    @Cacheable(value = CACHE_NAME, key = "#shopId + ':' + (#branchId != null ? #branchId : 'all')")
-    public Page<ProductResponse> getAllByShop(String shopId, String branchId, Pageable pageable) {
-        Page<BranchProduct> branchProductsPage;
-        if (StringUtils.hasText(branchId)) {
-            branchProductsPage = branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
-        } else {
-            branchProductsPage = branchProductRepository.findByShopIdAndDeletedFalse(shopId, pageable);
-        }
+    @Cacheable(value = CACHE_NAME, key = "#shopId + ':all:p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
+    public Page<ProductResponse> getAllByShop(String shopId, Pageable pageable) {
+        Page<BranchProduct> branchProductsPage =
+                branchProductRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+        return toResponsePage(branchProductsPage, pageable);
+    }
+
+    /**
+     * Lấy danh sách sản phẩm theo chi nhánh cụ thể.
+     * Cache key: "{shopId}:{branchId}:p{page}:s{size}:{sort}"
+     */
+    @Cacheable(value = CACHE_NAME, key = "#shopId + ':' + #branchId + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
+    public Page<ProductResponse> getAllByBranch(String shopId, String branchId, Pageable pageable) {
+        Page<BranchProduct> branchProductsPage =
+                branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
+        return toResponsePage(branchProductsPage, pageable);
+    }
+
+    private Page<ProductResponse> toResponsePage(Page<BranchProduct> branchProductsPage, Pageable pageable) {
 
         Set<String> productIds = branchProductsPage.getContent().stream()
                 .map(BranchProduct::getProductId)

@@ -58,16 +58,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private static final int MAX_PRODUCT_IMAGES = 10;
 
     @Override
-    public ProductResponse createProduct(String shopId, List<String> branchIds, ProductRequest request) {
+    public ProductResponse createProduct(String shopId, ProductRequest request) {
         // Validate shop
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
-        // [Option A] Nếu không truyền branchIds → tự động lấy tất cả chi nhánh của shop
-        if (branchIds == null || branchIds.isEmpty()) {
-            branchIds = branchRepository.findAllByShopIdAndDeletedFalse(shopId)
-                    .stream().map(Branch::getId).collect(Collectors.toList());
-        }
+        // Lấy tất cả chi nhánh của shop
+        List<String> branchIds = branchRepository.findAllByShopIdAndDeletedFalse(shopId)
+                .stream().map(Branch::getId).collect(Collectors.toList());
 
         // Validate branches
         Map<String, Branch> validBranches = validateBranches(shopId, branchIds);
@@ -96,9 +94,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Product product = createNewProduct(shopId, sku, request);
         product = productRepository.save(product);
         sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
-        sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
+        sequenceService.updateNextSequence(shopId, AppConstants.SequencePrefixes.BARCODE_GLOBAL, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
 
-        // Create BranchProducts
+        // Create BranchProducts cho tất cả chi nhánh
         List<BranchProduct> branchProducts = createBranchProducts(shop, product, branchIds, validBranches);
 
         // Log audit
@@ -115,13 +113,39 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     public ProductResponse createBranchProduct(String shopId, String branchId, ProductRequest request) {
         // Tạo sản phẩm từ branch: tạo Product cho shop, rồi tạo BranchProduct cho branch hiện tại
         List<String> branchIds = Collections.singletonList(branchId);
-        ProductResponse response = createProduct(shopId, branchIds, request);
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        branchRepository.findByIdAndShopIdAndDeletedFalse(branchId, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.BRANCH_NOT_FOUND));
 
-        // Log thêm để track nguồn tạo từ branch
-        auditLogService.log(null, shopId, response.getProductId(), "PRODUCT", "CREATED_BY_BRANCH",
+        // Validate barcode uniqueness
+        if (StringUtils.hasText(request.getBarcode())) {
+            productRepository.findByShopIdAndBarcodeAndDeletedFalse(shopId, request.getBarcode())
+                    .ifPresent(p -> { throw new BusinessException(ApiCode.BARCODE_EXISTS); });
+        }
+
+        // Generate SKU
+        String prefix = generateSkuPrefix(shop, request.getCategory());
+        String sku = StringUtils.hasText(request.getSku())
+                ? request.getSku()
+                : sequenceService.getNextCode(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
+        productRepository.findByShopIdAndSkuAndDeletedFalse(shopId, sku)
+                .ifPresent(p -> { throw new BusinessException(ApiCode.SKU_EXISTS); });
+
+        Product product = createNewProduct(shopId, sku, request);
+        product = productRepository.save(product);
+        sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
+        sequenceService.updateNextSequence(shopId, AppConstants.SequencePrefixes.BARCODE_GLOBAL, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
+
+        Map<String, Branch> validBranches = validateBranches(shopId, branchIds);
+        List<BranchProduct> branchProducts = createBranchProducts(shop, product, branchIds, validBranches);
+
+        auditLogService.log(null, shopId, product.getId(), "PRODUCT", "CREATED_BY_BRANCH",
                 String.format("Tạo sản phẩm '%s' (SKU: %s) từ chi nhánh %s",
-                        response.getName(), response.getSku(), branchId));
-        return response;
+                        product.getName(), product.getSku(), branchId));
+
+        productCache.evictByShop(shopId);
+        return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
     }
 
     @Override
@@ -394,11 +418,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
     @Override
     public String getSuggestedBarcode(String shopId, String industry, String category) {
-        String prefix = StringUtils.hasText(category)
-                ? String.format("%s_%s", industry.toUpperCase(), category.toUpperCase())
-                : industry.toUpperCase();
-        String sequence = sequenceService.getNextCode(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
-        String sequenceNumber = sequence.split("_")[2];
+        // Dùng prefix GLOBAL duy nhất cho barcode để đảm bảo sequence tăng liên tục
+        // bất kể industry/category — tránh trường hợp 2 prefix khác nhau trả về cùng số thứ tự → barcode trùng
+        String sequence = sequenceService.getNextCode(shopId,
+                AppConstants.SequencePrefixes.BARCODE_GLOBAL,
+                AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
+        // sequence format: "BARCODE_001", "BARCODE_002", ...
+        String[] parts = sequence.split("_");
+        String sequenceNumber = parts[parts.length - 1];
         String baseCode = "893" + String.format("%09d", Integer.parseInt(sequenceNumber));
         String checkDigit = calculateEan13CheckDigit(baseCode);
         return baseCode + checkDigit;

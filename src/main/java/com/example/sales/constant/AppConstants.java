@@ -10,4 +10,10 @@ public class AppConstants {
         public static final String SEQUENCE_TYPE_TICKET = "TICKET";
         public static final String SEQUENCE_TYPE_BARCODE = "BARCODE";
     }
+
+    public static class SequencePrefixes {
+        /** Prefix dùng chung cho tất cả barcode EAN-13 — bất kể industry/category,
+         *  đảm bảo số thứ tự barcode unique toàn shop. */
+        public static final String BARCODE_GLOBAL = "BARCODE";
+    }
 }

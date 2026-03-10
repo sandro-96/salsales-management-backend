@@ -12,7 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 public interface ProductService {
-    ProductResponse createProduct(String shopId, List<String> branchIds, ProductRequest request);
+    ProductResponse createProduct(String shopId, ProductRequest request);
 
     // id ở đây là id của Product
     ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request);

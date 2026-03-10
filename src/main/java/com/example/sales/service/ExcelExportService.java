@@ -10,8 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import java.io.ByteArrayOutputStream; // Thêm import này
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.function.Function;
 
@@ -44,7 +43,7 @@ public class ExcelExportService {
     }
 
     // ✅ Phương thức exportProducts được cập nhật để sử dụng ProductService và ProductResponse
-    public ResponseEntity<byte[]> exportProducts(String shopId, String branchId) throws IOException {
+    public ResponseEntity<byte[]> exportProducts(String shopId, String branchId) {
         // Lấy dữ liệu ProductResponse từ ProductService
         // Sử dụng phân trang để tránh load quá nhiều dữ liệu cùng lúc
         Pageable pageable = PageRequest.of(0, 1000); // Lấy 1000 sản phẩm mỗi lần
@@ -52,7 +51,11 @@ public class ExcelExportService {
         List<ProductResponse> allProducts = new java.util.ArrayList<>();
 
         do {
-            productPage = productCache.getAllByShop(shopId, branchId, pageable);
+            if (org.springframework.util.StringUtils.hasText(branchId)) {
+                productPage = productCache.getAllByBranch(shopId, branchId, pageable);
+            } else {
+                productPage = productCache.getAllByShop(shopId, pageable);
+            }
             allProducts.addAll(productPage.getContent());
             if (productPage.hasNext()) {
                 pageable = productPage.nextPageable();
@@ -65,17 +68,18 @@ public class ExcelExportService {
         // Định nghĩa headers cho file Excel
         List<String> headers = List.of(
                 "SKU", "Tên sản phẩm", "Danh mục", "Chi nhánh ID",
-                "Số lượng", "Giá", "Đơn vị", "URL Hình ảnh", "Mô tả", "Trạng thái hoạt động"
+                "Số lượng", "Giá", "Đơn vị", "Mô tả", "Trạng thái hoạt động"
         );
 
         // Định nghĩa cách map ProductResponse thành các dòng dữ liệu
         Function<ProductResponse, List<String>> rowMapper = p -> List.of(
-                p.getSku(),
-                p.getName(),
-                p.getBranchId(),
+                p.getSku() != null ? p.getSku() : "",
+                p.getName() != null ? p.getName() : "",
+                p.getCategory() != null ? p.getCategory() : "",
+                p.getBranchId() != null ? p.getBranchId() : "",
                 String.valueOf(p.getQuantity()),
                 String.valueOf(p.getPrice()),
-                p.getUnit(),
+                p.getUnit() != null ? p.getUnit() : "",
                 p.getDescription() != null ? p.getDescription() : "",
                 p.isActiveInBranch() ? "Có" : "Không"
         );
