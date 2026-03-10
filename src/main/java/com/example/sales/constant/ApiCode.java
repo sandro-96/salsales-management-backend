@@ -88,7 +88,11 @@ public enum ApiCode {
     INVALID_FILE_TYPE("4146", "Invalid file type"),
     TAX_POLICY_NOT_FOUND("4147", "Tax policy not found"),
     TAX_POLICY_OVERLAP("4148", "Tax policy date range overlaps with existing policy"),
-    PRODUCT_SHOP_INACTIVE("4149", "Cannot activate branch product because product is disabled at shop level");
+    PRODUCT_SHOP_INACTIVE("4149", "Cannot activate branch product because product is disabled at shop level"),
+    PRODUCT_IMAGE_UPLOADED("2010", "Product image uploaded successfully"),
+    PRODUCT_IMAGE_DELETED("2011", "Product image deleted successfully"),
+    PRODUCT_IMAGE_NOT_FOUND("4150", "Product image not found"),
+    PRODUCT_IMAGE_LIMIT_EXCEEDED("4151", "Product image limit exceeded (max 10 images)");
 
     private final String code;
     private final String message;

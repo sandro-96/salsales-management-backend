@@ -3,6 +3,8 @@ package com.example.sales.config;
 
 import com.example.sales.security.PlanInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,5 +49,18 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResourceHandler("/uploads/**")
                 .addResourceLocations("file:D:/app-uploads/") // dev trên Windows
                 .addResourceLocations("file:/var/www/app-uploads/"); // deploy Linux
+    }
+
+    /**
+     * Nâng giới hạn maxSwallowSize của Tomcat lên 100MB.
+     * Mặc định Tomcat chỉ cho phép "swallow" tối đa 2MB sau khi reject request,
+     * dẫn đến lỗi "Failed to parse multipart servlet request" khi upload nhiều ảnh lớn.
+     */
+    @Bean
+    public WebServerFactoryCustomizer<TomcatServletWebServerFactory> tomcatCustomizer() {
+        return factory -> factory.addConnectorCustomizers(connector -> {
+            // -1 = không giới hạn, hoặc đặt giá trị cụ thể (bytes): 100 * 1024 * 1024 = 100MB
+            connector.setMaxPostSize(30 * 1024 * 1024); // 30MB
+        });
     }
 }

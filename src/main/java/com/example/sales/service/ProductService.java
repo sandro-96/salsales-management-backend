@@ -7,6 +7,7 @@ import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -42,5 +43,11 @@ public interface ProductService {
     String getSuggestedSku(String shopId, String industry, String category);
 
     String getSuggestedBarcode(String shopId, String industry, String category);
+
+    // Upload ảnh cho sản phẩm — trả về danh sách URL ảnh sau khi thêm
+    List<String> uploadProductImages(String userId, String shopId, String productId, List<MultipartFile> files);
+
+    // Xóa một ảnh khỏi sản phẩm theo URL — trả về danh sách URL ảnh còn lại
+    List<String> deleteProductImage(String userId, String shopId, String productId, String imageUrl);
 }
 

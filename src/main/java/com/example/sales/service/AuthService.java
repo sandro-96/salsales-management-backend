@@ -157,7 +157,11 @@ public class AuthService {
             user.setLastLoginAt(Instant.now());
             userRepository.save(user);
             return new JwtResponse(accessToken, refreshToken);
+        } catch (BusinessException e) {
+            // Re-throw BusinessException (lỗi nghiệp vụ) không được nuốt
+            throw e;
         } catch (Exception e) {
+            log.error("Lỗi khi xác thực Google token", e);
             throw new BusinessException(ApiCode.INVALID_TOKEN);
         }
     }

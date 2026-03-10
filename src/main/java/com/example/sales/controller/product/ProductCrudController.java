@@ -10,6 +10,7 @@ import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
+import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,9 +22,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -43,6 +46,7 @@ public class ProductCrudController {
 
     private final ProductService productService;
     private final ProductCache productCache;
+    private final FileUploadService fileUploadService;
 
     // ─────────────────────────────────────────────────────────────────
     // CREATE
@@ -52,20 +56,29 @@ public class ProductCrudController {
             description = "Tạo Product (thông tin chung) và tự động tạo BranchProduct cho tất cả chi nhánh " +
                     "hoặc chỉ các chi nhánh được chỉ định qua query param branchIds. " +
                     "Giá và tồn kho khởi tạo lấy từ defaultPrice/costPrice, " +
-                    "cập nhật riêng từng chi nhánh bằng PUT /branches/{branchId}/products/{branchProductId}.")
+                    "cập nhật riêng từng chi nhánh bằng PUT /branches/{branchId}/products/{branchProductId}. " +
+                    "Có thể đính kèm ảnh ngay khi tạo qua part 'files' (tùy chọn, tối đa 10 ảnh).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tạo sản phẩm thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
             @ApiResponse(responseCode = "403", description = "Không có quyền tạo")
     })
-    @PostMapping("/shops/{shopId}/products")
+    @PostMapping(value = "/shops/{shopId}/products", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequirePermission(Permission.PRODUCT_CREATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> create(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "Danh sách ID chi nhánh (tùy chọn, mặc định: tất cả chi nhánh)")
             @RequestParam(required = false) List<String> branchIds,
-            @Valid @RequestBody ProductRequest request) {
+            @RequestPart("product") @Valid ProductRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        // Upload ảnh trước nếu có, gắn URL vào request
+        if (files != null && !files.isEmpty()) {
+            List<String> imageUrls = files.stream()
+                    .map(f -> fileUploadService.upload(f, "products/" + shopId))
+                    .collect(java.util.stream.Collectors.toList());
+            request.setImages(imageUrls);
+        }
         ProductResponse response = productService.createProduct(shopId, branchIds, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
@@ -126,20 +139,30 @@ public class ProductCrudController {
     @Operation(summary = "Cập nhật thông tin chung của sản phẩm",
             description = "Chỉ cập nhật các trường thuộc Product (tên, SKU, barcode, giá mặc định, mô tả...). " +
                     "Không ảnh hưởng đến giá/tồn kho từng chi nhánh. " +
-                    "Dùng PUT /branches/{branchId}/products/{branchProductId} để cập nhật từng chi nhánh.")
+                    "Dùng PUT /branches/{branchId}/products/{branchProductId} để cập nhật từng chi nhánh. " +
+                    "Có thể thay toàn bộ ảnh bằng cách đính kèm part 'files' (tùy chọn). " +
+                    "Nếu không gửi 'files', danh sách ảnh trong JSON sẽ được giữ nguyên.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
             @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật"),
             @ApiResponse(responseCode = "404", description = "Sản phẩm không tồn tại")
     })
-    @PutMapping("/shops/{shopId}/products/{productId}")
+    @PutMapping(value = "/shops/{shopId}/products/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequirePermission(Permission.PRODUCT_UPDATE)
     public ResponseEntity<ApiResponseDto<ProductResponse>> update(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "ID sản phẩm (Product ID)") @PathVariable String productId,
-            @Valid @RequestBody ProductRequest request) {
+            @RequestPart("product") @Valid ProductRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        // Nếu có file mới → upload lên S3, ảnh cũ sẽ được thay thế bởi danh sách mới
+        if (files != null && !files.isEmpty()) {
+            List<String> imageUrls = files.stream()
+                    .map(f -> fileUploadService.upload(f, "products/" + shopId + "/" + productId))
+                    .collect(java.util.stream.Collectors.toList());
+            request.setImages(imageUrls);
+        }
         ProductResponse response = productService.updateProduct(user.getId(), shopId, productId, request);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_UPDATED, response));
     }
@@ -214,5 +237,49 @@ public class ProductCrudController {
             @Parameter(description = "Danh mục") @RequestParam String category) {
         String suggestedCode = productService.getSuggestedBarcode(shopId, industry, category);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.SUCCESS, suggestedCode));
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // IMAGE UPLOAD / DELETE
+    // ─────────────────────────────────────────────────────────────────
+
+    @Operation(summary = "Upload ảnh cho sản phẩm",
+            description = "Upload một hoặc nhiều ảnh lên S3 và gắn URL vào sản phẩm. " +
+                    "Tối đa 10 ảnh/sản phẩm. Định dạng hỗ trợ: JPEG, JPG, PNG, WEBP. Kích thước tối đa: 5MB/ảnh.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Upload ảnh thành công"),
+            @ApiResponse(responseCode = "400", description = "File không hợp lệ hoặc vượt giới hạn ảnh"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm")
+    })
+    @PostMapping(value = "/shops/{shopId}/products/{productId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequirePermission(Permission.PRODUCT_UPDATE)
+    public ResponseEntity<ApiResponseDto<List<String>>> uploadProductImages(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "ID sản phẩm (Product ID)") @PathVariable String productId,
+            @Parameter(description = "Danh sách file ảnh (tối đa 10 ảnh, mỗi ảnh ≤ 5MB)")
+            @RequestParam("files") List<MultipartFile> files) {
+        List<String> imageUrls = productService.uploadProductImages(user.getId(), shopId, productId, files);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_IMAGE_UPLOADED, imageUrls));
+    }
+
+    @Operation(summary = "Xóa một ảnh khỏi sản phẩm",
+            description = "Xóa ảnh khỏi S3 và danh sách ảnh của sản phẩm theo URL. " +
+                    "Trả về danh sách URL ảnh còn lại sau khi xóa.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xóa ảnh thành công"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền cập nhật"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm hoặc ảnh")
+    })
+    @DeleteMapping("/shops/{shopId}/products/{productId}/images")
+    @RequirePermission(Permission.PRODUCT_UPDATE)
+    public ResponseEntity<ApiResponseDto<List<String>>> deleteProductImage(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "ID sản phẩm (Product ID)") @PathVariable String productId,
+            @Parameter(description = "URL đầy đủ của ảnh cần xóa") @RequestParam String imageUrl) {
+        List<String> remainingImages = productService.deleteProductImage(user.getId(), shopId, productId, imageUrl);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_IMAGE_DELETED, remainingImages));
     }
 }

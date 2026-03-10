@@ -20,6 +20,7 @@ import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.AuditLogService;
 import com.example.sales.service.BaseService;
+import com.example.sales.service.FileUploadService;
 import com.example.sales.service.ProductService;
 import com.example.sales.service.SequenceService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -51,6 +53,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final SequenceService sequenceService;
     private final ProductMapper productMapper;
     private final ProductSearchHelper productSearchHelper;
+    private final FileUploadService fileUploadService;
+
+    private static final int MAX_PRODUCT_IMAGES = 10;
 
     @Override
     public ProductResponse createProduct(String shopId, List<String> branchIds, ProductRequest request) {
@@ -99,11 +104,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Log audit
         logProductCreation(shopId, product, branchIds);
 
-        // Update cache — dùng BranchProduct đầu tiên làm đại diện
-        if (!branchProducts.isEmpty()) {
-            ProductResponse responseForCache = productMapper.toResponse(branchProducts.get(0), product);
-            productCache.update(branchProducts.get(0).getId(), responseForCache);
-        }
+        // Evict toàn bộ cache của shop để danh sách được load lại từ DB
+        productCache.evictByShop(shopId);
 
         // Return response — trả về BranchProduct đầu tiên hoặc product-only nếu không có branch nào
         return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
@@ -155,7 +157,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         logProductUpdate(userId, shopId, product, oldName, oldCategory, oldBarcode);
 
         // Invalidate cache cho toàn shop (vì product info thay đổi ảnh hưởng mọi branch)
-        productCache.remove(shopId, null);
+        productCache.evictByShop(shopId);
 
         // Trả về response: lấy BranchProduct đầu tiên làm đại diện (nếu có)
         List<BranchProduct> branchProducts = branchProductRepository.findByProductIdAndDeletedFalse(product.getId());
@@ -202,7 +204,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Update cache
         ProductResponse response = productMapper.toResponse(branchProduct, product);
-        productCache.update(branchProduct.getId(), response);
+        productCache.evictByShop(shopId);
 
         return response;
     }
@@ -233,7 +235,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         product.getName(), product.getSku(), branchProducts.size()));
 
         // Invalidate cache toàn shop
-        productCache.remove(shopId, null);
+        productCache.evictByShop(shopId);
     }
 
     @Override
@@ -288,7 +290,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Update cache
         ProductResponse response = productMapper.toResponse(branchProduct, product);
-        productCache.update(branchProduct.getId(), response);
+        productCache.evictByShop(shopId);
         return response;
     }
 
@@ -323,7 +325,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         newActiveState ? "" : " — đã tắt activeInBranch tại tất cả chi nhánh"));
 
         // Invalidate cache toàn shop
-        productCache.remove(shopId, null);
+        productCache.evictByShop(shopId);
 
         // Trả về response đại diện (BranchProduct đầu tiên nếu có)
         List<BranchProduct> branchProducts = branchProductRepository.findByProductIdAndDeletedFalse(productId);
@@ -529,6 +531,79 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         int total = oddSum * 3 + evenSum;
         int checkDigit = (10 - (total % 10)) % 10;
         return String.valueOf(checkDigit);
+    }
+
+    @Override
+    public List<String> uploadProductImages(String userId, String shopId, String productId, List<MultipartFile> files) {
+        // Validate shop
+        shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // Find Product
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        List<String> currentImages = product.getImages() != null ? new ArrayList<>(product.getImages()) : new ArrayList<>();
+
+        // Check image limit
+        if (currentImages.size() + files.size() > MAX_PRODUCT_IMAGES) {
+            throw new BusinessException(ApiCode.PRODUCT_IMAGE_LIMIT_EXCEEDED);
+        }
+
+        // Upload each file to S3 under "products/{shopId}/{productId}/" folder
+        String folder = "products/" + shopId + "/" + productId;
+        for (MultipartFile file : files) {
+            String imageUrl = fileUploadService.upload(file, folder);
+            currentImages.add(imageUrl);
+        }
+
+        product.setImages(currentImages);
+        productRepository.save(product);
+
+        // Invalidate cache for the shop
+        productCache.evictByShop(shopId);
+
+        // Log audit
+        auditLogService.log(userId, shopId, productId, "PRODUCT", "IMAGES_UPLOADED",
+                String.format("Upload %d ảnh cho sản phẩm '%s' (SKU: %s). Tổng ảnh hiện tại: %d",
+                        files.size(), product.getName(), product.getSku(), currentImages.size()));
+
+        return currentImages;
+    }
+
+    @Override
+    public List<String> deleteProductImage(String userId, String shopId, String productId, String imageUrl) {
+        // Validate shop
+        shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // Find Product
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+
+        List<String> currentImages = product.getImages() != null ? new ArrayList<>(product.getImages()) : new ArrayList<>();
+
+        if (!currentImages.contains(imageUrl)) {
+            throw new BusinessException(ApiCode.PRODUCT_IMAGE_NOT_FOUND);
+        }
+
+        // Delete from S3
+        fileUploadService.delete(imageUrl);
+
+        // Remove URL from list
+        currentImages.remove(imageUrl);
+        product.setImages(currentImages);
+        productRepository.save(product);
+
+        // Invalidate cache for the shop
+        productCache.evictByShop(shopId);
+
+        // Log audit
+        auditLogService.log(userId, shopId, productId, "PRODUCT", "IMAGE_DELETED",
+                String.format("Xóa ảnh khỏi sản phẩm '%s' (SKU: %s). Số ảnh còn lại: %d",
+                        product.getName(), product.getSku(), currentImages.size()));
+
+        return currentImages;
     }
 }
 

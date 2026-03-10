@@ -92,14 +92,22 @@ public class FileUploadService {
     // ─── helpers ───────────────────────────────────────────────────────────
 
     private String getPublicUrl(String key) {
-        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
+        // Dùng actual region đã được detect bởi S3Config (tránh URL sai khi region khác default)
+        String actualRegion = System.getProperty("aws.s3.actual-region", region);
+        return "https://" + bucket + ".s3." + actualRegion + ".amazonaws.com/" + key;
     }
 
     private String extractKeyFromUrl(String url) {
-        // https://bucket.s3.region.amazonaws.com/folder/filename
-        String prefix = "https://" + bucket + ".s3." + region + ".amazonaws.com/";
+        // Thử extract với actual region trước, fallback về configured region
+        String actualRegion = System.getProperty("aws.s3.actual-region", region);
+        String prefix = "https://" + bucket + ".s3." + actualRegion + ".amazonaws.com/";
         if (url.startsWith(prefix)) {
             return url.substring(prefix.length());
+        }
+        // fallback: thử với configured region
+        String fallbackPrefix = "https://" + bucket + ".s3." + region + ".amazonaws.com/";
+        if (url.startsWith(fallbackPrefix)) {
+            return url.substring(fallbackPrefix.length());
         }
         return url;
     }
