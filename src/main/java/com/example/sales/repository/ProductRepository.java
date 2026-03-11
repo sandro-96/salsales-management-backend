@@ -2,6 +2,8 @@
 package com.example.sales.repository;
 
 import com.example.sales.model.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,6 +14,9 @@ public interface ProductRepository extends MongoRepository<Product, String> {
     Optional<Product> findByIdAndDeletedFalse(String id);
     // Tìm Product theo ID và ShopId
     Optional<Product> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
+
+    // Lấy tất cả Product của shop (cấp shop, không phân biệt chi nhánh)
+    Page<Product> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
 
     // Tìm Product theo ShopId và SKU
     Optional<Product> findByShopIdAndSkuAndDeletedFalse(String shopId, String sku);

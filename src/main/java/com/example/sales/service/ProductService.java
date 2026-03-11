@@ -15,7 +15,7 @@ public interface ProductService {
     ProductResponse createProduct(String shopId, ProductRequest request);
 
     // id ở đây là id của Product
-    ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request);
+    ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request, List<MultipartFile> files);
 
     // Cập nhật thông tin BranchProduct (giá, tồn kho, discount...) tại một chi nhánh cụ thể
     ProductResponse updateBranchProduct(String userId, String shopId, String branchId, String branchProductId, BranchProductRequest request);

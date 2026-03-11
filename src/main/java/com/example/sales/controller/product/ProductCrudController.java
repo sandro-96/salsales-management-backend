@@ -165,14 +165,7 @@ public class ProductCrudController {
             @Parameter(description = "ID sản phẩm (Product ID)") @PathVariable String productId,
             @RequestPart("product") @Valid ProductRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
-        // Nếu có file mới → upload lên S3, ảnh cũ sẽ được thay thế bởi danh sách mới
-        if (files != null && !files.isEmpty()) {
-            List<String> imageUrls = files.stream()
-                    .map(f -> fileUploadService.upload(f, "products/" + shopId + "/" + productId))
-                    .collect(java.util.stream.Collectors.toList());
-            request.setImages(imageUrls);
-        }
-        ProductResponse response = productService.updateProduct(user.getId(), shopId, productId, request);
+        ProductResponse response = productService.updateProduct(user.getId(), shopId, productId, request, files);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_UPDATED, response));
     }
 

@@ -49,14 +49,16 @@ public class ProductCache {
     }
 
     /**
-     * Lấy danh sách sản phẩm toàn shop (gộp tất cả chi nhánh).
+     * Lấy danh sách sản phẩm toàn shop (cấp Product, không phân biệt chi nhánh).
      * Cache key: "{shopId}:all:p{page}:s{size}:{sort}"
      */
     @Cacheable(value = CACHE_NAME, key = "#shopId + ':all:p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
     public Page<ProductResponse> getAllByShop(String shopId, Pageable pageable) {
-        Page<BranchProduct> branchProductsPage =
-                branchProductRepository.findByShopIdAndDeletedFalse(shopId, pageable);
-        return toResponsePage(branchProductsPage, pageable);
+        Page<Product> productsPage = productRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+        List<ProductResponse> responses = productsPage.getContent().stream()
+                .map(p -> productMapper.toResponse(null, p))
+                .collect(Collectors.toList());
+        return new PageImpl<>(responses, pageable, productsPage.getTotalElements());
     }
 
     /**

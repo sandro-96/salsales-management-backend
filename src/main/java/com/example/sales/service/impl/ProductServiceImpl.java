@@ -149,7 +149,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     }
 
     @Override
-    public ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request) {
+    public ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request, List<MultipartFile> files) {
         // Validate shop
         shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
@@ -168,10 +168,33 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Product product = productRepository.findByIdAndShopIdAndDeletedFalse(id, shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
 
+        // Nếu có file mới → upload lên S3, merge với ảnh giữ lại trong request
+        if (files != null && !files.isEmpty()) {
+            List<String> newImageUrls = files.stream()
+                    .map(f -> fileUploadService.upload(f, "products/" + shopId + "/" + id))
+                    .collect(Collectors.toList());
+            List<String> merged = new ArrayList<>();
+            if (request.getImages() != null) merged.addAll(request.getImages());
+            merged.addAll(newImageUrls);
+            if (merged.size() > MAX_PRODUCT_IMAGES) {
+                throw new BusinessException(ApiCode.PRODUCT_IMAGE_LIMIT_EXCEEDED);
+            }
+            request.setImages(merged);
+        }
+
         // Save old values for audit
         String oldName = product.getName();
         String oldCategory = product.getCategory();
         String oldBarcode = product.getBarcode();
+
+        // Xóa ảnh bị remove khỏi S3 (ảnh có trong DB nhưng không còn trong request)
+        List<String> oldImages = product.getImages() != null ? new ArrayList<>(product.getImages()) : new ArrayList<>();
+        List<String> newImages = request.getImages() != null ? request.getImages() : new ArrayList<>();
+        oldImages.stream()
+                .filter(url -> !newImages.contains(url))
+                .forEach(url -> {
+                    try { fileUploadService.delete(url); } catch (Exception ignored) {}
+                });
 
         // Update Product fields only
         updateExistingProduct(product, request);
