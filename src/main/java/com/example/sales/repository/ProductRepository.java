@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -17,6 +18,9 @@ public interface ProductRepository extends MongoRepository<Product, String> {
 
     // Lấy tất cả Product của shop (cấp shop, không phân biệt chi nhánh)
     Page<Product> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+
+    // Lấy toàn bộ Product (không phân trang) — dùng khi cần seed BranchProduct cho branch mới
+    List<Product> findAllByShopIdAndDeletedFalse(String shopId);
 
     // Tìm Product theo ShopId và SKU
     Optional<Product> findByShopIdAndSkuAndDeletedFalse(String shopId, String sku);

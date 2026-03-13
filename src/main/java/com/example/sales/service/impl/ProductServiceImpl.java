@@ -27,13 +27,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -67,9 +65,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         List<String> branchIds = branchRepository.findAllByShopIdAndDeletedFalse(shopId)
                 .stream().map(Branch::getId).collect(Collectors.toList());
 
-        // Validate branches
-        Map<String, Branch> validBranches = validateBranches(shopId, branchIds);
-
         // Validate barcode uniqueness
         if (StringUtils.hasText(request.getBarcode())) {
             productRepository.findByShopIdAndBarcodeAndDeletedFalse(shopId, request.getBarcode())
@@ -97,7 +92,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         sequenceService.updateNextSequence(shopId, AppConstants.SequencePrefixes.BARCODE_GLOBAL, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
 
         // Create BranchProducts cho tất cả chi nhánh
-        List<BranchProduct> branchProducts = createBranchProducts(shop, product, branchIds, validBranches);
+        List<BranchProduct> branchProducts = createBranchProducts(shop, product, branchIds);
 
         // Log audit
         logProductCreation(shopId, product, branchIds);
@@ -137,8 +132,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
         sequenceService.updateNextSequence(shopId, AppConstants.SequencePrefixes.BARCODE_GLOBAL, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
 
-        Map<String, Branch> validBranches = validateBranches(shopId, branchIds);
-        List<BranchProduct> branchProducts = createBranchProducts(shop, product, branchIds, validBranches);
+        List<BranchProduct> branchProducts = createBranchProducts(shop, product, branchIds);
 
         auditLogService.log(null, shopId, product.getId(), "PRODUCT", "CREATED_BY_BRANCH",
                 String.format("Tạo sản phẩm '%s' (SKU: %s) từ chi nhánh %s",
@@ -384,9 +378,16 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
-        List<BranchProduct> branchProducts = productSearchHelper.search(shopId, branchId, request, pageable);
-        long total = productSearchHelper.count(shopId, branchId, request);
+        // Bước 1: Tìm productIds từ Product theo keyword/category (field chỉ có ở Product)
+        // null = không có filter text → không giới hạn productId
+        // Set rỗng = có filter nhưng không khớp → trả về trang rỗng ngay
+        Set<String> matchingProductIds = productSearchHelper.findMatchingProductIds(shopId, request);
 
+        // Bước 2: Lọc BranchProduct theo productIds + filter riêng của branch (price, activeInBranch)
+        List<BranchProduct> branchProducts = productSearchHelper.searchBranchProducts(shopId, branchId, matchingProductIds, request, pageable);
+        long total = productSearchHelper.countBranchProducts(shopId, branchId, matchingProductIds, request);
+
+        // Bước 3: Lấy Product info cho các BranchProduct tìm được
         Set<String> productIds = branchProducts.stream()
                 .map(BranchProduct::getProductId)
                 .collect(Collectors.toSet());
@@ -454,19 +455,16 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         return baseCode + checkDigit;
     }
 
-    private Map<String, Branch> validateBranches(String shopId, List<String> branchIds) {
-        Map<String, Branch> validBranches = new HashMap<>();
-        if (branchIds != null && !branchIds.isEmpty()) {
-            List<Branch> branches = branchRepository.findAllByShopIdAndDeletedFalse(shopId);
-            validBranches = branches.stream()
-                    .collect(Collectors.toMap(Branch::getId, branch -> branch));
-            for (String branchId : branchIds) {
-                if (StringUtils.hasText(branchId) && !validBranches.containsKey(branchId)) {
-                    throw new BusinessException(ApiCode.BRANCH_NOT_FOUND);
-                }
+    private void validateBranches(String shopId, List<String> branchIds) {
+        if (branchIds == null || branchIds.isEmpty()) return;
+        List<Branch> branches = branchRepository.findAllByShopIdAndDeletedFalse(shopId);
+        Map<String, Branch> validBranches = branches.stream()
+                .collect(Collectors.toMap(Branch::getId, branch -> branch));
+        for (String branchId : branchIds) {
+            if (StringUtils.hasText(branchId) && !validBranches.containsKey(branchId)) {
+                throw new BusinessException(ApiCode.BRANCH_NOT_FOUND);
             }
         }
-        return validBranches;
     }
 
     private String generateSkuPrefix(Shop shop, String category) {
@@ -511,10 +509,12 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         existing.setActive(request.isActive());
     }
 
-    private List<BranchProduct> createBranchProducts(Shop shop, Product product, List<String> branchIds,
-                                                     Map<String, Branch> validBranches) {
+    private List<BranchProduct> createBranchProducts(Shop shop, Product product, List<String> branchIds) {
         List<BranchProduct> branchProducts = new ArrayList<>();
         if (branchIds == null || branchIds.isEmpty()) return branchProducts;
+
+        // Validate tất cả branchId thuộc shop
+        validateBranches(shop.getId(), branchIds);
 
         // Check for existing BranchProducts
         List<BranchProduct> existingBranchProducts = branchProductRepository
@@ -535,14 +535,11 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         .price(product.getDefaultPrice()) // Lấy giá mặc định từ Product
                         .branchCostPrice(product.getCostPrice())
                         .activeInBranch(product.isActive())
-                        .product(product)
-                        .shop(shop)
-                        .branch(validBranches.get(branchId))
                         .build();
                 branchProducts.add(branchProduct);
             }
         }
-        return saveAllBranchProducts(branchProducts).join();
+        return saveAllBranchProducts(branchProducts);
     }
 
     private void logProductCreation(String shopId, Product product, List<String> branchIds) {
@@ -562,9 +559,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         product.getName(), product.getSku(), oldName, oldCategory, oldBarcode));
     }
 
-    @Async("taskExecutor")
-    public CompletableFuture<List<BranchProduct>> saveAllBranchProducts(List<BranchProduct> branchProducts) {
-        return CompletableFuture.completedFuture(branchProductRepository.saveAll(branchProducts));
+    private List<BranchProduct> saveAllBranchProducts(List<BranchProduct> branchProducts) {
+        return branchProductRepository.saveAll(branchProducts);
     }
 
     private String calculateEan13CheckDigit(String baseCode) {
@@ -578,7 +574,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 evenSum += digits[i];
             }
         }
-        int total = oddSum * 3 + evenSum;
+        int total = oddSum + evenSum * 3;
         int checkDigit = (10 - (total % 10)) % 10;
         return String.valueOf(checkDigit);
     }
@@ -619,6 +615,30 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         files.size(), product.getName(), product.getSku(), currentImages.size()));
 
         return currentImages;
+    }
+
+    @Override
+    public void seedBranchProductsForNewBranch(String shopId, String branchId) {
+        List<Product> products = productRepository.findAllByShopIdAndDeletedFalse(shopId);
+        if (products.isEmpty()) return;
+
+        // Branch vừa được tạo mới → chắc chắn chưa có BranchProduct nào
+        // Seed BranchProduct cho tất cả products hiện có của shop
+        List<BranchProduct> branchProducts = products.stream()
+                .map(p -> BranchProduct.builder()
+                        .productId(p.getId())
+                        .shopId(shopId)
+                        .branchId(branchId)
+                        .quantity(0)
+                        .minQuantity(0)
+                        .price(p.getDefaultPrice())
+                        .branchCostPrice(p.getCostPrice())
+                        .activeInBranch(p.isActive())
+                        .build())
+                .collect(Collectors.toList());
+
+        branchProductRepository.saveAll(branchProducts);
+        productCache.evictByShop(shopId);
     }
 
     @Override

@@ -12,7 +12,6 @@ import com.example.sales.model.Branch;
 import com.example.sales.repository.BranchRepository;
 import com.example.sales.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,7 +22,7 @@ public class BranchService {
 
     private final BranchRepository branchRepository;
     private final AuditLogService auditLogService;
-    private final MongoTemplate mongoTemplate;
+    private final ProductService productService;
 
 
     public List<BranchListResponse> getAll(String shopId) {
@@ -53,6 +52,10 @@ public class BranchService {
                 .build();
 
         Branch saved = branchRepository.save(branch);
+
+        // Seed BranchProduct cho tất cả products hiện có trong shop
+        // → đảm bảo branch mới luôn có đầy đủ sản phẩm dù được tạo sau
+        productService.seedBranchProductsForNewBranch(shopId, saved.getId());
 
         auditLogService.log(
                 userId,

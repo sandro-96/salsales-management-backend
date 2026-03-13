@@ -49,5 +49,11 @@ public interface ProductService {
 
     // Xóa một ảnh khỏi sản phẩm theo URL — trả về danh sách URL ảnh còn lại
     List<String> deleteProductImage(String userId, String shopId, String productId, String imageUrl);
+
+    /**
+     * Seed BranchProduct cho toàn bộ Products hiện có của shop khi tạo branch mới.
+     * Mỗi Product sẽ có 1 BranchProduct với giá mặc định từ Product, tồn kho = 0.
+     */
+    void seedBranchProductsForNewBranch(String shopId, String branchId);
 }
 

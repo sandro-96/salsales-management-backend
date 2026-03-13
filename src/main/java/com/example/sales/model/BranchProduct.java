@@ -6,8 +6,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DBRef;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,6 +21,11 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document("branch_products")
+@CompoundIndexes({
+        @CompoundIndex(def = "{'shopId': 1, 'branchId': 1, 'deleted': 1}", name = "idx_shop_branch_deleted"),
+        @CompoundIndex(def = "{'shopId': 1, 'deleted': 1}", name = "idx_shop_deleted"),
+        @CompoundIndex(def = "{'productId': 1, 'branchId': 1}", unique = true, name = "idx_product_branch_unique")
+})
 public class BranchProduct extends BaseEntity {
     @Id
     private String id;
@@ -54,12 +60,5 @@ public class BranchProduct extends BaseEntity {
     private boolean activeInBranch = true; // Trạng thái tại chi nhánh
 
     private List<BranchProductVariant> variants; // Biến thể tại chi nhánh
-
-    // (Tùy chọn) Tham chiếu trực tiếp đến Product, Shop, Branch
-    @DBRef
-    private Product product;
-    @DBRef
-    private Shop shop;
-    @DBRef
-    private Branch branch;
 }
+
