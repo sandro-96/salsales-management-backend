@@ -121,7 +121,7 @@ public class ProductCrudController {
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @ModelAttribute ProductSearchRequest request,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<ProductResponse> response = productService.searchProducts(shopId, request.getBranchId(), request, pageable);
+        Page<ProductResponse> response = productCache.searchProducts(shopId, request.getBranchId(), request, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_SEARCH_RESULTS, response));
     }
 

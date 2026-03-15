@@ -1,6 +1,8 @@
 package com.example.sales.cache;
 
 import com.example.sales.dto.product.ProductResponse;
+import com.example.sales.dto.product.ProductSearchRequest;
+import com.example.sales.helper.ProductSearchHelper;
 import com.example.sales.model.BranchProduct;
 import com.example.sales.model.Product;
 import com.example.sales.repository.BranchProductRepository;
@@ -22,11 +24,13 @@ import java.util.stream.Collectors;
 /**
  * Cache layer for product-related data.
  *
- * Key pattern: "branch_products_by_shop_branch" :: "{shopId}:all:p{page}:s{size}:{sort}"
- *                                                   "{shopId}:{branchId}:p{page}:s{size}:{sort}"
+ * Key pattern: "branch_products_by_shop_branch" ::
+ *   "{shopId}:all:p{page}:s{size}:{sort}"
+ *   "{shopId}:{branchId}:p{page}:s{size}:{sort}"
+ *   "{shopId}:search:{branchId}:kw=...:cat=...:act=...:minP=...:maxP=...:p{page}:s{size}:{sort}"
  *
  * Paging info được đưa vào key để mỗi trang có entry riêng biệt trong cache.
- * evictByShop(shopId) scan prefix "{shopId}:" để xóa toàn bộ entries của shop.
+ * evictByShop(shopId) scan prefix "{shopId}:" để xóa toàn bộ entries của shop (bao gồm cả search keys).
  */
 @Component
 public class ProductCache {
@@ -36,15 +40,18 @@ public class ProductCache {
     private final BranchProductRepository branchProductRepository;
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final ProductSearchHelper productSearchHelper;
     private final CacheManager cacheManager;
 
     public ProductCache(BranchProductRepository branchProductRepository,
                         ProductRepository productRepository,
                         ProductMapper productMapper,
+                        ProductSearchHelper productSearchHelper,
                         CacheManager cacheManager) {
         this.branchProductRepository = branchProductRepository;
         this.productRepository = productRepository;
         this.productMapper = productMapper;
+        this.productSearchHelper = productSearchHelper;
         this.cacheManager = cacheManager;
     }
 
@@ -70,6 +77,34 @@ public class ProductCache {
         Page<BranchProduct> branchProductsPage =
                 branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
         return toResponsePage(branchProductsPage, pageable);
+    }
+
+    /**
+     * Tìm kiếm sản phẩm theo keyword, category, price range, active, branchId...
+     * Cache key: "{shopId}:search:{branchId}:kw=...:cat=...:act=...:minP=...:maxP=...:p{page}:s{size}:{sort}"
+     * Key bắt đầu bằng "{shopId}:" nên evictByShop() sẽ xóa đúng.
+     */
+    @Cacheable(value = CACHE_NAME, key = "#shopId + ':search:' + (#branchId ?: '') + ':kw=' + #request.keyword + ':cat=' + #request.category + ':act=' + #request.active + ':minP=' + #request.minPrice + ':maxP=' + #request.maxPrice + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
+    public Page<ProductResponse> searchProducts(String shopId, String branchId,
+                                                ProductSearchRequest request, Pageable pageable) {
+        Set<String> matchingProductIds = productSearchHelper.findMatchingProductIds(shopId, request);
+
+        List<BranchProduct> branchProducts =
+                productSearchHelper.searchBranchProducts(shopId, branchId, matchingProductIds, request, pageable);
+        long total = productSearchHelper.countBranchProducts(shopId, branchId, matchingProductIds, request);
+
+        Set<String> productIds = branchProducts.stream()
+                .map(BranchProduct::getProductId)
+                .collect(Collectors.toSet());
+
+        Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        List<ProductResponse> responses = branchProducts.stream()
+                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId())))
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(responses, pageable, total);
     }
 
     private Page<ProductResponse> toResponsePage(Page<BranchProduct> branchProductsPage, Pageable pageable) {

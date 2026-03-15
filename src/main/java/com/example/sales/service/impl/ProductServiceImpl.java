@@ -12,7 +12,9 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.helper.ProductSearchHelper;
 import com.example.sales.model.Branch;
 import com.example.sales.model.BranchProduct;
+import com.example.sales.model.BranchProductVariant;
 import com.example.sales.model.Product;
+import com.example.sales.model.ProductVariant;
 import com.example.sales.model.Shop;
 import com.example.sales.repository.BranchProductRepository;
 import com.example.sales.repository.BranchRepository;
@@ -487,7 +489,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .images(request.getImages())
                 .barcode(request.getBarcode())
                 .supplierId(request.getSupplierId())
-                .variants(request.getVariants())
+                .variants(assignVariantIds(request.getVariants()))
                 .priceHistory(request.getPriceHistory())
                 .active(request.isActive())
                 .build();
@@ -504,9 +506,23 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         existing.setImages(request.getImages());
         existing.setBarcode(request.getBarcode());
         existing.setSupplierId(request.getSupplierId());
-        existing.setVariants(request.getVariants());
+        existing.setVariants(assignVariantIds(request.getVariants()));
         existing.setPriceHistory(request.getPriceHistory());
         existing.setActive(request.isActive());
+    }
+
+    /**
+     * Tự động sinh variantId (UUID) cho các variant chưa có ID.
+     * Giữ nguyên variantId nếu đã tồn tại (trường hợp update).
+     */
+    private List<ProductVariant> assignVariantIds(List<ProductVariant> variants) {
+        if (variants == null || variants.isEmpty()) return variants;
+        variants.forEach(v -> {
+            if (!StringUtils.hasText(v.getVariantId())) {
+                v.setVariantId(UUID.randomUUID().toString());
+            }
+        });
+        return variants;
     }
 
     private List<BranchProduct> createBranchProducts(Shop shop, Product product, List<String> branchIds) {
@@ -523,6 +539,20 @@ public class ProductServiceImpl extends BaseService implements ProductService {
             throw new BusinessException(ApiCode.PRODUCT_EXISTS_IN_BRANCH);
         }
 
+        // Seed BranchProductVariant từ ProductVariant (giá mặc định của từng biến thể)
+        List<BranchProductVariant> seededVariants = null;
+        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
+            seededVariants = product.getVariants().stream()
+                    .map(v -> BranchProductVariant.builder()
+                            .variantId(v.getVariantId())
+                            .quantity(0)
+                            .price(v.getPrice())
+                            .branchCostPrice(v.getCostPrice())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+        final List<BranchProductVariant> finalSeededVariants = seededVariants;
+
         // Khởi tạo BranchProduct với giá mặc định từ Product
         for (String branchId : branchIds) {
             if (StringUtils.hasText(branchId)) {
@@ -535,6 +565,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         .price(product.getDefaultPrice()) // Lấy giá mặc định từ Product
                         .branchCostPrice(product.getCostPrice())
                         .activeInBranch(product.isActive())
+                        .variants(finalSeededVariants)
                         .build();
                 branchProducts.add(branchProduct);
             }
