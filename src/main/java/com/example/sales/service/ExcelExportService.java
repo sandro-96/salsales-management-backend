@@ -2,7 +2,7 @@
 package com.example.sales.service;
 
 import com.example.sales.cache.ProductCache;
-import com.example.sales.dto.product.ProductResponse; // Import ProductResponse
+import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.export.GenericExcelExporter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -10,27 +10,127 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
 import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
+/**
+ * Xuất sản phẩm ra file Excel với cấu trúc cột nhất quán với ExcelImportService:
+ *
+ *   Col  0  SKU
+ *   Col  1  Tên sản phẩm
+ *   Col  2  Danh mục
+ *   Col  3  Đơn vị
+ *   Col  4  Barcode
+ *   Col  5  Giá nhập mặc định   (Product.costPrice)
+ *   Col  6  Giá bán mặc định    (Product.defaultPrice)
+ *   Col  7  Giá bán chi nhánh   (BranchProduct.price)
+ *   Col  8  Giá nhập chi nhánh  (BranchProduct.branchCostPrice)
+ *   Col  9  Số lượng            (BranchProduct.quantity)
+ *   Col 10  Số lượng tối thiểu  (BranchProduct.minQuantity)
+ *   Col 11  Giá khuyến mãi      (BranchProduct.discountPrice)
+ *   Col 12  % Giảm giá          (BranchProduct.discountPercentage)
+ *   Col 13  Hạn sử dụng         (BranchProduct.expiryDate, yyyy-MM-dd)
+ *   Col 14  Mô tả               (Product.description)
+ *   Col 15  Trạng thái SP       (Product.active)
+ *   Col 16  Trạng thái chi nhánh (BranchProduct.activeInBranch)
+ */
 @Service
 @RequiredArgsConstructor
 public class ExcelExportService {
 
     private final ProductCache productCache;
 
-    // Phương thức exportExcel tổng quát có thể giữ nguyên nếu bạn vẫn dùng nó ở nơi khác
-    public <T> ResponseEntity<byte[]> exportExcel(String fileName,
-                                                  String sheetName,
-                                                  List<String> headers,
-                                                  List<T> data,
-                                                  Function<T, List<String>> rowMapper) {
-        try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) { // Sử dụng ByteArrayOutputStream
-            GenericExcelExporter<T> exporter = new GenericExcelExporter<>();
-            exporter.export(sheetName, headers, data, rowMapper, bos); // Ghi vào OutputStream
+    private static final String PRODUCT_NOTE_ROW = "* Cột đỏ = bắt buộc (Tên sản phẩm, Danh mục)";
 
-            byte[] content = bos.toByteArray(); // Lấy byte array từ OutputStream
+    private static final List<String> PRODUCT_HEADERS = List.of(
+            "SKU",
+            "Tên sản phẩm",
+            "Danh mục",
+            "Đơn vị",
+            "Barcode",
+            "Giá nhập mặc định",
+            "Giá bán mặc định",
+            "Giá bán chi nhánh",
+            "Giá nhập chi nhánh",
+            "Số lượng",
+            "Số lượng tối thiểu",
+            "Giá khuyến mãi",
+            "% Giảm giá",
+            "Hạn sử dụng",
+            "Mô tả",
+            "Trạng thái SP",
+            "Trạng thái chi nhánh"
+    );
+
+    private static final Function<ProductResponse, List<String>> PRODUCT_ROW_MAPPER = p -> {
+        List<String> row = new ArrayList<>();
+        row.add(safe(p.getSku()));
+        row.add(safe(p.getName()));
+        row.add(safe(p.getCategory()));
+        row.add(safe(p.getUnit()));
+        row.add(safe(p.getBarcode()));
+        row.add(String.valueOf(p.getCostPrice()));
+        row.add(String.valueOf(p.getDefaultPrice()));
+        // BranchProduct fields — may be 0 when exported at shop level (no branchId)
+        row.add(p.getBranchId() != null ? String.valueOf(p.getPrice())          : "");
+        row.add(p.getBranchId() != null ? String.valueOf(p.getBranchCostPrice()) : "");
+        row.add(p.getBranchId() != null ? String.valueOf(p.getQuantity())        : "");
+        row.add(p.getBranchId() != null ? String.valueOf(p.getMinQuantity())     : "");
+        row.add(p.getBranchId() != null && p.getDiscountPrice()      != null ? String.valueOf(p.getDiscountPrice())      : "");
+        row.add(p.getBranchId() != null && p.getDiscountPercentage() != null ? String.valueOf(p.getDiscountPercentage()) : "");
+        row.add(p.getBranchId() != null && p.getExpiryDate()         != null ? p.getExpiryDate().toString()             : "");
+        row.add(safe(p.getDescription()));
+        row.add(p.isActive() ? "TRUE" : "FALSE");
+        row.add(p.getBranchId() != null ? (p.isActiveInBranch() ? "TRUE" : "FALSE") : "");
+        return row;
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Public API
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Xuất sản phẩm cho một chi nhánh cụ thể hoặc toàn shop (khi branchId == null).
+     * Khi không có branchId, các cột chi nhánh (giá bán chi nhánh, số lượng...) sẽ để trống.
+     */
+    public ResponseEntity<byte[]> exportProducts(String shopId, String branchId) {
+        List<ProductResponse> allProducts = fetchAll(shopId, branchId);
+
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            GenericExcelExporter<ProductResponse> exporter = new GenericExcelExporter<>();
+            exporter.export("Products", PRODUCT_HEADERS, PRODUCT_NOTE_ROW, allProducts, PRODUCT_ROW_MAPPER, bos);
+            byte[] content = bos.toByteArray();
+
+            String filename = StringUtils.hasText(branchId)
+                    ? "products_branch_" + branchId + ".xlsx"
+                    : "products_shop_" + shopId + ".xlsx";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            ContentDisposition.attachment().filename(filename).build().toString())
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(content);
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể export file Excel sản phẩm", e);
+        }
+    }
+
+    /**
+     * Phương thức exportExcel tổng quát — dùng được cho các entity khác ngoài Product.
+     */
+    public <T> ResponseEntity<byte[]> exportExcel(String fileName,
+                                                   String sheetName,
+                                                   List<String> headers,
+                                                   List<T> data,
+                                                   Function<T, List<String>> rowMapper) {
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+            GenericExcelExporter<T> exporter = new GenericExcelExporter<>();
+            exporter.export(sheetName, headers, data, rowMapper, bos);
+            byte[] content = bos.toByteArray();
 
             HttpHeaders responseHeaders = new HttpHeaders();
             responseHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
@@ -42,60 +142,27 @@ public class ExcelExportService {
         }
     }
 
-    // ✅ Phương thức exportProducts được cập nhật để sử dụng ProductService và ProductResponse
-    public ResponseEntity<byte[]> exportProducts(String shopId, String branchId) {
-        // Lấy dữ liệu ProductResponse từ ProductService
-        // Sử dụng phân trang để tránh load quá nhiều dữ liệu cùng lúc
-        Pageable pageable = PageRequest.of(0, 1000); // Lấy 1000 sản phẩm mỗi lần
-        Page<ProductResponse> productPage;
-        List<ProductResponse> allProducts = new java.util.ArrayList<>();
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
+    private List<ProductResponse> fetchAll(String shopId, String branchId) {
+        List<ProductResponse> result = new ArrayList<>();
+        Pageable pageable = PageRequest.of(0, 500);
+        Page<ProductResponse> page;
         do {
-            if (org.springframework.util.StringUtils.hasText(branchId)) {
-                productPage = productCache.getAllByBranch(shopId, branchId, "", pageable);
+            if (StringUtils.hasText(branchId)) {
+                page = productCache.getAllByBranch(shopId, branchId, "", pageable);
             } else {
-                productPage = productCache.getAllByShop(shopId, "", pageable);
+                page = productCache.getAllByShop(shopId, "", pageable);
             }
-            allProducts.addAll(productPage.getContent());
-            if (productPage.hasNext()) {
-                pageable = productPage.nextPageable();
-            } else {
-                break;
-            }
-        } while (true);
+            result.addAll(page.getContent());
+            pageable = page.hasNext() ? page.nextPageable() : null;
+        } while (pageable != null);
+        return result;
+    }
 
-
-        // Định nghĩa headers cho file Excel
-        List<String> headers = List.of(
-                "SKU", "Tên sản phẩm", "Danh mục", "Chi nhánh ID",
-                "Số lượng", "Giá", "Đơn vị", "Mô tả", "Trạng thái hoạt động"
-        );
-
-        // Định nghĩa cách map ProductResponse thành các dòng dữ liệu
-        Function<ProductResponse, List<String>> rowMapper = p -> List.of(
-                p.getSku() != null ? p.getSku() : "",
-                p.getName() != null ? p.getName() : "",
-                p.getCategory() != null ? p.getCategory() : "",
-                p.getBranchId() != null ? p.getBranchId() : "",
-                String.valueOf(p.getQuantity()),
-                String.valueOf(p.getPrice()),
-                p.getUnit() != null ? p.getUnit() : "",
-                p.getDescription() != null ? p.getDescription() : "",
-                p.isActiveInBranch() ? "Có" : "Không"
-        );
-
-        // Sử dụng GenericExcelExporter để tạo file Excel
-        try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            GenericExcelExporter<ProductResponse> exporter = new GenericExcelExporter<>();
-            exporter.export("Products", headers, allProducts, rowMapper, bos);
-            byte[] content = bos.toByteArray();
-
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("products.xlsx").build().toString())
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(content);
-        } catch (Exception e) {
-            throw new RuntimeException("Không thể export file Excel sản phẩm", e);
-        }
+    private static String safe(String value) {
+        return value != null ? value : "";
     }
 }
