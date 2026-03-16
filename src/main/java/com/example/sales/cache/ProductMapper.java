@@ -47,6 +47,7 @@ public class ProductMapper {
                     .branchVariants(branchProduct.getVariants())
                     .branchId(branchProduct.getBranchId())
                     .activeInBranch(branchProduct.isActiveInBranch())
+                    .branchPriceHistory(branchProduct.getPriceHistory())
                     .createdAt(branchProduct.getCreatedAt())
                     .updatedAt(branchProduct.getUpdatedAt());
         }

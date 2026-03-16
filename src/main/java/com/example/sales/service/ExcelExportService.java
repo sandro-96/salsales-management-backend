@@ -52,9 +52,9 @@ public class ExcelExportService {
 
         do {
             if (org.springframework.util.StringUtils.hasText(branchId)) {
-                productPage = productCache.getAllByBranch(shopId, branchId, pageable);
+                productPage = productCache.getAllByBranch(shopId, branchId, "", pageable);
             } else {
-                productPage = productCache.getAllByShop(shopId, pageable);
+                productPage = productCache.getAllByShop(shopId, "", pageable);
             }
             allProducts.addAll(productPage.getContent());
             if (productPage.hasNext()) {

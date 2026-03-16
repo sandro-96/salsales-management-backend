@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -57,26 +58,42 @@ public class ProductCache {
 
     /**
      * Lấy danh sách sản phẩm toàn shop (cấp Product, không phân biệt chi nhánh).
-     * Cache key: "{shopId}:all:p{page}:s{size}:{sort}"
+     * Khi có keyword sẽ tìm theo name/SKU/barcode trên collection products.
+     * Cache key: "{shopId}:all:kw={keyword}:p{page}:s{size}:{sort}"
      */
-    @Cacheable(value = CACHE_NAME, key = "#shopId + ':all:p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
-    public Page<ProductResponse> getAllByShop(String shopId, Pageable pageable) {
-        Page<Product> productsPage = productRepository.findByShopIdAndDeletedFalse(shopId, pageable);
-        List<ProductResponse> responses = productsPage.getContent().stream()
-                .map(p -> productMapper.toResponse(null, p))
-                .collect(Collectors.toList());
-        return new PageImpl<>(responses, pageable, productsPage.getTotalElements());
+    @Cacheable(value = CACHE_NAME, key = "#shopId + ':all:kw=' + #keyword + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
+    public Page<ProductResponse> getAllByShop(String shopId, String keyword, Pageable pageable) {
+        if (!StringUtils.hasText(keyword)) {
+            // Fast path: không có keyword → query trực tiếp
+            Page<Product> productsPage = productRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+            List<ProductResponse> responses = productsPage.getContent().stream()
+                    .map(p -> productMapper.toResponse(null, p))
+                    .collect(Collectors.toList());
+            return new PageImpl<>(responses, pageable, productsPage.getTotalElements());
+        }
+        // Keyword path: lọc qua ProductSearchHelper
+        ProductSearchRequest req = new ProductSearchRequest();
+        req.setKeyword(keyword);
+        return doSearch(shopId, null, req, pageable);
     }
 
     /**
      * Lấy danh sách sản phẩm theo chi nhánh cụ thể.
-     * Cache key: "{shopId}:{branchId}:p{page}:s{size}:{sort}"
+     * Khi có keyword sẽ tìm theo name/SKU/barcode trên collection products.
+     * Cache key: "{shopId}:{branchId}:kw={keyword}:p{page}:s{size}:{sort}"
      */
-    @Cacheable(value = CACHE_NAME, key = "#shopId + ':' + #branchId + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
-    public Page<ProductResponse> getAllByBranch(String shopId, String branchId, Pageable pageable) {
-        Page<BranchProduct> branchProductsPage =
-                branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
-        return toResponsePage(branchProductsPage, pageable);
+    @Cacheable(value = CACHE_NAME, key = "#shopId + ':' + #branchId + ':kw=' + #keyword + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
+    public Page<ProductResponse> getAllByBranch(String shopId, String branchId, String keyword, Pageable pageable) {
+        if (!StringUtils.hasText(keyword)) {
+            // Fast path: không có keyword → query trực tiếp
+            Page<BranchProduct> branchProductsPage =
+                    branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
+            return toResponsePage(branchProductsPage, pageable);
+        }
+        // Keyword path: lọc qua ProductSearchHelper
+        ProductSearchRequest req = new ProductSearchRequest();
+        req.setKeyword(keyword);
+        return doSearch(shopId, branchId, req, pageable);
     }
 
     /**
@@ -87,6 +104,15 @@ public class ProductCache {
     @Cacheable(value = CACHE_NAME, key = "#shopId + ':search:' + (#branchId ?: '') + ':kw=' + #request.keyword + ':cat=' + #request.category + ':act=' + #request.active + ':minP=' + #request.minPrice + ':maxP=' + #request.maxPrice + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
     public Page<ProductResponse> searchProducts(String shopId, String branchId,
                                                 ProductSearchRequest request, Pageable pageable) {
+        return doSearch(shopId, branchId, request, pageable);
+    }
+
+    /**
+     * Logic tìm kiếm dùng chung cho searchProducts, getAllByShop(keyword), getAllByBranch(keyword).
+     * Không đặt @Cacheable ở đây — caching được xử lý ở tầng gọi (tránh self-invocation bypass proxy).
+     */
+    private Page<ProductResponse> doSearch(String shopId, String branchId,
+                                           ProductSearchRequest request, Pageable pageable) {
         Set<String> matchingProductIds = productSearchHelper.findMatchingProductIds(shopId, request);
 
         List<BranchProduct> branchProducts =

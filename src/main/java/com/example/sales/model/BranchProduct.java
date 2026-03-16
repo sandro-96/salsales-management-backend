@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -60,5 +61,8 @@ public class BranchProduct extends BaseEntity {
     private boolean activeInBranch = true; // Trạng thái tại chi nhánh
 
     private List<BranchProductVariant> variants; // Biến thể tại chi nhánh
+
+    @Builder.Default
+    private List<PriceHistory> priceHistory = new ArrayList<>(); // Lịch sử giá tại chi nhánh
 }
 

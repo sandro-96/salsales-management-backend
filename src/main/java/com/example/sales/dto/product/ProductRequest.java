@@ -1,7 +1,6 @@
 // File: src/main/java/com/example/sales/dto/product/ProductRequest.java
 package com.example.sales.dto.product;
 
-import com.example.sales.model.PriceHistory;
 import com.example.sales.model.ProductVariant;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
@@ -20,6 +19,8 @@ import java.util.Map;
  * Các trường riêng của từng chi nhánh (price, quantity, branchCostPrice, discount...)
  * được quản lý riêng qua BranchProductRequest và API:
  *   PUT /shops/{shopId}/branches/{branchId}/products/{branchProductId}
+ *
+ * Lưu ý: priceHistory KHÔNG được truyền từ client — tự động ghi bởi server khi giá thay đổi.
  */
 @Data
 @Builder(toBuilder = true)
@@ -53,7 +54,8 @@ public class ProductRequest {
     private String supplierId;
 
     private List<ProductVariant> variants;
-    private List<PriceHistory> priceHistory;
+
+    private String reason; // Lý do thay đổi giá (tùy chọn, dùng khi update)
 
     @Builder.Default
     private boolean active = true;

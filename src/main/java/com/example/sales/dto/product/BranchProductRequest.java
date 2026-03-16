@@ -40,5 +40,7 @@ public class BranchProductRequest {
     private LocalDate expiryDate; // Hạn sử dụng (dành cho thực phẩm, thuốc...)
 
     private List<BranchProductVariant> branchVariants; // Biến thể tại chi nhánh
+
+    private String reason; // Lý do thay đổi giá (tùy chọn, dùng khi ghi priceHistory)
 }
 

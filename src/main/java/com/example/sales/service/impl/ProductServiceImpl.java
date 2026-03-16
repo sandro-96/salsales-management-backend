@@ -13,6 +13,7 @@ import com.example.sales.helper.ProductSearchHelper;
 import com.example.sales.model.Branch;
 import com.example.sales.model.BranchProduct;
 import com.example.sales.model.BranchProductVariant;
+import com.example.sales.model.PriceHistory;
 import com.example.sales.model.Product;
 import com.example.sales.model.ProductVariant;
 import com.example.sales.model.Shop;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,6 +46,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl extends BaseService implements ProductService {
+    private static final int MAX_PRICE_HISTORY = 50;
+
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
     private final ShopRepository shopRepository;
@@ -193,7 +197,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 });
 
         // Update Product fields only
-        updateExistingProduct(product, request);
+        updateExistingProduct(product, request, userId);
         product = productRepository.save(product);
 
         // Log audit
@@ -226,6 +230,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Lấy shop để kiểm tra trackInventory
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // Auto-track thay đổi giá trước khi ghi đè
+        appendBranchPriceHistory(branchProduct, request, userId, product.getDefaultPrice());
 
         // Cập nhật các field BranchProduct
         branchProduct.setPrice(request.getPrice() != 0 ? request.getPrice() : product.getDefaultPrice());
@@ -490,12 +497,15 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .barcode(request.getBarcode())
                 .supplierId(request.getSupplierId())
                 .variants(assignVariantIds(request.getVariants()))
-                .priceHistory(request.getPriceHistory())
+                .priceHistory(new ArrayList<>()) // Bắt đầu rỗng — history sẽ được ghi khi giá thay đổi
                 .active(request.isActive())
                 .build();
     }
 
-    private void updateExistingProduct(Product existing, ProductRequest request) {
+    private void updateExistingProduct(Product existing, ProductRequest request, String userId) {
+        // Auto-track thay đổi giá trước khi ghi đè
+        appendProductPriceHistory(existing, request, userId);
+
         existing.setName(request.getName());
         existing.setNameTranslations(request.getNameTranslations());
         existing.setCategory(request.getCategory());
@@ -507,8 +517,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         existing.setBarcode(request.getBarcode());
         existing.setSupplierId(request.getSupplierId());
         existing.setVariants(assignVariantIds(request.getVariants()));
-        existing.setPriceHistory(request.getPriceHistory());
         existing.setActive(request.isActive());
+        // priceHistory KHÔNG lấy từ request — được quản lý bởi appendProductPriceHistory()
     }
 
     /**
@@ -705,6 +715,66 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         product.getName(), product.getSku(), currentImages.size()));
 
         return currentImages;
+    }
+
+    /**
+     * Tự động ghi lịch sử giá cho Product (cấp shop).
+     * Chỉ append khi defaultPrice hoặc costPrice thực sự thay đổi.
+     * Giữ tối đa MAX_PRICE_HISTORY entries (FIFO — xóa entry cũ nhất khi vượt giới hạn).
+     */
+    private void appendProductPriceHistory(Product product, ProductRequest request, String userId) {
+        boolean priceChanged = Math.abs(product.getDefaultPrice() - request.getDefaultPrice()) > 0.001;
+        boolean costChanged  = Math.abs(product.getCostPrice()    - request.getCostPrice())    > 0.001;
+        if (!priceChanged && !costChanged) return;
+
+        List<PriceHistory> history = new ArrayList<>(
+                product.getPriceHistory() != null ? product.getPriceHistory() : List.of()
+        );
+        history.add(PriceHistory.builder()
+                .oldPrice(product.getDefaultPrice())
+                .newPrice(request.getDefaultPrice())
+                .oldCostPrice(product.getCostPrice())
+                .newCostPrice(request.getCostPrice())
+                .changedAt(LocalDateTime.now())
+                .changedBy(userId)
+                .reason(request.getReason())
+                .build());
+
+        if (history.size() > MAX_PRICE_HISTORY) {
+            history = history.subList(history.size() - MAX_PRICE_HISTORY, history.size());
+        }
+        product.setPriceHistory(history);
+    }
+
+    /**
+     * Tự động ghi lịch sử giá cho BranchProduct (cấp chi nhánh).
+     * Chỉ append khi price hoặc branchCostPrice thực sự thay đổi.
+     * Giữ tối đa MAX_PRICE_HISTORY entries (FIFO).
+     */
+    private void appendBranchPriceHistory(BranchProduct branchProduct, BranchProductRequest request,
+                                          String userId, double defaultPrice) {
+        double newPrice = request.getPrice() != 0 ? request.getPrice() : defaultPrice;
+        boolean priceChanged = Math.abs(branchProduct.getPrice()          - newPrice)                   > 0.001;
+        boolean costChanged  = Math.abs(branchProduct.getBranchCostPrice() - request.getBranchCostPrice()) > 0.001;
+        if (!priceChanged && !costChanged) return;
+
+        List<PriceHistory> history = new ArrayList<>(
+                branchProduct.getPriceHistory() != null ? branchProduct.getPriceHistory() : List.of()
+        );
+        history.add(PriceHistory.builder()
+                .oldPrice(branchProduct.getPrice())
+                .newPrice(newPrice)
+                .oldCostPrice(branchProduct.getBranchCostPrice())
+                .newCostPrice(request.getBranchCostPrice())
+                .changedAt(LocalDateTime.now())
+                .changedBy(userId)
+                .reason(request.getReason())
+                .build());
+
+        if (history.size() > MAX_PRICE_HISTORY) {
+            history = history.subList(history.size() - MAX_PRICE_HISTORY, history.size());
+        }
+        branchProduct.setPriceHistory(history);
     }
 }
 
