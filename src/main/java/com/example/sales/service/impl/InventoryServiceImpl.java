@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryServiceImpl implements InventoryService {
 
     private final BranchProductRepository branchProductRepository;
-    private final ProductRepository productRepository; // Để lấy tên sản phẩm cho audit/log
+    private final ProductRepository productRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
@@ -41,7 +41,7 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (isInventoryManagementRequired(shopId)) {
+        if (!isInventoryManagementRequired(shopId)) {
             log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác nhập.", shopId);
             return -1;
         }
@@ -54,8 +54,8 @@ public class InventoryServiceImpl implements InventoryService {
         Product masterProduct = getMasterProduct(branchProduct.getProductId(), shopId);
 
         saveInventoryTransaction(
-                userId, shopId, branchId, branchProduct.getId(),
-                masterProduct.getName(), InventoryType.IMPORT, quantity, branchProduct.getQuantity(),
+                shopId, branchId, branchProduct.getId(),
+                masterProduct, InventoryType.IMPORT, quantity, branchProduct.getQuantity(),
                 note, null
         );
 
@@ -76,7 +76,7 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (isInventoryManagementRequired(shopId)) {
+        if (!isInventoryManagementRequired(shopId)) {
             log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác xuất.", shopId);
             return -1;
         }
@@ -95,8 +95,8 @@ public class InventoryServiceImpl implements InventoryService {
         Product masterProduct = getMasterProduct(branchProduct.getProductId(), shopId);
 
         saveInventoryTransaction(
-                userId, shopId, branchId, branchProduct.getId(),
-                masterProduct.getName(), InventoryType.EXPORT, quantity, branchProduct.getQuantity(),
+                shopId, branchId, branchProduct.getId(),
+                masterProduct, InventoryType.EXPORT, quantity, branchProduct.getQuantity(),
                 note, referenceId
         );
 
@@ -117,14 +117,14 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (isInventoryManagementRequired(shopId)) {
+        if (!isInventoryManagementRequired(shopId)) {
             log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác điều chỉnh.", shopId);
             return -1;
         }
 
         BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
         int oldQuantity = branchProduct.getQuantity();
-        int quantityChange = newQuantity - oldQuantity; // Số lượng thay đổi (có thể âm hoặc dương)
+        int quantityChange = newQuantity - oldQuantity;
 
         branchProduct.setQuantity(newQuantity);
         branchProductRepository.save(branchProduct);
@@ -132,8 +132,8 @@ public class InventoryServiceImpl implements InventoryService {
         Product masterProduct = getMasterProduct(branchProduct.getProductId(), shopId);
 
         saveInventoryTransaction(
-                userId, shopId, branchId, branchProduct.getId(),
-                masterProduct.getName(), InventoryType.ADJUSTMENT, quantityChange, branchProduct.getQuantity(),
+                shopId, branchId, branchProduct.getId(),
+                masterProduct, InventoryType.ADJUSTMENT, quantityChange, branchProduct.getQuantity(),
                 note, null
         );
 
@@ -149,9 +149,13 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public Page<InventoryTransactionResponse> getTransactionHistory(String userId, String shopId, String branchId, String branchProductId, Pageable pageable) {
+        findBranchProduct(shopId, branchId, branchProductId);
+
         auditLogService.log(userId, shopId, branchProductId, "BRANCH_PRODUCT", "INVENTORY_HISTORY_VIEW",
                 String.format("Lấy lịch sử giao dịch tồn kho cho sản phẩm '%s' tại chi nhánh %s.", branchProductId, branchId));
-        return inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(branchProductId, pageable)
+
+        return inventoryTransactionRepository
+                .findByProductIdAndShopIdAndBranchIdOrderByCreatedAtDesc(branchProductId, shopId, branchId, pageable)
                 .map(this::mapToInventoryTransactionResponse);
     }
 
@@ -159,7 +163,7 @@ public class InventoryServiceImpl implements InventoryService {
     public boolean isInventoryManagementRequired(String shopId) {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-        return !shop.getType().isTrackInventory(); // Ví dụ: Cửa hàng dịch vụ không quản lý tồn kho
+        return shop.getType().isTrackInventory();
     }
 
     private BranchProduct findBranchProduct(String shopId, String branchId, String branchProductId) {
@@ -173,50 +177,39 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     private void saveInventoryTransaction(
-            String userId, String shopId, String branchId, String branchProductId,
-            String productName, InventoryType type, int quantity, int currentStock, String note, String referenceId) {
+            String shopId, String branchId, String branchProductId,
+            Product masterProduct, InventoryType type, int quantity, int currentStock,
+            String note, String referenceId) {
 
         InventoryTransaction transaction = InventoryTransaction.builder()
                 .shopId(shopId)
                 .branchId(branchId)
                 .productId(branchProductId)
+                .productName(masterProduct.getName())   // [Bug #4 Fix] snapshot
+                .sku(masterProduct.getSku())             // [Bug #4 Fix] snapshot
                 .type(type)
                 .quantity(quantity)
+                .currentStock(currentStock)              // [Bug #3 Fix] snapshot tồn kho sau giao dịch
                 .note(note)
                 .referenceId(referenceId)
                 .build();
         inventoryTransactionRepository.save(transaction);
-        auditLogService.log(userId, shopId, branchProductId, "INVENTORY_TRANSACTION", type.name(),
-                String.format("Giao dịch tồn kho: %s - %s, Số lượng: %d, Tồn kho hiện tại: %d, Ghi chú: %s, Tham chiếu: %s",
-                        productName, type.name(), quantity, currentStock, note, referenceId));
     }
 
     private InventoryTransactionResponse mapToInventoryTransactionResponse(InventoryTransaction transaction) {
-        // Tùy thuộc vào cách bạn muốn hiển thị Product name trong response,
-        // có thể cần fetch Product master ở đây hoặc Product name đã được lưu trong transaction
-        // Hiện tại, giả định InventoryTransaction chỉ lưu productId, cần fetch Product.name
-        String productName = "Unknown Product";
-        try {
-            // Lấy ID của Product master từ BranchProduct ID trong transaction
-            BranchProduct branchProduct = branchProductRepository.findById(transaction.getProductId()).orElse(null);
-            if (branchProduct != null) {
-                Product masterProduct = productRepository.findById(branchProduct.getProductId()).orElse(null);
-                if (masterProduct != null) {
-                    productName = masterProduct.getName();
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Could not resolve product name for transaction: {}", transaction.getId(), e);
-        }
+        String productName = transaction.getProductName() != null ? transaction.getProductName() : "Unknown Product";
+        String sku = transaction.getSku() != null ? transaction.getSku() : "";
 
         return InventoryTransactionResponse.builder()
                 .id(transaction.getId())
                 .shopId(transaction.getShopId())
                 .branchId(transaction.getBranchId())
-                .branchProductId(transaction.getProductId()) // Đây là branchProductId
+                .branchProductId(transaction.getProductId())
                 .productName(productName)
+                .sku(sku)
                 .type(transaction.getType())
                 .quantity(transaction.getQuantity())
+                .currentStock(transaction.getCurrentStock())
                 .note(transaction.getNote())
                 .referenceId(transaction.getReferenceId())
                 .createdAt(transaction.getCreatedAt())

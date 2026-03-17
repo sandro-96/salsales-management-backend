@@ -24,8 +24,10 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.AuditLogService;
 import com.example.sales.service.BaseService;
 import com.example.sales.service.FileUploadService;
+import com.example.sales.service.ProductCatalogService;
 import com.example.sales.service.ProductService;
 import com.example.sales.service.SequenceService;
+import com.example.sales.util.CategoryUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -58,6 +60,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final ProductMapper productMapper;
     private final ProductSearchHelper productSearchHelper;
     private final FileUploadService fileUploadService;
+    private final ProductCatalogService productCatalogService;
 
     private static final int MAX_PRODUCT_IMAGES = 10;
 
@@ -103,6 +106,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Log audit
         logProductCreation(shopId, product, branchIds);
 
+        // Upsert vào internal catalog nếu sản phẩm có barcode
+        catalogUpsert(product);
+
         // Evict toàn bộ cache của shop để danh sách được load lại từ DB
         productCache.evictByShop(shopId);
 
@@ -143,6 +149,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         auditLogService.log(null, shopId, product.getId(), "PRODUCT", "CREATED_BY_BRANCH",
                 String.format("Tạo sản phẩm '%s' (SKU: %s) từ chi nhánh %s",
                         product.getName(), product.getSku(), branchId));
+
+        // Upsert vào internal catalog nếu sản phẩm có barcode
+        catalogUpsert(product);
 
         productCache.evictByShop(shopId);
         return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
@@ -202,6 +211,9 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Log audit
         logProductUpdate(userId, shopId, product, oldName, oldCategory, oldBarcode);
+
+        // Upsert vào internal catalog nếu sản phẩm có barcode
+        catalogUpsert(product);
 
         // Invalidate cache cho toàn shop (vì product info thay đổi ảnh hưởng mọi branch)
         productCache.evictByShop(shopId);
@@ -444,7 +456,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     @Override
     public String getSuggestedSku(String shopId, String industry, String category) {
         String prefix = StringUtils.hasText(category)
-                ? String.format("%s_%s", industry.toUpperCase(), category.toUpperCase())
+                ? String.format("%s_%s", industry.toUpperCase(), CategoryUtils.toSkuSegment(category))
                 : industry.toUpperCase();
         return sequenceService.getNextCode(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
     }
@@ -478,7 +490,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
     private String generateSkuPrefix(Shop shop, String category) {
         return StringUtils.hasText(category)
-                ? String.format("%s_%s", shop.getType().getIndustry().name().toUpperCase(), category.toUpperCase())
+                ? String.format("%s_%s", shop.getType().getIndustry().name().toUpperCase(), CategoryUtils.toSkuSegment(category))
                 : shop.getType().getIndustry().name().toUpperCase();
     }
 
@@ -487,7 +499,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .shopId(shopId)
                 .name(request.getName())
                 .nameTranslations(request.getNameTranslations())
-                .category(request.getCategory())
+                .category(CategoryUtils.normalize(request.getCategory()))
                 .sku(sku)
                 .costPrice(request.getCostPrice())
                 .defaultPrice(request.getDefaultPrice())
@@ -508,7 +520,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         existing.setName(request.getName());
         existing.setNameTranslations(request.getNameTranslations());
-        existing.setCategory(request.getCategory());
+        existing.setCategory(CategoryUtils.normalize(request.getCategory()));
         existing.setCostPrice(request.getCostPrice());
         existing.setDefaultPrice(request.getDefaultPrice());
         existing.setUnit(request.getUnit());
@@ -598,6 +610,21 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 String.format("Cập nhật thông tin chung sản phẩm '%s' (SKU: %s). " +
                                 "Thông tin cũ - Tên: %s, Danh mục: %s, Barcode: %s",
                         product.getName(), product.getSku(), oldName, oldCategory, oldBarcode));
+    }
+
+    /**
+     * Upsert thông tin sản phẩm vào internal catalog nếu có barcode.
+     * Chạy async nên không block luồng chính.
+     */
+    private void catalogUpsert(Product product) {
+        if (!StringUtils.hasText(product.getBarcode())) return;
+        productCatalogService.upsert(
+                product.getBarcode(),
+                product.getName(),
+                product.getCategory(),
+                product.getDescription(),
+                product.getImages()
+        );
     }
 
     private List<BranchProduct> saveAllBranchProducts(List<BranchProduct> branchProducts) {

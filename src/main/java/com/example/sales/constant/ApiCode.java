@@ -92,7 +92,9 @@ public enum ApiCode {
     PRODUCT_IMAGE_UPLOADED("2010", "Product image uploaded successfully"),
     PRODUCT_IMAGE_DELETED("2011", "Product image deleted successfully"),
     PRODUCT_IMAGE_NOT_FOUND("4150", "Product image not found"),
-    PRODUCT_IMAGE_LIMIT_EXCEEDED("4151", "Product image limit exceeded (max 10 images)");
+    PRODUCT_IMAGE_LIMIT_EXCEEDED("4151", "Product image limit exceeded (max 10 images)"),
+    CATALOG_NOT_FOUND("4152", "Barcode not found in catalog"),
+    CATALOG_FOUND("2012", "Catalog entry found");
 
     private final String code;
     private final String message;

@@ -18,9 +18,11 @@ public class InventoryTransactionResponse {
     private String shopId;
     private String branchId;
     private String branchProductId; // ID của BranchProduct liên quan đến giao dịch
-    private String productName;     // Tên của sản phẩm (từ Product master)
+    private String productName;     // Tên của sản phẩm (snapshot)
+    private String sku;             // SKU sản phẩm (snapshot)
     private InventoryType type;     // Loại giao dịch (IMPORT, EXPORT, ADJUSTMENT)
     private int quantity;           // Số lượng thay đổi trong giao dịch
+    private int currentStock;       // Tồn kho sau giao dịch
     private String note;
     private String referenceId;     // ID tham chiếu (ví dụ: Order ID)
     private LocalDateTime createdAt;

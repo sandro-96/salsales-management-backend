@@ -12,6 +12,7 @@ import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.ExcelImportService;
 import com.example.sales.service.SequenceService;
+import com.example.sales.util.CategoryUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -80,7 +81,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     // ── Product fields ────────────────────────────────────────────
                     String sku          = getCellValue(row.getCell(0));
                     String name         = getCellValue(row.getCell(1));
-                    String category     = getCellValue(row.getCell(2));
+                    String category     = CategoryUtils.normalize(getCellValue(row.getCell(2)));
                     String unit         = getCellValue(row.getCell(3));
                     String barcode      = getCellValue(row.getCell(4));
                     double costPrice    = getNumericCellValue(row.getCell(5));
@@ -247,12 +248,12 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     }
 
     /**
-     * Sinh prefix SKU theo đúng quy tắc của ProductServiceImpl:
-     * "{INDUSTRY}" nếu không có category, "{INDUSTRY}_{CATEGORY}" nếu có.
+     * Sinh prefix SKU — delegate sang {@link CategoryUtils#toSkuSegment}.
+     * Ví dụ: shop RETAIL + "Cá Tươi" → "RETAIL_CA_TUOI"
      */
     private String generateSkuPrefix(Shop shop, String category) {
         return StringUtils.hasText(category)
-                ? String.format("%s_%s", shop.getType().getIndustry().name().toUpperCase(), category.toUpperCase())
+                ? String.format("%s_%s", shop.getType().getIndustry().name().toUpperCase(), CategoryUtils.toSkuSegment(category))
                 : shop.getType().getIndustry().name().toUpperCase();
     }
 

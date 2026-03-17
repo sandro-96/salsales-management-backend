@@ -26,7 +26,13 @@ public class InventoryTransaction extends BaseEntity {
 
     private InventoryType type;  // IMPORT, EXPORT, ADJUSTMENT
 
-    private int quantity;
+    private int quantity;        // Số lượng thay đổi (delta cho IMPORT/EXPORT, newQuantity cho ADJUSTMENT)
+
+    private int currentStock;    // Tồn kho SAU giao dịch — snapshot để reconstruct timeline
+
+    // Denormalized fields — snapshot tại thời điểm giao dịch, tránh N+1 khi load history
+    private String productName;
+    private String sku;
 
     private String note;
 
