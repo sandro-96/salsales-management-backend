@@ -4,10 +4,12 @@ package com.example.sales.service.impl;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.AppConstants;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.model.Branch;
 import com.example.sales.model.BranchProduct;
 import com.example.sales.model.Product;
 import com.example.sales.model.Shop;
 import com.example.sales.repository.BranchProductRepository;
+import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.ExcelImportService;
@@ -25,6 +27,7 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -60,14 +63,21 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final BranchProductRepository branchProductRepository;
     private final ShopRepository shopRepository;
     private final SequenceService sequenceService;
+    private final BranchRepository branchRepository;
 
     @Override
     @Transactional
-    public int importProducts(String shopId, String branchId, InputStream inputStream) {
+    public int importProducts(String shopId, InputStream inputStream) {
         // Load shop một lần — cần để sinh SKU theo đúng prefix industry/category
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
+        // Lấy tất cả branch active của shop
+        List<Branch> activeBranches = branchRepository.findAllByShopIdAndDeletedFalse(shopId);
+        if (activeBranches.isEmpty()) {
+            log.warn("Shop '{}' không có chi nhánh active nào!", shopId);
+            return 0;
+        }
         int importedCount = 0;
         try (Workbook workbook = WorkbookFactory.create(inputStream)) {
             Sheet sheet = findProductSheet(workbook);
@@ -81,13 +91,25 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     // ── Product fields ────────────────────────────────────────────
                     String sku          = getCellValue(row.getCell(0));
                     String name         = getCellValue(row.getCell(1));
-                    String category     = CategoryUtils.normalize(getCellValue(row.getCell(2)));
-                    String unit         = getCellValue(row.getCell(3));
+                    // Lấy value trước dấu '-' nếu có, ví dụ: "value-label" -> "value"
+                    String rawCategory  = getCellValue(row.getCell(2));
+                    String category     = null;
+                    if (rawCategory != null) {
+                        int dashIdx = rawCategory.indexOf('-');
+                        category = dashIdx > 0 ? rawCategory.substring(0, dashIdx).trim() : rawCategory.trim();
+                        category = CategoryUtils.normalize(category);
+                    }
+                    // Lấy value trước dấu '-' nếu có, ví dụ: "value-label" -> "value"
+                    String rawUnit = getCellValue(row.getCell(3));
+                    String unit = null;
+                    if (rawUnit != null) {
+                        int dashIdx = rawUnit.indexOf('-');
+                        unit = dashIdx > 0 ? rawUnit.substring(0, dashIdx).trim() : rawUnit.trim();
+                    }
                     String barcode      = getCellValue(row.getCell(4));
                     double costPrice    = getNumericCellValue(row.getCell(5));
                     double defaultPrice = getNumericCellValue(row.getCell(6));
                     String description  = getCellValue(row.getCell(14));
-                    boolean active      = getBooleanCellValue(row.getCell(15), true);
 
                     // ── BranchProduct fields ──────────────────────────────────────
                     double branchPrice       = getNumericCellValue(row.getCell(7));
@@ -97,7 +119,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                     Double discountPrice     = getNullableNumeric(row.getCell(11));
                     Double discountPct       = getNullableNumeric(row.getCell(12));
                     LocalDate expiryDate     = getDateCellValue(row.getCell(13));
-                    boolean activeInBranch   = getBooleanCellValue(row.getCell(16), true);
 
                     // Tên sản phẩm và danh mục là bắt buộc
                     // (danh mục cần thiết để sinh đúng prefix SKU: {INDUSTRY}_{CATEGORY}_XXX)
@@ -126,7 +147,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         if (StringUtils.hasText(barcode)) product.setBarcode(barcode);
                         if (costPrice >= 0) product.setCostPrice(costPrice);
                         if (defaultPrice > 0) product.setDefaultPrice(defaultPrice);
-                        product.setActive(active);
+                        product.setActive(true);
                         productRepository.save(product);
                         log.info("Cập nhật Product cho SKU '{}'", sku);
                     } else {
@@ -145,7 +166,6 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                 .barcode(StringUtils.hasText(barcode) ? barcode : null)
                                 .costPrice(costPrice)
                                 .defaultPrice(defaultPrice)
-                                .active(active)
                                 .build();
                         product = productRepository.save(product);
                         // Cập nhật sequence sau khi lưu thành công (y hệt ProductServiceImpl)
@@ -154,37 +174,38 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         log.info("Tạo mới Product với SKU '{}'", product.getSku());
                     }
 
-                    // ── 2. Upsert BranchProduct ───────────────────────────────────
-                    Optional<BranchProduct> existingBP =
-                            branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), branchId);
-                    if (existingBP.isPresent()) {
-                        BranchProduct bp = existingBP.get();
-                        bp.setPrice(branchPrice);
-                        bp.setBranchCostPrice(branchCostPrice);
-                        bp.setQuantity(quantity);
-                        bp.setMinQuantity(minQuantity);
-                        bp.setDiscountPrice(discountPrice);
-                        bp.setDiscountPercentage(discountPct);
-                        bp.setExpiryDate(expiryDate);
-                        bp.setActiveInBranch(activeInBranch);
-                        branchProductRepository.save(bp);
-                        log.info("Cập nhật BranchProduct cho SKU '{}' tại chi nhánh '{}'", product.getSku(), branchId);
-                    } else {
-                        BranchProduct bp = BranchProduct.builder()
-                                .productId(product.getId())
-                                .shopId(shopId)
-                                .branchId(branchId)
-                                .price(branchPrice)
-                                .branchCostPrice(branchCostPrice)
-                                .quantity(quantity)
-                                .minQuantity(minQuantity)
-                                .discountPrice(discountPrice)
-                                .discountPercentage(discountPct)
-                                .expiryDate(expiryDate)
-                                .activeInBranch(activeInBranch)
-                                .build();
-                        branchProductRepository.save(bp);
-                        log.info("Tạo mới BranchProduct cho SKU '{}' tại chi nhánh '{}'", product.getSku(), branchId);
+                    // ── 2. Upsert BranchProduct cho tất cả branch active ──────────
+                    for (Branch branch : activeBranches) {
+                        String branchId = branch.getId();
+                        Optional<BranchProduct> existingBP =
+                                branchProductRepository.findByProductIdAndBranchIdAndDeletedFalse(product.getId(), branchId);
+                        if (existingBP.isPresent()) {
+                            BranchProduct bp = existingBP.get();
+                            bp.setPrice(branchPrice);
+                            bp.setBranchCostPrice(branchCostPrice);
+                            bp.setQuantity(quantity);
+                            bp.setMinQuantity(minQuantity);
+                            bp.setDiscountPrice(discountPrice);
+                            bp.setDiscountPercentage(discountPct);
+                            bp.setExpiryDate(expiryDate);
+                            branchProductRepository.save(bp);
+                            log.info("Cập nhật BranchProduct cho SKU '{}' tại chi nhánh '{}'", product.getSku(), branchId);
+                        } else {
+                            BranchProduct bp = BranchProduct.builder()
+                                    .productId(product.getId())
+                                    .shopId(shopId)
+                                    .branchId(branchId)
+                                    .price(branchPrice)
+                                    .branchCostPrice(branchCostPrice)
+                                    .quantity(quantity)
+                                    .minQuantity(minQuantity)
+                                    .discountPrice(discountPrice)
+                                    .discountPercentage(discountPct)
+                                    .expiryDate(expiryDate)
+                                    .build();
+                            branchProductRepository.save(bp);
+                            log.info("Tạo mới BranchProduct cho SKU '{}' tại chi nhánh '{}'", product.getSku(), branchId);
+                        }
                     }
                     importedCount++;
                 } catch (Exception e) {
@@ -316,3 +337,4 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         return null;
     }
 }
+

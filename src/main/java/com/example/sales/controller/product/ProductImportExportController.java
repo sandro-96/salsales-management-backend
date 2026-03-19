@@ -41,13 +41,12 @@ public class ProductImportExportController {
     public ResponseEntity<ApiResponseDto<Integer>> importProducts(
             @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
             @Parameter(description = "ID cửa hàng") @RequestParam String shopId,
-            @Parameter(description = "ID chi nhánh mà sản phẩm sẽ được nhập vào") @RequestParam String branchId,
             @Parameter(description = "File Excel chứa dữ liệu sản phẩm") @RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File không được để trống.");
         }
         try {
-            int importedCount = excelImportService.importProducts(shopId, branchId, file.getInputStream());
+            int importedCount = excelImportService.importProducts(shopId, file.getInputStream());
             return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_IMPORTED, importedCount));
         } catch (IOException e) {
             throw new IllegalArgumentException("Không thể đọc file hoặc xử lý dữ liệu: " + e.getMessage(), e);

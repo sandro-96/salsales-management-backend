@@ -34,8 +34,7 @@ public final class CategoryUtils {
         for (String word : words) {
             if (!sb.isEmpty()) sb.append(" ");
             if (!word.isEmpty()) {
-                sb.append(Character.toUpperCase(word.charAt(0)));
-                sb.append(word.substring(1).toLowerCase());
+                sb.append(word);
             }
         }
         return sb.toString();
