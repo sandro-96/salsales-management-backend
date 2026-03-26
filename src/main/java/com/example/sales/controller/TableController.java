@@ -23,7 +23,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/tables")
+@RequestMapping("/api/shops/{shopId}/tables")
 @RequiredArgsConstructor
 @Validated
 public class TableController {
@@ -56,7 +56,7 @@ public class TableController {
     })
     public ApiResponseDto<Page<TableResponse>> getByShop(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
-            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
         return ApiResponseDto.success(ApiCode.SUCCESS, tableService.getByShop(user.getId(), shopId, branchId, pageable));
@@ -74,9 +74,10 @@ public class TableController {
     })
     public ApiResponseDto<TableResponse> updateStatus(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của cửa hàng") String shopId,
             @PathVariable @Parameter(description = "ID của bàn") String id,
             @RequestParam @Parameter(description = "Trạng thái mới của bàn") TableStatus status) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, tableService.updateStatus(user.getId(), id, status));
+        return ApiResponseDto.success(ApiCode.SUCCESS, tableService.updateStatus(user.getId(), shopId, id, status));
     }
 
     @PutMapping("/{id}")
@@ -91,6 +92,7 @@ public class TableController {
     })
     public ApiResponseDto<TableResponse> updateTable(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của cửa hàng") String shopId,
             @PathVariable @Parameter(description = "ID của bàn") String id,
             @RequestBody @Valid @Parameter(description = "Thông tin cập nhật bàn") TableRequest request) {
         return ApiResponseDto.success(ApiCode.SUCCESS, tableService.updateTable(user.getId(), id, request));
@@ -108,8 +110,9 @@ public class TableController {
     })
     public ApiResponseDto<?> deleteTable(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của cửa hàng") String shopId,
             @PathVariable @Parameter(description = "ID của bàn") String id) {
-        tableService.deleteTable(user.getId(), id);
+        tableService.deleteTable(user.getId(), shopId, id);
         return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 }

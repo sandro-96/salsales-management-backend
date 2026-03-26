@@ -81,9 +81,9 @@ public class TableService {
     }
 
     @Transactional
-    public TableResponse updateStatus(String userId, String tableId, TableStatus status) {
+    public TableResponse updateStatus(String userId, String shopId, String tableId, TableStatus status) {
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(null, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
@@ -139,9 +139,9 @@ public class TableService {
     }
 
     @Transactional
-    public void deleteTable(String userId, String tableId) {
+    public void deleteTable(String userId, String shopId, String tableId) {
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(null, userId, ShopRole.OWNER);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER);
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
