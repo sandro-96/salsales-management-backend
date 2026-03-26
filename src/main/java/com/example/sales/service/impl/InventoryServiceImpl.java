@@ -16,6 +16,7 @@ import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.AuditLogService;
 import com.example.sales.service.InventoryService;
+import com.example.sales.cache.ProductCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -33,6 +34,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
+    private final ProductCache productCache;
 
     @Override
     @Transactional
@@ -58,6 +60,8 @@ public class InventoryServiceImpl implements InventoryService {
                 masterProduct, InventoryType.IMPORT, quantity, branchProduct.getQuantity(),
                 note, null
         );
+
+        productCache.evictByBranch(shopId, branchId);
 
         auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "INVENTORY_IMPORT",
                 String.format("Nhập thêm %d đơn vị sản phẩm '%s' (SKU: %s) vào chi nhánh %s. Tồn kho cũ: %d, Tồn kho mới: %d.",
@@ -100,6 +104,8 @@ public class InventoryServiceImpl implements InventoryService {
                 note, referenceId
         );
 
+        productCache.evictByBranch(shopId, branchId);
+
         auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "INVENTORY_EXPORT",
                 String.format("Xuất %d đơn vị sản phẩm '%s' (SKU: %s) khỏi chi nhánh %s. Tồn kho cũ: %d, Tồn kho mới: %d. Tham chiếu: %s.",
                         quantity, masterProduct.getName(), masterProduct.getSku(), branchId, oldQuantity, branchProduct.getQuantity(), referenceId));
@@ -136,6 +142,8 @@ public class InventoryServiceImpl implements InventoryService {
                 masterProduct, InventoryType.ADJUSTMENT, quantityChange, branchProduct.getQuantity(),
                 note, null
         );
+
+        productCache.evictByBranch(shopId, branchId);
 
         auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "INVENTORY_ADJUSTMENT",
                 String.format("Điều chỉnh tồn kho sản phẩm '%s' (SKU: %s) tại chi nhánh %s từ %d thành %d. Thay đổi: %s%d.",

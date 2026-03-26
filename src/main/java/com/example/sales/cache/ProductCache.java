@@ -176,6 +176,23 @@ public class ProductCache {
         }
     }
 
+    public void evictByBranch(String shopId, String branchId) {
+        org.springframework.cache.Cache cache = cacheManager.getCache(CACHE_NAME);
+        if (cache == null) return;
+
+        Object nativeCache = cache.getNativeCache();
+        if (nativeCache instanceof java.util.concurrent.ConcurrentMap) {
+            @SuppressWarnings("unchecked")
+            java.util.concurrent.ConcurrentMap<Object, Object> map =
+                    (java.util.concurrent.ConcurrentMap<Object, Object>) nativeCache;
+            String prefix = shopId + ":" + branchId + ":";
+            map.keySet().removeIf(k -> k.toString().startsWith(prefix));
+        } else {
+            // Với Redis, không có cách nào để evict theo prefix, nên phải clear toàn bộ cache (bao gồm cả shopId:all).
+            cache.clear();
+        }
+    }
+
     /**
      * Update cache entry cho một BranchProduct sau khi cập nhật.
      * Sau đó gọi evictByShop để đảm bảo danh sách cũng được làm mới.
