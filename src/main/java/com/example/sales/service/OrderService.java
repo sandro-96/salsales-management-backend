@@ -98,6 +98,7 @@ public class OrderService extends BaseService {
                     .price(basePrice)
                     .priceAfterDiscount(finalPrice)
                     .appliedPromotionId(promoId)
+                    .trackInventory(masterProduct.isTrackInventory()) // Có theo dõi tồn kho không
                     .build();
 
             totals[0] += reqItem.getQuantity();
@@ -113,8 +114,8 @@ public class OrderService extends BaseService {
         Order created = orderRepository.save(order);
 
         // Điều chỉnh tồn kho sau khi tạo đơn hàng
-        if (shop.getType().isTrackInventory()) {
-            for (OrderItem item : created.getItems()) {
+        for (OrderItem item : created.getItems()) {
+            if (item.isTrackInventory()) {
                 // Sử dụng BranchProduct ID để điều chỉnh tồn kho
                 inventoryService.exportProductQuantity(
                         userId, shopId, created.getBranchId(), item.getBranchProductId(),
@@ -137,10 +138,8 @@ public class OrderService extends BaseService {
         orderRepository.save(order);
 
         // Hoàn kho khi hủy đơn hàng nếu shop có quản lý tồn kho
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-        if (shop.getType().isTrackInventory()) {
-            for (OrderItem item : order.getItems()) {
+        for (OrderItem item : order.getItems()) {
+            if (item.isTrackInventory()) {
                 inventoryService.importProductQuantity(
                         userId, shopId, order.getBranchId(), item.getBranchProductId(),
                         item.getQuantity(), "Hoàn kho khi hủy đơn hàng " + orderId);
@@ -269,18 +268,14 @@ public class OrderService extends BaseService {
         }
 
         if (request.getItems() != null && !request.getItems().isEmpty()) {
-            Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-
             // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ (nếu shop có quản lý tồn kho)
-            if (shop.getType().isTrackInventory()) {
-                for (OrderItem oldItem : order.getItems()) {
+            for (OrderItem oldItem : order.getItems()) {
+                if (oldItem.isTrackInventory()) {
                     inventoryService.importProductQuantity(
-                            userId, shopId, order.getBranchId(), oldItem.getBranchProductId(), // Sử dụng BranchProduct ID
-                            oldItem.getQuantity(), "Hoàn kho khi cập nhật đơn hàng " + orderId);
+                        userId, shopId, order.getBranchId(), oldItem.getBranchProductId(), // Sử dụng BranchProduct ID
+                        oldItem.getQuantity(), "Hoàn kho khi cập nhật đơn hàng " + orderId);
                 }
             }
-
             // 🔁 2. Áp dụng lại tồn kho cho danh sách mới và tính toán lại tổng tiền
             double[] totals = {0, 0};
 
@@ -317,19 +312,19 @@ public class OrderService extends BaseService {
                         .price(basePrice)
                         .priceAfterDiscount(finalPrice)
                         .appliedPromotionId(promoId)
+                        .trackInventory(masterProduct.isTrackInventory()) // Có theo dõi tồn kho không
                         .build();
 
                 // Trừ kho mới (nếu shop có quản lý tồn kho)
-                if (shop.getType().isTrackInventory()) {
+                if (item.isTrackInventory()) {
                     inventoryService.exportProductQuantity(
                             userId, shopId, order.getBranchId(), item.getBranchProductId(), // Sử dụng BranchProduct ID
                             item.getQuantity(), "Xuất kho khi cập nhật đơn hàng " + orderId, orderId);
                 }
-
                 totals[0] += reqItem.getQuantity();
                 totals[1] += reqItem.getQuantity() * finalPrice;
                 return item;
-            }).toList();
+            }).toList();    
 
             order.setItems(updatedItems);
             order.setTotalPrice(totals[1]);

@@ -254,7 +254,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         branchProduct.setDiscountPercentage(request.getDiscountPercentage());
         branchProduct.setExpiryDate(request.getExpiryDate());
         branchProduct.setVariants(request.getBranchVariants());
-        if (shop.getType().isTrackInventory()) {
+        if (product.isTrackInventory()) {
             branchProduct.setQuantity(request.getQuantity());
         }
         branchProduct = branchProductRepository.save(branchProduct);
@@ -395,6 +395,31 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     }
 
     @Override
+    public ProductResponse toggleTrackInventory(String userId, String shopId, String productId) {
+        // Validate shop
+        shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        // Find Product
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(productId, shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+        boolean newTrackInventoryState = !product.isTrackInventory();
+        product.setTrackInventory(newTrackInventoryState);
+        product = productRepository.save(product);
+
+        // Log audit
+        String action = newTrackInventoryState ? "TRACK_INVENTORY_ACTIVATED" : "TRACK_INVENTORY_DEACTIVATED";
+        auditLogService.log(userId, shopId, productId, "PRODUCT", action,
+                String.format("%s sản phẩm '%s' (SKU: %s) ở cấp shop%s",
+                        newTrackInventoryState ? "Kích hoạt" : "Ngưng theo dõi tồn kho",
+                        product.getName(), product.getSku(),
+                        newTrackInventoryState ? "" : " — đã tắt quantity tại tất cả chi nhánh"));
+        // Update cache
+        productCache.evictByShop(shopId);
+        return productMapper.toResponse(null, product);
+    }
+
+    @Override
     public Page<ProductResponse> searchProducts(String shopId, String branchId, ProductSearchRequest request, Pageable pageable) {
         shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
@@ -425,31 +450,11 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
     @Override
     public List<ProductResponse> getLowStockProducts(String shopId, String branchId, int threshold) {
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
-
-        if (!shop.getType().isTrackInventory()) {
-            return List.of();
-        }
-
-        List<BranchProduct> lowStockBranchProducts;
-        if (StringUtils.hasText(branchId)) {
-            branchRepository.findByIdAndShopIdAndDeletedFalse(branchId, shopId)
-                    .orElseThrow(() -> new BusinessException(ApiCode.BRANCH_NOT_FOUND));
-            lowStockBranchProducts = branchProductRepository.findByShopIdAndBranchIdAndQuantityLessThanAndDeletedFalse(shopId, branchId, threshold);
-        } else {
-            lowStockBranchProducts = branchProductRepository.findByShopIdAndQuantityLessThanAndDeletedFalse(shopId, threshold);
-        }
-
-        Set<String> productIds = lowStockBranchProducts.stream()
+        Set<String> productIds = branchProductRepository.findByShopIdAndBranchIdAndQuantityLessThanAndDeletedFalse(shopId, branchId, threshold).stream()
                 .map(BranchProduct::getProductId)
                 .collect(Collectors.toSet());
-
-        Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
-                .collect(Collectors.toMap(Product::getId, Function.identity()));
-
-        return lowStockBranchProducts.stream()
-                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId())))
+        return productRepository.findAllById(productIds).stream()
+                .map(product -> productMapper.toResponse(null, product))
                 .collect(Collectors.toList());
     }
 
@@ -511,6 +516,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .variants(assignVariantIds(request.getVariants()))
                 .priceHistory(new ArrayList<>()) // Bắt đầu rỗng — history sẽ được ghi khi giá thay đổi
                 .active(request.isActive())
+                .trackInventory(request.isTrackInventory()) // Có theo dõi tồn kho không
                 .build();
     }
 
@@ -530,6 +536,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         existing.setSupplierId(request.getSupplierId());
         existing.setVariants(assignVariantIds(request.getVariants()));
         existing.setActive(request.isActive());
+        existing.setTrackInventory(request.isTrackInventory()); // Có theo dõi tồn kho không
         // priceHistory KHÔNG lấy từ request — được quản lý bởi appendProductPriceHistory()
     }
 

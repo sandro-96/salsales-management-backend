@@ -195,7 +195,6 @@ public class ShopService extends BaseService {
                 .slug(shop.getSlug())
                 .phone(shop.getPhone())
                 .active(shop.isActive())
-                .isTrackInventory(shop.isTrackInventory())
                 .industry(shop.getType().getIndustry())
                 .businessModel(shop.getBusinessModel())
                 .build();

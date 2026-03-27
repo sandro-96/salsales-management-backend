@@ -43,33 +43,27 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (!isInventoryManagementRequired(shopId)) {
-            log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác nhập.", shopId);
-            return -1;
-        }
-
         BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
+        Product product = productRepository.findByIdAndShopIdAndDeletedFalse(branchProduct.getProductId(), shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
+        if (!product.isTrackInventory()) {
+            throw new BusinessException(ApiCode.PRODUCT_NOT_TRACK_INVENTORY);
+        }
         int oldQuantity = branchProduct.getQuantity();
         branchProduct.setQuantity(oldQuantity + quantity);
         branchProductRepository.save(branchProduct);
 
-        Product masterProduct = getMasterProduct(branchProduct.getProductId(), shopId);
-
         saveInventoryTransaction(
                 shopId, branchId, branchProduct.getId(),
-                masterProduct, InventoryType.IMPORT, quantity, branchProduct.getQuantity(),
+                product, InventoryType.IMPORT, quantity, branchProduct.getQuantity(),
                 note, null
         );
-
         productCache.evictByBranch(shopId, branchId);
-
         auditLogService.log(userId, shopId, branchProduct.getId(), "BRANCH_PRODUCT", "INVENTORY_IMPORT",
-                String.format("Nhập thêm %d đơn vị sản phẩm '%s' (SKU: %s) vào chi nhánh %s. Tồn kho cũ: %d, Tồn kho mới: %d.",
-                        quantity, masterProduct.getName(), masterProduct.getSku(), branchId, oldQuantity, branchProduct.getQuantity()));
-
+                String.format("Nhập %d đơn vị sản phẩm '%s' (SKU: %s) vào chi nhánh %s. Tồn kho cũ: %d, Tồn kho mới: %d.",
+                        quantity, product.getName(), product.getSku(), branchId, oldQuantity, branchProduct.getQuantity()));
         log.info("Nhập thành công {} sản phẩm '{}' cho chi nhánh {}. Số lượng mới: {}",
-                quantity, masterProduct.getName(), branchId, branchProduct.getQuantity());
-
+                quantity, product.getName(), branchId, branchProduct.getQuantity());
         return branchProduct.getQuantity();
     }
 
@@ -78,11 +72,6 @@ public class InventoryServiceImpl implements InventoryService {
     public int exportProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note, String referenceId) {
         if (quantity <= 0) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
-        }
-
-        if (!isInventoryManagementRequired(shopId)) {
-            log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác xuất.", shopId);
-            return -1;
         }
 
         BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
@@ -123,11 +112,6 @@ public class InventoryServiceImpl implements InventoryService {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
 
-        if (!isInventoryManagementRequired(shopId)) {
-            log.info("Cửa hàng {} không yêu cầu quản lý tồn kho. Bỏ qua thao tác điều chỉnh.", shopId);
-            return -1;
-        }
-
         BranchProduct branchProduct = findBranchProduct(shopId, branchId, branchProductId);
         int oldQuantity = branchProduct.getQuantity();
         int quantityChange = newQuantity - oldQuantity;
@@ -165,13 +149,6 @@ public class InventoryServiceImpl implements InventoryService {
         return inventoryTransactionRepository
                 .findByProductIdAndShopIdAndBranchIdOrderByCreatedAtDesc(branchProductId, shopId, branchId, pageable)
                 .map(this::mapToInventoryTransactionResponse);
-    }
-
-    @Override
-    public boolean isInventoryManagementRequired(String shopId) {
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-        return shop.getType().isTrackInventory();
     }
 
     private BranchProduct findBranchProduct(String shopId, String branchId, String branchProductId) {

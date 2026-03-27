@@ -17,4 +17,5 @@ public class OrderItem {
     private double price;             // Giá gốc tại thời điểm đặt hàng
     private double priceAfterDiscount; // Giá sau khi áp dụng khuyến mãi
     private String appliedPromotionId; // ID của khuyến mãi đã áp dụng
+    private boolean trackInventory; // Có theo dõi tồn kho không
 }

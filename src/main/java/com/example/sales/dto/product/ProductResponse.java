@@ -59,6 +59,7 @@ public class ProductResponse {
     private List<BranchProductVariant> branchVariants;
     private String branchId;
     private boolean activeInBranch; // Trạng thái kích hoạt tại chi nhánh này
+    private boolean trackInventory; // Có theo dõi tồn kho không
     private List<PriceHistory> branchPriceHistory; // Lịch sử thay đổi giá tại chi nhánh
 
     private LocalDateTime createdAt;

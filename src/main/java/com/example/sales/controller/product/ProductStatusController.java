@@ -59,6 +59,25 @@ public class ProductStatusController {
     }
 
     @Operation(
+            summary = "Bật/tắt trạng thái theo dõi tồn kho của sản phẩm ở cấp shop",
+            description = "Toggle Product.trackInventory ở cấp shop."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật trạng thái thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    @PatchMapping("/shops/{shopId}/products/{productId}/toggle-track-inventory")
+    @RequirePermission(Permission.PRODUCT_UPDATE_STATUS)
+    public ResponseEntity<ApiResponseDto<ProductResponse>> toggleTrackInventory(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
+            @Parameter(description = "ID sản phẩm (Product ID)") @PathVariable String productId) {
+        ProductResponse response = productService.toggleTrackInventory(user.getId(), shopId, productId);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_STATUS_UPDATED, response));
+    }
+
+    @Operation(
             summary = "Bật/tắt trạng thái bán hàng của sản phẩm tại một chi nhánh",
             description = """
                     Toggle BranchProduct.activeInBranch — chỉ ảnh hưởng chi nhánh được chỉ định.

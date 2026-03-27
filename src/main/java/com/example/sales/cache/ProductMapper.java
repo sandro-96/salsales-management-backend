@@ -32,6 +32,7 @@ public class ProductMapper {
                 .variants(product.getVariants())
                 .priceHistory(product.getPriceHistory())
                 .active(product.isActive())
+                .trackInventory(product.isTrackInventory())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt());
 

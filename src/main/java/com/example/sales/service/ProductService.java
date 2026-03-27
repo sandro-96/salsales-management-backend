@@ -35,6 +35,9 @@ public interface ProductService {
     // Toggle Product.active ở cấp shop — khi false sẽ sync tắt activeInBranch toàn bộ chi nhánh, khi true thì chỉ bật lại Product.active
     ProductResponse toggleActiveShop(String userId, String shopId, String productId);
 
+    // Toggle Product.trackInventory ở cấp shop
+    ProductResponse toggleTrackInventory(String userId, String shopId, String productId);
+
     // Tìm kiếm sản phẩm theo keyword, category, price range, active...
     Page<ProductResponse> searchProducts(String shopId, String branchId, ProductSearchRequest request, Pageable pageable);
 

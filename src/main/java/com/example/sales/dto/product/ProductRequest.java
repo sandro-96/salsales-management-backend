@@ -59,5 +59,8 @@ public class ProductRequest {
 
     @Builder.Default
     private boolean active = true;
+
+    @Builder.Default
+    private boolean trackInventory = false;
 }
 

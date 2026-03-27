@@ -56,12 +56,4 @@ public interface InventoryService {
      * @return Trang chứa danh sách các giao dịch tồn kho.
      */
     Page<InventoryTransactionResponse> getTransactionHistory(String userId, String shopId, String branchId, String branchProductId, Pageable pageable);
-
-    /**
-     * Kiểm tra xem cửa hàng có yêu cầu quản lý tồn kho hay không.
-     *
-     * @param shopId ID của cửa hàng.
-     * @return true nếu cửa hàng yêu cầu quản lý tồn kho, ngược lại false.
-     */
-    boolean isInventoryManagementRequired(String shopId);
 }

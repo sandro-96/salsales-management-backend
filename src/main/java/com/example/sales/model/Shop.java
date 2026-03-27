@@ -51,9 +51,5 @@ public class Shop extends BaseEntity {
     private SubscriptionPlan plan = SubscriptionPlan.FREE;
 
     private LocalDateTime planExpiry;
-
-    public boolean isTrackInventory() {
-        return type != null && type.isTrackInventory();
-    }
 }
 

@@ -56,6 +56,9 @@ public class Product extends BaseEntity {
     @Builder.Default
     private boolean active = true; // Trạng thái sản phẩm
 
+    @Builder.Default
+    private boolean trackInventory = false; // Có theo dõi tồn kho không
+
     @Pattern(regexp = "^([A-Z0-9_]*|[0-9]{12,13})$", message = "Barcode phải là chữ in hoa, số, dấu _ hoặc 12-13 chữ số")
     private String barcode; // Mã vạch (cho bán lẻ)
     private String supplierId; // ID nhà cung cấp
