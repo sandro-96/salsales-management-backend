@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/service/impl/ExcelImportServiceImpl.java
 package com.example.sales.service.impl;
 
+import com.example.sales.cache.ProductCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.AppConstants;
 import com.example.sales.exception.BusinessException;
@@ -64,6 +65,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
     private final ShopRepository shopRepository;
     private final SequenceService sequenceService;
     private final BranchRepository branchRepository;
+    private final ProductCache productCache;
 
     @Override
     @Transactional
@@ -215,6 +217,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         } catch (IOException e) {
             log.error("Lỗi đọc file Excel: {}", e.getMessage());
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (importedCount > 0) {
+            productCache.evictByShop(shopId);
         }
         return importedCount;
     }

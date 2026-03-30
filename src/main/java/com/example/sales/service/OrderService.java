@@ -59,11 +59,6 @@ public class OrderService extends BaseService {
 
         double[] totals = {0, 0};
 
-        // Lấy thông tin shop để kiểm tra loại hình kinh doanh (có quản lý tồn kho không)
-        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
-
-
         List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
             // Lấy Product master
             Product masterProduct = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())

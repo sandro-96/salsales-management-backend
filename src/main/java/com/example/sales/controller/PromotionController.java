@@ -31,7 +31,7 @@ public class PromotionController {
 
     private final PromotionService promotionService;
 
-    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
+    //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @GetMapping
     @RequirePermission(Permission.PROMOTION_VIEW)
     @Operation(summary = "Lấy danh sách khuyến mãi", description = "Lấy danh sách khuyến mãi của cửa hàng với phân trang")
@@ -49,7 +49,7 @@ public class PromotionController {
         return ApiResponseDto.success(ApiCode.SUCCESS, promotionService.getAll(user.getId(), shopId, branchId, pageable));
     }
 
-    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
+    //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PostMapping
     @RequirePermission(Permission.PROMOTION_CREATE)
     @Operation(summary = "Tạo khuyến mãi mới", description = "Tạo một khuyến mãi mới cho cửa hàng")
@@ -67,7 +67,7 @@ public class PromotionController {
         return ApiResponseDto.success(ApiCode.SUCCESS, promotionService.create(user.getId(), shopId, request));
     }
 
-    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
+    //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @PutMapping("/{id}")
     @RequirePermission(Permission.PROMOTION_UPDATE)
     @Operation(summary = "Cập nhật khuyến mãi", description = "Cập nhật thông tin khuyến mãi của cửa hàng")
@@ -86,7 +86,7 @@ public class PromotionController {
         return ApiResponseDto.success(ApiCode.SUCCESS, promotionService.update(user.getId(), shopId, id, request));
     }
 
-    @RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
+    //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
     @DeleteMapping("/{id}")
     @RequirePermission(Permission.PROMOTION_DELETE)
     @Operation(summary = "Xóa khuyến mãi", description = "Xóa mềm một khuyến mãi của cửa hàng")

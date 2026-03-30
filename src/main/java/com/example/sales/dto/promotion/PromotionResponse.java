@@ -19,4 +19,5 @@ public class PromotionResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private boolean active;
+    private String branchId;
 }

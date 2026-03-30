@@ -10,10 +10,12 @@ import com.example.sales.model.BranchProduct;
 import com.example.sales.model.InventoryTransaction;
 import com.example.sales.model.Product;
 import com.example.sales.model.Shop;
+import com.example.sales.model.User;
 import com.example.sales.repository.BranchProductRepository;
 import com.example.sales.repository.InventoryTransactionRepository;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.UserRepository;
 import com.example.sales.service.AuditLogService;
 import com.example.sales.service.InventoryService;
 import com.example.sales.cache.ProductCache;
@@ -23,6 +25,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +40,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final ProductRepository productRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final ShopRepository shopRepository;
+    private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final ProductCache productCache;
 
@@ -146,9 +154,26 @@ public class InventoryServiceImpl implements InventoryService {
         auditLogService.log(userId, shopId, branchProductId, "BRANCH_PRODUCT", "INVENTORY_HISTORY_VIEW",
                 String.format("Lấy lịch sử giao dịch tồn kho cho sản phẩm '%s' tại chi nhánh %s.", branchProductId, branchId));
 
-        return inventoryTransactionRepository
-                .findByProductIdAndShopIdAndBranchIdOrderByCreatedAtDesc(branchProductId, shopId, branchId, pageable)
-                .map(this::mapToInventoryTransactionResponse);
+        Page<InventoryTransaction> page = inventoryTransactionRepository
+                .findByProductIdAndShopIdAndBranchIdOrderByCreatedAtDesc(branchProductId, shopId, branchId, pageable);
+
+        var userIds = page.getContent().stream()
+                .map(InventoryTransaction::getCreatedBy)
+                .filter(Objects::nonNull)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+
+        Map<String, String> createdByNameByUserId = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, this::displayNameForUser));
+
+        return page.map(t -> mapToInventoryTransactionResponse(t, createdByNameByUserId));
+    }
+
+    private String displayNameForUser(User u) {
+        if (StringUtils.hasText(u.getFullName())) {
+            return u.getFullName();
+        }
+        return u.getEmail() != null ? u.getEmail() : "";
     }
 
     private BranchProduct findBranchProduct(String shopId, String branchId, String branchProductId) {
@@ -181,9 +206,12 @@ public class InventoryServiceImpl implements InventoryService {
         inventoryTransactionRepository.save(transaction);
     }
 
-    private InventoryTransactionResponse mapToInventoryTransactionResponse(InventoryTransaction transaction) {
+    private InventoryTransactionResponse mapToInventoryTransactionResponse(
+            InventoryTransaction transaction, Map<String, String> createdByNameByUserId) {
         String productName = transaction.getProductName() != null ? transaction.getProductName() : "Unknown Product";
         String sku = transaction.getSku() != null ? transaction.getSku() : "";
+        String createdBy = transaction.getCreatedBy();
+        String createdByName = createdBy != null ? createdByNameByUserId.get(createdBy) : null;
 
         return InventoryTransactionResponse.builder()
                 .id(transaction.getId())
@@ -198,7 +226,8 @@ public class InventoryServiceImpl implements InventoryService {
                 .note(transaction.getNote())
                 .referenceId(transaction.getReferenceId())
                 .createdAt(transaction.getCreatedAt())
-                .createdBy(transaction.getCreatedBy())
+                .createdBy(createdBy)
+                .createdByName(createdByName)
                 .build();
     }
 }

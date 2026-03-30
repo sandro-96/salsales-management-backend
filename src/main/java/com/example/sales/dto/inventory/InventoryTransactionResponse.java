@@ -27,4 +27,6 @@ public class InventoryTransactionResponse {
     private String referenceId;     // ID tham chiếu (ví dụ: Order ID)
     private LocalDateTime createdAt;
     private String createdBy;       // ID người dùng thực hiện giao dịch
+    /** Họ tên (hoặc email nếu chưa có họ tên) — tra từ users theo createdBy */
+    private String createdByName;
 }

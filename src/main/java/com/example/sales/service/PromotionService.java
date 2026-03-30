@@ -13,6 +13,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+
 @Service
 @RequiredArgsConstructor
 public class PromotionService {
@@ -21,11 +23,19 @@ public class PromotionService {
     private final AuditLogService auditLogService;
 
     public Page<PromotionResponse> getAll(String userId, String shopId, String branchId, Pageable pageable) {
-        return promotionRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
-                .map(this::toResponse);
+        Page<Promotion> promotions;
+        if (branchId != null && !branchId.isBlank()) {
+            promotions = promotionRepository.findByShopIdAndBranchScope(shopId, branchId, pageable);
+        } else {
+            promotions = promotionRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+        }
+        return promotions.map(this::toResponse);
     }
 
     public PromotionResponse create(String userId, String shopId, PromotionRequest request) {
+        String branchId = (request.getBranchId() != null && !request.getBranchId().isBlank())
+                ? request.getBranchId() : null;
+
         Promotion promotion = Promotion.builder()
                 .shopId(shopId)
                 .name(request.getName())
@@ -35,15 +45,16 @@ public class PromotionService {
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .active(request.isActive())
-                .branchId(request.getBranchId())
+                .branchId(branchId)
                 .build();
 
         Promotion saved = promotionRepository.save(promotion);
         auditLogService.log(userId, shopId, saved.getId(), "PROMOTION", "CREATED",
-                String.format("Tạo khuyến mãi: %s (%.2f %s)",
+                String.format("Tạo khuyến mãi: %s (%.2f %s)%s",
                         saved.getName(),
                         saved.getDiscountValue(),
-                        saved.getDiscountType()));
+                        saved.getDiscountType(),
+                        saved.getBranchId() != null ? " [Chi nhánh: " + saved.getBranchId() + "]" : " [Toàn shop]"));
         return toResponse(saved);
     }
 
@@ -52,7 +63,7 @@ public class PromotionService {
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
 
-        if (!promotion.getBranchId().equals(request.getBranchId())) {
+        if (!Objects.equals(promotion.getBranchId(), request.getBranchId())) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
@@ -79,7 +90,6 @@ public class PromotionService {
         promotionRepository.save(promotion);
         auditLogService.log(userId, shopId, promotion.getId(), "PROMOTION", "DELETED",
                 String.format("Xoá mềm khuyến mãi: %s", promotion.getName()));
-
     }
 
     private PromotionResponse toResponse(Promotion p) {
@@ -92,6 +102,7 @@ public class PromotionService {
                 .startDate(p.getStartDate())
                 .endDate(p.getEndDate())
                 .active(p.isActive())
+                .branchId(p.getBranchId())
                 .build();
     }
 }
