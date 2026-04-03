@@ -96,7 +96,9 @@ public enum ApiCode {
     CATALOG_NOT_FOUND("4152", "Barcode not found in catalog"),
     CATALOG_FOUND("2012", "Catalog entry found"),
     PRODUCT_NOT_TRACK_INVENTORY("4153", "Product does not require inventory tracking"),
-    STAFF_PROFILE_NOT_FOUND("4154", "Staff profile not found");
+    STAFF_PROFILE_NOT_FOUND("4154", "Staff profile not found"),
+    TICKET_NOT_FOUND("4155", "Support ticket not found"),
+    NOTIFICATION_NOT_FOUND("4156", "Notification not found");
 
     private final String code;
     private final String message;

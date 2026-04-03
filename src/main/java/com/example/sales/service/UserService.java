@@ -95,6 +95,9 @@ public class UserService {
         if (request.getAvatarUrl() != null) {
             user.setAvatarUrl(request.getAvatarUrl());
         }
+        if (request.getBirthDate() != null) {
+            user.setBirthDate(request.getBirthDate());
+        }
         return buildUserResponse(userRepository.save(user));
     }
 
@@ -131,6 +134,7 @@ public class UserService {
                 .verified(user.isVerified())
                 .active(user.isActive())
                 .lastLoginAt(user.getLastLoginAt())
+                .gender(user.getGender())
                 .build();
     }
 }

@@ -3,9 +3,15 @@ package com.example.sales.dto;
 import com.example.sales.constant.Gender;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 
 @Data
 public class UpdateProfileRequest {
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate birthDate;
 
     @Size(max = 50, message = "Họ không được vượt quá 50 ký tự")
     private String lastName;

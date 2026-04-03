@@ -39,5 +39,7 @@ public enum Permission {
     BRANCH_VIEW,
     INVENTORY_VIEW,
     INVENTORY_MANAGE,
-    REPORT_VIEW
+    REPORT_VIEW,
+    SUPPORT_VIEW,
+    SUPPORT_MANAGE
 }
