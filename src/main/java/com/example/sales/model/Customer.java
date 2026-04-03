@@ -27,5 +27,14 @@ public class Customer extends BaseEntity {
     private String note;
     private String shopId;
     private String branchId;   // Có thể null nếu không phân biệt chi nhánh
+
+    @Builder.Default
+    private long loyaltyPoints = 0;
+
+    @Builder.Default
+    private long totalPointsEarned = 0;
+
+    @Builder.Default
+    private long totalPointsRedeemed = 0;
 }
 

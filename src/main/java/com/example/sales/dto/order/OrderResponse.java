@@ -32,11 +32,8 @@ public class OrderResponse {
     private List<OrderItemResponse> items; // Danh sách các mục trong đơn hàng
     private OrderTaxSnapshot taxSnapshot; // Thông tin thuế tại thời điểm tạo đơn hàng
 
-    // OrderItemResponse đã được định nghĩa trong OrderService trước đó, nhưng ta có thể định nghĩa lại tại đây cho rõ ràng.
-    // Nếu bạn muốn giữ nó là inner class trong OrderService.java (như trong OrderService.java bạn đã cung cấp),
-    // thì không cần định nghĩa lại ở đây.
-    // Tuy nhiên, việc có một DTO riêng biệt cho OrderItemResponse thường tốt hơn để tái sử dụng.
-    // Tôi sẽ định nghĩa nó như một inner static class ở đây để đảm bảo nó tồn tại,
-    // hoặc bạn có thể tạo một file OrderItemResponse.java riêng biệt.
-    // Để giữ cho tổ chức gọn gàng, tôi sẽ tạo một file riêng cho OrderItemResponse.java
+    private String customerId;
+    private long pointsEarned;
+    private long pointsRedeemed;
+    private double pointsDiscount;
 }

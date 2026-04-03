@@ -15,5 +15,8 @@ public class CustomerResponse {
     private String address;
     private String note;
     private String branchId;
+    private long loyaltyPoints;
+    private long totalPointsEarned;
+    private long totalPointsRedeemed;
     private LocalDateTime createdAt;
 }

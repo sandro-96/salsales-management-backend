@@ -3,12 +3,15 @@ package com.example.sales.controller;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.dto.customer.AdjustPointsRequest;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
 import com.example.sales.dto.customer.CustomerSearchRequest;
+import com.example.sales.dto.customer.PointTransactionResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
 import com.example.sales.service.CustomerService;
+import com.example.sales.service.LoyaltyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final LoyaltyService loyaltyService;
 
     @GetMapping
     @RequirePermission(Permission.CUSTOMER_VIEW)
@@ -127,5 +131,41 @@ public class CustomerController {
             @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tuỳ chọn)") String branchId,
             @ModelAttribute CustomerSearchRequest searchRequest) {
         return customerService.exportCustomers(shopId, branchId, searchRequest);
+    }
+
+    // ==================== LOYALTY POINTS ====================
+
+    @GetMapping("/{id}/points")
+    @RequirePermission(Permission.CUSTOMER_VIEW)
+    @Operation(summary = "Lấy số dư điểm", description = "Lấy số điểm tích lũy hiện tại của khách hàng")
+    public ApiResponseDto<Long> getPointsBalance(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestParam String shopId,
+            @PathVariable String id) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, loyaltyService.getBalance(shopId, id));
+    }
+
+    @GetMapping("/{id}/points/history")
+    @RequirePermission(Permission.CUSTOMER_VIEW)
+    @Operation(summary = "Lịch sử điểm", description = "Lấy lịch sử giao dịch điểm tích lũy của khách hàng")
+    public ApiResponseDto<Page<PointTransactionResponse>> getPointHistory(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestParam String shopId,
+            @PathVariable String id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponseDto.success(ApiCode.SUCCESS, loyaltyService.getPointHistory(shopId, id, page, size));
+    }
+
+    @PostMapping("/{id}/points/adjust")
+    @RequirePermission(Permission.CUSTOMER_UPDATE)
+    @Operation(summary = "Điều chỉnh điểm", description = "Cộng hoặc trừ điểm thủ công cho khách hàng")
+    public ApiResponseDto<?> adjustPoints(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestParam String shopId,
+            @PathVariable String id,
+            @RequestBody @Valid AdjustPointsRequest request) {
+        loyaltyService.adjustPoints(shopId, id, request.getPoints(), request.getNote(), user.getId());
+        return ApiResponseDto.success(ApiCode.SUCCESS);
     }
 }

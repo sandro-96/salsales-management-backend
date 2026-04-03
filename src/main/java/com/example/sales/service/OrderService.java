@@ -40,6 +40,7 @@ public class OrderService extends BaseService {
     private final InventoryService inventoryService;
     private final OrderCache orderCache;
     private final OrderTaxApplier orderTaxApplier;
+    private final LoyaltyService loyaltyService;
 
     @Transactional
     public OrderResponse createOrder(String userId, String branchId, String shopId, OrderRequest request) {
@@ -50,6 +51,7 @@ public class OrderService extends BaseService {
         order.setNote(request.getNote());
         order.setStatus(OrderStatus.PENDING);
         order.setPaid(false);
+        order.setCustomerId(request.getCustomerId());
 
         if (branchId == null || branchId.isBlank()) {
             log.error("Branch ID không được để trống");
@@ -108,6 +110,18 @@ public class OrderService extends BaseService {
 
         Order created = orderRepository.save(order);
 
+        // Áp dụng đổi điểm nếu có (sau khi có orderId)
+        if (request.getCustomerId() != null && request.getPointsToRedeem() > 0) {
+            long discount = loyaltyService.redeemPoints(
+                    shopId, branchId, request.getCustomerId(),
+                    request.getPointsToRedeem(), created.getId(), userId);
+            created.setPointsRedeemed(request.getPointsToRedeem());
+            created.setPointsDiscount(discount);
+            created.setTotalPrice(Math.max(0, totals[1] - discount));
+            orderTaxApplier.applyTax(created);
+            created = orderRepository.save(created);
+        }
+
         // Điều chỉnh tồn kho sau khi tạo đơn hàng
         for (OrderItem item : created.getItems()) {
             if (item.isTrackInventory()) {
@@ -141,6 +155,16 @@ public class OrderService extends BaseService {
             }
         }
 
+        // Hoàn điểm khi hủy đơn hàng
+        if (order.getCustomerId() != null && !order.getCustomerId().isBlank()) {
+            try {
+                loyaltyService.refundPoints(shopId, order.getBranchId(),
+                        order.getCustomerId(), orderId, userId);
+            } catch (Exception e) {
+                log.warn("Không thể hoàn điểm cho đơn hàng {}: {}", orderId, e.getMessage());
+            }
+        }
+
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
     }
 
@@ -159,6 +183,22 @@ public class OrderService extends BaseService {
 
         Order updated = orderRepository.save(order);
         releaseTable(updated); // Giải phóng bàn khi đơn hàng hoàn thành/thanh toán
+
+        // Tích điểm cho khách hàng
+        if (updated.getCustomerId() != null && !updated.getCustomerId().isBlank()) {
+            try {
+                loyaltyService.earnPoints(shopId, updated.getBranchId(),
+                        updated.getCustomerId(), updated.getTotalAmount(),
+                        updated.getId(), userId);
+                // Cập nhật lại điểm đã tích vào order
+                long earned = (long) (updated.getTotalAmount() / 10_000);
+                updated.setPointsEarned(earned);
+                orderRepository.save(updated);
+            } catch (Exception e) {
+                log.warn("Không thể tích điểm cho đơn hàng {}: {}", orderId, e.getMessage());
+            }
+        }
+
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
                 "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
         return toResponse(updated);
@@ -346,6 +386,10 @@ public class OrderService extends BaseService {
                 .totalPrice(order.getTotalPrice())
                 .items(order.getItems().stream().map(this::toItemResponse).toList())
                 .taxSnapshot(order.getTaxSnapshot())
+                .customerId(order.getCustomerId())
+                .pointsEarned(order.getPointsEarned())
+                .pointsRedeemed(order.getPointsRedeemed())
+                .pointsDiscount(order.getPointsDiscount())
                 .build();
     }
 

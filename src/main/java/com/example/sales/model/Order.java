@@ -54,4 +54,15 @@ public class Order extends BaseEntity {
     private boolean isPaid;
 
     private String note;
+
+    private String customerId;
+
+    @Builder.Default
+    private long pointsEarned = 0;
+
+    @Builder.Default
+    private long pointsRedeemed = 0;
+
+    @Builder.Default
+    private double pointsDiscount = 0;
 }

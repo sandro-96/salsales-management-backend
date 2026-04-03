@@ -27,6 +27,11 @@ public class OrderRequest {
 
     private String note;
 
+    private String customerId;          // Khách hàng (tuỳ chọn, để tích điểm)
+
+    @Min(value = 0, message = "Số điểm đổi phải >= 0")
+    private long pointsToRedeem;        // Số điểm muốn đổi (0 = không đổi)
+
     @Valid
     @NotEmpty(message = "Đơn hàng phải có ít nhất một sản phẩm")
     private List<OrderItemRequest> items;

@@ -126,6 +126,9 @@ public class CustomerService {
                 .address(c.getAddress())
                 .note(c.getNote())
                 .branchId(c.getBranchId())
+                .loyaltyPoints(c.getLoyaltyPoints())
+                .totalPointsEarned(c.getTotalPointsEarned())
+                .totalPointsRedeemed(c.getTotalPointsRedeemed())
                 .createdAt(c.getCreatedAt())
                 .build();
     }
