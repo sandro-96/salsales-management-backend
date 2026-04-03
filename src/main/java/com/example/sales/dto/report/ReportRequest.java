@@ -12,5 +12,6 @@ import java.time.LocalDate;
 public class ReportRequest {
     private LocalDate startDate;
     private LocalDate endDate;
-    private OrderStatus status; // optional
+    private OrderStatus status;
+    private String branchId;
 }

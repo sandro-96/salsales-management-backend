@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/repository/ShopUserRepository.java
 package com.example.sales.repository;
 
+import com.example.sales.constant.ShopRole;
 import com.example.sales.model.ShopUser;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,4 +15,6 @@ public interface ShopUserRepository extends MongoRepository<ShopUser, String> {
     Page<ShopUser> findByUserIdAndDeletedFalse(String userId, Pageable pageable);
     Optional<ShopUser> findByShopIdAndUserId(String shopId, String userId);
     Page<ShopUser> findByShopId(String shopId, Pageable pageable);
+    Page<ShopUser> findByShopIdAndDeletedFalse(String shopId, Pageable pageable);
+    Page<ShopUser> findByShopIdAndRoleAndDeletedFalse(String shopId, ShopRole role, Pageable pageable);
 }

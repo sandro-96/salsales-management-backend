@@ -1,8 +1,9 @@
-// File: src/main/java/com/example/sales/dto/customer/CustomerResponse.java
 package com.example.sales.dto.customer;
 
 import lombok.Builder;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -13,4 +14,6 @@ public class CustomerResponse {
     private String email;
     private String address;
     private String note;
+    private String branchId;
+    private LocalDateTime createdAt;
 }

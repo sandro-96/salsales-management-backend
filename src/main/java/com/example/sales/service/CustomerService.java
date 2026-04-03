@@ -1,16 +1,23 @@
-// File: src/main/java/com/example/sales/service/CustomerService.java
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.customer.CustomerRequest;
 import com.example.sales.dto.customer.CustomerResponse;
+import com.example.sales.dto.customer.CustomerSearchRequest;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.helper.CustomerSearchHelper;
 import com.example.sales.model.Customer;
 import com.example.sales.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -18,13 +25,23 @@ import java.util.List;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final CustomerSearchHelper customerSearchHelper;
     private final AuditLogService auditLogService;
+    private final ExcelExportService excelExportService;
 
-    public List<CustomerResponse> getCustomers(String shopId, String branchId) {
-        return customerRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public Page<CustomerResponse> searchCustomers(String shopId, String branchId, CustomerSearchRequest request) {
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
+        List<Customer> customers = customerSearchHelper.search(shopId, branchId, request, pageable);
+        long total = customerSearchHelper.count(shopId, branchId, request);
+        List<CustomerResponse> responses = customers.stream().map(this::toResponse).toList();
+        return new PageImpl<>(responses, pageable, total);
+    }
+
+    public CustomerResponse getById(String shopId, String id) {
+        Customer customer = customerRepository.findByIdAndDeletedFalse(id)
+                .filter(c -> c.getShopId().equals(shopId))
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+        return toResponse(customer);
     }
 
     public CustomerResponse createCustomer(String shopId, String userId, CustomerRequest request) {
@@ -44,12 +61,12 @@ public class CustomerService {
         return toResponse(saved);
     }
 
-    public CustomerResponse updateCustomer(String shopId, String id, CustomerRequest request) {
+    public CustomerResponse updateCustomer(String shopId, String userId, String id, CustomerRequest request) {
         Customer existing = customerRepository.findByIdAndDeletedFalse(id)
                 .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
 
-        if (!existing.getBranchId().equals(request.getBranchId())) {
+        if (existing.getBranchId() != null && !existing.getBranchId().equals(request.getBranchId())) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
@@ -60,24 +77,44 @@ public class CustomerService {
         existing.setNote(request.getNote());
 
         Customer saved = customerRepository.save(existing);
-        auditLogService.log(null, shopId, saved.getId(), "CUSTOMER", "UPDATED",
+        auditLogService.log(userId, shopId, saved.getId(), "CUSTOMER", "UPDATED",
                 String.format("Cập nhật khách hàng: %s (%s)", saved.getName(), saved.getPhone()));
         return toResponse(saved);
     }
 
-    public void deleteCustomer(String shopId, String branchId, String id) {
+    public void deleteCustomer(String shopId, String userId, String branchId, String id) {
         Customer customer = customerRepository.findByIdAndDeletedFalse(id)
                 .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
 
-        if (!customer.getBranchId().equals(branchId)) {
+        if (customer.getBranchId() != null && !customer.getBranchId().equals(branchId)) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
         customer.setDeleted(true);
         customerRepository.save(customer);
-        auditLogService.log(null, shopId, customer.getId(), "CUSTOMER", "DELETED",
+        auditLogService.log(userId, shopId, customer.getId(), "CUSTOMER", "DELETED",
                 String.format("Xoá mềm khách hàng: %s (%s)", customer.getName(), customer.getPhone()));
+    }
+
+    public ResponseEntity<byte[]> exportCustomers(String shopId, String branchId, CustomerSearchRequest request) {
+        List<Customer> customers = customerSearchHelper.exportAll(shopId, branchId, request);
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+        return excelExportService.exportExcel(
+                "customers.xlsx",
+                "Khách hàng",
+                List.of("Tên", "Số điện thoại", "Email", "Địa chỉ", "Ghi chú", "Ngày tạo"),
+                customers,
+                c -> List.of(
+                        safe(c.getName()),
+                        safe(c.getPhone()),
+                        safe(c.getEmail()),
+                        safe(c.getAddress()),
+                        safe(c.getNote()),
+                        c.getCreatedAt() != null ? c.getCreatedAt().format(df) : ""
+                )
+        );
     }
 
     private CustomerResponse toResponse(Customer c) {
@@ -88,6 +125,12 @@ public class CustomerService {
                 .email(c.getEmail())
                 .address(c.getAddress())
                 .note(c.getNote())
+                .branchId(c.getBranchId())
+                .createdAt(c.getCreatedAt())
                 .build();
+    }
+
+    private static String safe(String value) {
+        return value != null ? value : "";
     }
 }

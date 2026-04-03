@@ -3,15 +3,18 @@ package com.example.sales.service;
 
 import com.example.sales.cache.ShopUserCache;
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.dto.shopUser.ShopMemberResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.model.StaffProfile;
 import com.example.sales.model.User;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.repository.StaffProfileRepository;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.security.PermissionUtils;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ public class ShopUserService extends BaseService {
     private final AuditLogService auditLogService;
     private final ShopUserCache shopUserCache;
     private final UserRepository userRepository;
+    private final StaffProfileRepository staffProfileRepository;
 
     public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
         ShopRole actual = shopUserCache.getUserRoleInShop(shopId, userId);
@@ -74,6 +78,98 @@ public class ShopUserService extends BaseService {
         }
     }
 
+    public ShopMemberResponse addUserByEmail(String shopId, String email, ShopRole role, String performedByUserId) {
+        if (role == ShopRole.OWNER) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+        if (!shop.isActive()) {
+            throw new BusinessException(ApiCode.SHOP_INACTIVE);
+        }
+
+        User user = userRepository.findByEmailAndDeletedFalse(email)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+
+        Optional<ShopUser> existingShopUser = shopUserRepository.findByShopIdAndUserId(shopId, user.getId());
+
+        ShopUser savedShopUser;
+        if (existingShopUser.isPresent()) {
+            ShopUser shopUser = existingShopUser.get();
+            if (!shopUser.isDeleted()) {
+                throw new BusinessException(ApiCode.USER_ALREADY_IN_SHOP);
+            }
+            shopUser.setDeleted(false);
+            shopUser.setRole(role);
+            shopUser.setPermissions(PermissionUtils.getDefaultPermissions(role));
+            savedShopUser = shopUserRepository.save(shopUser);
+            auditLogService.log(performedByUserId, shopId, shopUser.getId(), "SHOP_USER", "RESTORED",
+                    String.format("Khôi phục người dùng %s vào cửa hàng %s với vai trò %s", email, shopId, role));
+        } else {
+            ShopUser newShopUser = ShopUser.builder()
+                    .shopId(shopId)
+                    .userId(user.getId())
+                    .role(role)
+                    .permissions(PermissionUtils.getDefaultPermissions(role))
+                    .build();
+            savedShopUser = shopUserRepository.save(newShopUser);
+            auditLogService.log(performedByUserId, shopId, newShopUser.getId(), "SHOP_USER", "ADDED",
+                    String.format("Thêm người dùng %s vào cửa hàng %s với vai trò %s", email, shopId, role));
+        }
+
+        return toMemberResponse(savedShopUser, user, null);
+    }
+
+    public void updateUserRole(String shopId, String targetUserId, ShopRole newRole, String performedByUserId) {
+        if (newRole == ShopRole.OWNER) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+        if (targetUserId.equals(performedByUserId)) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
+        ShopUser target = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, targetUserId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+
+        if (target.getRole() == ShopRole.OWNER) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
+        ShopRole actorRole = getUserRole(shopId, performedByUserId);
+        ensureCanModifyRole(actorRole, target.getRole());
+
+        ShopRole oldRole = target.getRole();
+        target.setRole(newRole);
+        target.setPermissions(PermissionUtils.getDefaultPermissions(newRole));
+        shopUserRepository.save(target);
+
+        auditLogService.log(performedByUserId, shopId, target.getId(), "SHOP_USER", "ROLE_UPDATED",
+                String.format("Cập nhật vai trò từ %s thành %s cho người dùng %s", oldRole, newRole, targetUserId));
+    }
+
+    public void updatePermissions(String shopId, String targetUserId, Set<Permission> permissions, String performedByUserId) {
+        if (targetUserId.equals(performedByUserId)) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
+        ShopUser target = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, targetUserId)
+                .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+
+        if (target.getRole() == ShopRole.OWNER) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
+        ShopRole actorRole = getUserRole(shopId, performedByUserId);
+        ensureCanModifyRole(actorRole, target.getRole());
+
+        target.setPermissions(permissions);
+        shopUserRepository.save(target);
+
+        auditLogService.log(performedByUserId, shopId, target.getId(), "SHOP_USER", "PERMISSIONS_UPDATED",
+                String.format("Cập nhật quyền cho người dùng %s", targetUserId));
+    }
+
     public void removeUser(String shopId, String userId, String performedByUserId) {
         validateRoleHierarchy(shopId, performedByUserId, userId);
         if (userId.equals(performedByUserId)) {
@@ -83,6 +179,11 @@ public class ShopUserService extends BaseService {
         }
         ShopUser shopUser = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+
+        if (shopUser.getRole() == ShopRole.OWNER) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+
         shopUser.setDeleted(true);
         shopUserRepository.save(shopUser);
 
@@ -147,47 +248,81 @@ public class ShopUserService extends BaseService {
     }
 
     public void validateRoleHierarchy(String shopId, String actorUserId, String targetUserId) {
-        // Lấy role người thực hiện (actor) tại branch
         ShopRole actorRole = getUserRole(shopId, actorUserId);
-
-        // Lấy role người bị thao tác (target)
         ShopRole targetRole = getUserRole(shopId, targetUserId);
-
-        // Thực hiện logic so sánh
         ensureCanModifyRole(actorRole, targetRole);
     }
 
-    public Page<ShopMemberResponse> getUsersInShop(String shopId, String userId, Pageable pageable) {
-        // Kiểm tra cửa hàng có tồn tại và đang hoạt động
+    public Page<ShopMemberResponse> getUsersInShop(String shopId, String userId, String keyword, ShopRole roleFilter, Pageable pageable) {
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         if (!shop.isActive()) {
             throw new BusinessException(ApiCode.SHOP_INACTIVE);
         }
 
-        // Lấy danh sách các thành viên của cửa hàng
-        Sort sort = pageable.getSort().and(Sort.by("createdAt").descending());
+        Sort sort = pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by("createdAt").descending();
         pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
-        Page<ShopUser> shopUsers = shopUserRepository.findByShopId(shopId, pageable);
+
+        Page<ShopUser> shopUsers;
+        if (roleFilter != null) {
+            shopUsers = shopUserRepository.findByShopIdAndRoleAndDeletedFalse(shopId, roleFilter, pageable);
+        } else {
+            shopUsers = shopUserRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+        }
 
         List<String> userIds = shopUsers.map(ShopUser::getUserId).toList();
         Map<String, User> userMap = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
-        return shopUsers.map(su -> ShopMemberResponse.builder()
+
+        Map<String, StaffProfile> profileMap = staffProfileRepository
+                .findByShopIdAndUserIdInAndDeletedFalse(shopId, userIds).stream()
+                .collect(Collectors.toMap(StaffProfile::getUserId, Function.identity()));
+
+        List<ShopMemberResponse> filtered = shopUsers.getContent().stream()
+                .map(su -> toMemberResponse(su, userMap.getOrDefault(su.getUserId(), new User()),
+                        profileMap.get(su.getUserId())))
+                .filter(member -> matchesKeyword(member, keyword))
+                .toList();
+
+        return new PageImpl<>(filtered, pageable, shopUsers.getTotalElements());
+    }
+
+    private boolean matchesKeyword(ShopMemberResponse member, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return true;
+        }
+        String kw = keyword.toLowerCase().trim();
+        return (member.getFullName() != null && member.getFullName().toLowerCase().contains(kw))
+                || (member.getEmail() != null && member.getEmail().toLowerCase().contains(kw))
+                || (member.getPhone() != null && member.getPhone().toLowerCase().contains(kw));
+    }
+
+    private ShopMemberResponse toMemberResponse(ShopUser su, User user, StaffProfile profile) {
+        ShopMemberResponse.ShopMemberResponseBuilder builder = ShopMemberResponse.builder()
                 .id(su.getId())
                 .userId(su.getUserId())
-                .fullName(userMap.getOrDefault(su.getUserId(), new User()).getFullName())
-                .address(userMap.getOrDefault(su.getUserId(), new User()).getAddress())
-                .email(userMap.getOrDefault(su.getUserId(), new User()).getEmail())
-                .phone(userMap.getOrDefault(su.getUserId(), new User()).getPhone())
-                .avatarUrl(userMap.getOrDefault(su.getUserId(), new User()).getAvatarUrl())
-                .city(userMap.getOrDefault(su.getUserId(), new User()).getCity())
-                .state(userMap.getOrDefault(su.getUserId(), new User()).getState())
-                .birthDate(userMap.getOrDefault(su.getUserId(), new User()).getBirthDate())
+                .fullName(user.getFullName())
+                .address(user.getAddress())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .city(user.getCity())
+                .state(user.getState())
+                .birthDate(user.getBirthDate())
                 .createdAt(su.getCreatedAt())
-                .gender(userMap.getOrDefault(su.getUserId(), new User()).getGender())
+                .gender(user.getGender())
                 .role(su.getRole())
-                .build());
+                .permissions(su.getPermissions());
+
+        if (profile != null) {
+            builder.branchId(profile.getBranchId());
+            builder.position(profile.getPosition());
+            builder.department(profile.getDepartment());
+        }
+
+        return builder.build();
     }
 
     public void markDeletedByShopId(String shopId) {

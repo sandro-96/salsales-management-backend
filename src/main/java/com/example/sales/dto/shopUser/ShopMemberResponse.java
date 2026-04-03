@@ -1,13 +1,14 @@
 package com.example.sales.dto.shopUser;
 
 import com.example.sales.constant.Gender;
+import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
 import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Date;
+import java.util.Set;
 
 @Data
 @Builder
@@ -24,5 +25,9 @@ public class ShopMemberResponse {
     private LocalDate birthDate;
     private Gender gender;
     private ShopRole role;
+    private Set<Permission> permissions;
+    private String branchId;
+    private String position;
+    private String department;
     private LocalDateTime createdAt;
 }

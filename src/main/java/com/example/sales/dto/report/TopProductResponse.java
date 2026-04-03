@@ -9,10 +9,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ReportResponse {
-    private long totalOrders;
-    private long totalProductsSold;
+public class TopProductResponse {
+    private String productId;
+    private String productName;
+    private long totalQuantitySold;
     private double totalRevenue;
-    private double totalAmount;
-    private double averageOrderValue;
 }

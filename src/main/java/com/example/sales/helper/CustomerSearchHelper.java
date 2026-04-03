@@ -1,4 +1,3 @@
-// File: src/main/java/com/example/sales/helper/CustomerSearchHelper.java
 package com.example.sales.helper;
 
 import com.example.sales.dto.customer.CustomerSearchRequest;
@@ -7,7 +6,8 @@ import org.bson.Document;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Component;
 
@@ -26,10 +26,14 @@ public class CustomerSearchHelper {
         this.mongoTemplate = mongoTemplate;
     }
 
-    public List<Customer> search(String userId, CustomerSearchRequest req, Pageable pageable) {
+    public List<Customer> search(String shopId, String branchId, CustomerSearchRequest req, Pageable pageable) {
+        String sortBy = req.getSortBy() != null ? req.getSortBy() : "createdAt";
+        Sort.Direction direction = "asc".equalsIgnoreCase(req.getSortDir())
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+
         Aggregation agg = newAggregation(
-                buildMatch(userId, req),
-                sort(Sort.Direction.DESC, "_id"),
+                buildMatch(shopId, branchId, req),
+                sort(direction, sortBy),
                 skip((long) pageable.getPageNumber() * pageable.getPageSize()),
                 limit(pageable.getPageSize())
         );
@@ -37,35 +41,38 @@ public class CustomerSearchHelper {
         return mongoTemplate.aggregate(agg, "customers", Customer.class).getMappedResults();
     }
 
-    public long counts(String userId, CustomerSearchRequest req) {
+    public long count(String shopId, String branchId, CustomerSearchRequest req) {
         Aggregation countAgg = newAggregation(
-                buildMatch(userId, req),
-                count().as("total")
+                buildMatch(shopId, branchId, req),
+                Aggregation.count().as("total")
         );
 
-        return Optional.of(
+        return Optional.ofNullable(
                 mongoTemplate.aggregate(countAgg, "customers", Document.class)
                         .getUniqueMappedResult()
         ).map(d -> ((Number) d.get("total")).longValue()).orElse(0L);
     }
 
-    public List<Customer> exportAll(String userId, CustomerSearchRequest req) {
+    public List<Customer> exportAll(String shopId, String branchId, CustomerSearchRequest req) {
         Aggregation agg = newAggregation(
-                buildMatch(userId, req),
+                buildMatch(shopId, branchId, req),
                 sort(Sort.Direction.ASC, "name")
         );
 
         return mongoTemplate.aggregate(agg, "customers", Customer.class).getMappedResults();
     }
 
-    private MatchOperation buildMatch(String userId, CustomerSearchRequest req) {
+    private MatchOperation buildMatch(String shopId, String branchId, CustomerSearchRequest req) {
         String keyword = Optional.ofNullable(req.getKeyword()).orElse("").trim();
 
-        Criteria base = Criteria.where("userId").is(userId);
         List<Criteria> andConditions = new ArrayList<>();
-        andConditions.add(base);
+        andConditions.add(Criteria.where("shopId").is(shopId));
+        andConditions.add(Criteria.where("deleted").is(false));
 
-        // keyword
+        if (branchId != null && !branchId.isBlank()) {
+            andConditions.add(Criteria.where("branchId").is(branchId));
+        }
+
         if (!keyword.isEmpty()) {
             andConditions.add(new Criteria().orOperator(
                     Criteria.where("name").regex(keyword, "i"),
@@ -74,7 +81,6 @@ public class CustomerSearchHelper {
             ));
         }
 
-        // filter ngày tạo
         if (req.getFromDate() != null || req.getToDate() != null) {
             Criteria dateCriteria = Criteria.where("createdAt");
             if (req.getFromDate() != null) {

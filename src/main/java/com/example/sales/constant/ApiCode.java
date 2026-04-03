@@ -95,7 +95,8 @@ public enum ApiCode {
     PRODUCT_IMAGE_LIMIT_EXCEEDED("4151", "Product image limit exceeded (max 10 images)"),
     CATALOG_NOT_FOUND("4152", "Barcode not found in catalog"),
     CATALOG_FOUND("2012", "Catalog entry found"),
-    PRODUCT_NOT_TRACK_INVENTORY("4153", "Product does not require inventory tracking");
+    PRODUCT_NOT_TRACK_INVENTORY("4153", "Product does not require inventory tracking"),
+    STAFF_PROFILE_NOT_FOUND("4154", "Staff profile not found");
 
     private final String code;
     private final String message;
