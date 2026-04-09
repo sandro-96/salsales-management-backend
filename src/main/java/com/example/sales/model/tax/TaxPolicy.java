@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 @Getter
@@ -67,4 +68,15 @@ public class TaxPolicy {
 
     @Builder.Default
     private boolean active = true;
+
+    /**
+     * Khi shop/chi nhánh chưa cấu hình chính sách thuế: không thuế, tổng thanh toán = tiền hàng.
+     */
+    public static TaxPolicy noTaxFallback() {
+        return TaxPolicy.builder()
+                .name("Không áp thuế (chưa cấu hình)")
+                .priceIncludesTax(false)
+                .rules(Collections.emptyList())
+                .build();
+    }
 }

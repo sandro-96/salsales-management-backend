@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -20,6 +21,27 @@ public class TaxPolicyService {
     private final AuditLogService auditLogService;
 
     /**
+     * Tìm tax policy đang hiệu lực (empty nếu shop chưa cấu hình).
+     */
+    public Optional<TaxPolicy> findEffectivePolicy(
+            String shopId,
+            String branchId,
+            LocalDateTime atTime
+    ) {
+        LocalDateTime time = atTime != null ? atTime : LocalDateTime.now();
+
+        if (branchId != null) {
+            Optional<TaxPolicy> branchPolicy =
+                    taxPolicyRepository.findEffectivePolicy(shopId, branchId, time);
+            if (branchPolicy.isPresent()) {
+                return branchPolicy;
+            }
+        }
+
+        return taxPolicyRepository.findEffectivePolicy(shopId, null, time);
+    }
+
+    /**
      * Resolve tax policy đang hiệu lực cho shop / branch tại 1 thời điểm
      */
     public TaxPolicy resolveEffectivePolicy(
@@ -27,28 +49,8 @@ public class TaxPolicyService {
             String branchId,
             LocalDateTime atTime
     ) {
-        LocalDateTime time = atTime != null ? atTime : LocalDateTime.now();
-
-        // 1️⃣ Ưu tiên branch override
-        if (branchId != null) {
-            Optional<TaxPolicy> branchPolicy =
-                    taxPolicyRepository.findEffectivePolicy(
-                            shopId,
-                            branchId,
-                            time
-                    );
-
-            if (branchPolicy.isPresent()) {
-                return branchPolicy.get();
-            }
-        }
-
-        // 2️⃣ Fallback shop default (branchId = null)
-        return taxPolicyRepository
-                .findEffectivePolicy(shopId, null, time)
-                .orElseThrow(() ->
-                        new BusinessException(ApiCode.TAX_POLICY_NOT_FOUND)
-                );
+        return findEffectivePolicy(shopId, branchId, atTime)
+                .orElseThrow(() -> new BusinessException(ApiCode.TAX_POLICY_NOT_FOUND));
     }
 
     /**
@@ -60,11 +62,14 @@ public class TaxPolicyService {
     }
 
     /**
-     * Soft-disable một policy
+     * Soft-disable một policy (chỉ trong đúng cửa hàng)
      */
-    public void deactivatePolicy(String userId, String policyId) {
+    public void deactivatePolicy(String userId, String shopId, String policyId) {
         TaxPolicy policy = taxPolicyRepository.findById(policyId)
                 .orElseThrow(() -> new BusinessException(ApiCode.TAX_POLICY_NOT_FOUND));
+        if (!Objects.equals(shopId, policy.getShopId())) {
+            throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
 
         policy.setActive(false);
         taxPolicyRepository.save(policy);

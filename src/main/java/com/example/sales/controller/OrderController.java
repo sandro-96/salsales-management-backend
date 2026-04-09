@@ -8,6 +8,8 @@ import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.dto.order.OrderUpdateRequest;
+import com.example.sales.model.tax.OrderTaxSnapshot;
+import com.example.sales.service.tax.OrderTaxApplier;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
 import com.example.sales.service.OrderService;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderTaxApplier orderTaxApplier;
 
     @GetMapping
     @RequirePermission(Permission.ORDER_VIEW)
@@ -46,6 +49,26 @@ public class OrderController {
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
         Page<OrderResponse> orders = orderService.getShopOrders(shopId, pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
+    }
+
+    @GetMapping("/preview-tax")
+    @RequirePermission(Permission.ORDER_CREATE)
+    @Operation(summary = "Xem trước thuế đơn hàng", description = "Tính thuế theo chính sách hiện hành từ tổng tiền hàng (chưa cộng thuế hoặc đã gồm thuế tùy cấu hình cửa hàng)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tính thuế thành công"),
+            @ApiResponse(responseCode = "400", description = "totalPrice không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này")
+    })
+    public ApiResponseDto<OrderTaxSnapshot> previewTax(
+            @RequestParam @Parameter(description = "ID cửa hàng") String shopId,
+            @RequestParam @Parameter(description = "ID chi nhánh") String branchId,
+            @RequestParam @Parameter(description = "Tổng tiền hàng (cùng nghĩa totalPrice lúc tạo đơn)") double totalPrice) {
+        if (totalPrice < 0 || totalPrice > 1_000_000_000_000d) {
+            return ApiResponseDto.error(ApiCode.VALIDATION_ERROR, "totalPrice must be between 0 and 1e12", null);
+        }
+        OrderTaxSnapshot snapshot = orderTaxApplier.preview(shopId, branchId, totalPrice);
+        return ApiResponseDto.success(ApiCode.ORDER_TAX_PREVIEW, snapshot);
     }
 
     @PostMapping

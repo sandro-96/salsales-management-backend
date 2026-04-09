@@ -20,11 +20,9 @@ public class OrderTaxApplier {
      */
     public void applyTax(Order order) {
 
-        TaxPolicy policy = taxPolicyService.resolveEffectivePolicy(
-                order.getShopId(),
-                order.getBranchId(),
-                LocalDateTime.now()
-        );
+        TaxPolicy policy = taxPolicyService
+                .findEffectivePolicy(order.getShopId(), order.getBranchId(), LocalDateTime.now())
+                .orElseGet(TaxPolicy::noTaxFallback);
 
         double baseAmount = order.getTotalPrice();
         // totalPrice = tổng item trước tax (design của bạn đang rất ổn)
@@ -34,5 +32,15 @@ public class OrderTaxApplier {
 
         order.setTaxSnapshot(snapshot);
         order.setTotalAmount(snapshot.getGrandTotal());
+    }
+
+    /**
+     * Xem trước thuế theo tổng tiền hàng (sau KM / giảm điểm — cùng nghĩa với totalPrice khi tạo đơn).
+     */
+    public OrderTaxSnapshot preview(String shopId, String branchId, double baseAmount) {
+        TaxPolicy policy = taxPolicyService
+                .findEffectivePolicy(shopId, branchId, LocalDateTime.now())
+                .orElseGet(TaxPolicy::noTaxFallback);
+        return taxCalculationService.calculate(Math.max(0, baseAmount), policy);
     }
 }

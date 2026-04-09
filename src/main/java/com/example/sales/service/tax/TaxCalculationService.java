@@ -5,6 +5,7 @@ import com.example.sales.model.tax.*;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -19,6 +20,8 @@ public class TaxCalculationService {
 
         boolean priceIncludesTax = policy.isPriceIncludesTax();
         List<OrderTaxLine> taxLines = new ArrayList<>();
+        List<TaxRule> rules =
+                policy.getRules() != null ? policy.getRules() : Collections.emptyList();
 
         double netAmount;
         double runningBase;
@@ -26,7 +29,7 @@ public class TaxCalculationService {
 
         // 1️⃣ Xác định NET
         if (priceIncludesTax) {
-            netAmount = extractNetAmount(baseAmount, policy);
+            netAmount = extractNetAmount(baseAmount, rules);
             runningBase = netAmount;
         } else {
             netAmount = baseAmount;
@@ -34,7 +37,7 @@ public class TaxCalculationService {
         }
 
         // 2️⃣ Tính từng TaxRule
-        for (TaxRule rule : policy.getRules()) {
+        for (TaxRule rule : rules) {
 
             double taxableBase = rule.isApplyOnPreviousTaxes()
                     ? runningBase
@@ -69,8 +72,8 @@ public class TaxCalculationService {
      * Tách NET từ GROSS
      * (chỉ áp dụng cho thuế % không chồng thuế)
      */
-    private double extractNetAmount(double gross, TaxPolicy policy) {
-        double percentSum = policy.getRules().stream()
+    private double extractNetAmount(double gross, List<TaxRule> rules) {
+        double percentSum = rules.stream()
                 .filter(r -> r.getType() == TaxRuleType.PERCENT)
                 .filter(r -> !r.isApplyOnPreviousTaxes())
                 .mapToDouble(TaxRule::getValue)
