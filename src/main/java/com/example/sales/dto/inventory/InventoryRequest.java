@@ -21,6 +21,9 @@ public class InventoryRequest {
     @NotBlank(message = "Branch Product ID không được để trống")
     private String branchProductId; // ID của BranchProduct
 
+    /** Nếu sản phẩm có biến thể — bắt buộc cho nhập/xuất theo biến thể */
+    private String variantId;
+
     @NotNull(message = "Loại giao dịch không được để trống")
     private InventoryType type; // IMPORT, EXPORT, ADJUSTMENT
 

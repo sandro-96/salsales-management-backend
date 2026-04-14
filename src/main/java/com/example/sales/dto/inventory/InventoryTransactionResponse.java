@@ -18,6 +18,9 @@ public class InventoryTransactionResponse {
     private String shopId;
     private String branchId;
     private String branchProductId; // ID của BranchProduct liên quan đến giao dịch
+    private String variantId;
+    /** Tên biến thể (đọc từ Product.variants tại thời điểm xem lịch sử). */
+    private String variantName;
     private String productName;     // Tên của sản phẩm (snapshot)
     private String sku;             // SKU sản phẩm (snapshot)
     private InventoryType type;     // Loại giao dịch (IMPORT, EXPORT, ADJUSTMENT)

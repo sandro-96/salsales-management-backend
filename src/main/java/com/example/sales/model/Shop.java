@@ -35,6 +35,12 @@ public class Shop extends BaseEntity {
     private Country countryCode;
     private String slug;
 
+    /**
+     * Mã số thuế (MST) đăng ký của pháp nhân / cửa hàng.
+     * Chi nhánh có thể ghi đè riêng nếu có MST tại điểm kinh doanh.
+     */
+    private String taxRegistrationNumber;
+
     @Builder.Default
     private boolean active = true;
 

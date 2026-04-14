@@ -18,7 +18,7 @@ public interface InventoryService {
      * @param note Ghi chú cho giao dịch.
      * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
      */
-    int importProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note);
+    int importProductQuantity(String userId, String shopId, String branchId, String branchProductId, String variantId, int quantity, String note);
 
     /**
      * Xuất bớt số lượng sản phẩm khỏi kho của chi nhánh.
@@ -33,7 +33,7 @@ public interface InventoryService {
      * @param referenceId ID tham chiếu (ví dụ: ID đơn hàng).
      * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
      */
-    int exportProductQuantity(String userId, String shopId, String branchId, String branchProductId, int quantity, String note, String referenceId);
+    int exportProductQuantity(String userId, String shopId, String branchId, String branchProductId, String variantId, int quantity, String note, String referenceId);
 
     /**
      * Điều chỉnh số lượng tồn kho của sản phẩm tại chi nhánh.
@@ -46,7 +46,7 @@ public interface InventoryService {
      * @param note Ghi chú cho giao dịch.
      * @return Số lượng tồn kho mới của sản phẩm tại chi nhánh.
      */
-    int adjustProductQuantity(String userId, String shopId, String branchId, String branchProductId, int newQuantity, String note);
+    int adjustProductQuantity(String userId, String shopId, String branchId, String branchProductId, String variantId, int newQuantity, String note);
 
     /**
      * Lấy lịch sử giao dịch tồn kho cho một sản phẩm cụ thể.

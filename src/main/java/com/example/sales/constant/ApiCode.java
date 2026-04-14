@@ -99,7 +99,10 @@ public enum ApiCode {
     PRODUCT_NOT_TRACK_INVENTORY("4153", "Product does not require inventory tracking"),
     STAFF_PROFILE_NOT_FOUND("4154", "Staff profile not found"),
     TICKET_NOT_FOUND("4155", "Support ticket not found"),
-    NOTIFICATION_NOT_FOUND("4156", "Notification not found");
+    NOTIFICATION_NOT_FOUND("4156", "Notification not found"),
+    ORDER_LINE_VARIANT_REQUIRED("4157", "This product has variants — variantId is required on each order line"),
+    PRODUCT_VARIANT_NOT_FOUND("4158", "Variant not found for this branch product"),
+    ORDER_LINE_VARIANT_NOT_ALLOWED("4159", "This product has no variants — variantId must not be sent");
 
     private final String code;
     private final String message;

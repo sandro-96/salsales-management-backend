@@ -39,6 +39,12 @@ public class Branch extends BaseEntity {
     private Integer capacity;
 
     private String description;
+
+    /**
+     * MST riêng của chi nhánh (tùy chọn). Để trống = dùng MST của cửa hàng khi hiển thị/hóa đơn.
+     */
+    private String taxRegistrationNumber;
+
     @Builder.Default
     private boolean isDefault = false;
     @Builder.Default

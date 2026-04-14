@@ -20,6 +20,7 @@ import com.example.sales.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +47,7 @@ public class ShopService extends BaseService {
         shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
         shop.setCountryCode(request.getCountryCode());
+        shop.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(request.getTaxRegistrationNumber()));
         BusinessModel model = request.getBusinessModel() != null
                 ? request.getBusinessModel()
                 : request.getType().getDefaultBusinessModel();
@@ -96,6 +98,7 @@ public class ShopService extends BaseService {
         shop.setAddress(request.getAddress());
         shop.setPhone(request.getPhone());
         shop.setCountryCode(request.getCountryCode());
+        shop.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(request.getTaxRegistrationNumber()));
         shop.setBusinessModel(request.getBusinessModel());
         shop.setActive(request.isActive());
 
@@ -157,6 +160,7 @@ public class ShopService extends BaseService {
                     .countryCode(shop.getCountryCode())
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
+                    .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -175,6 +179,7 @@ public class ShopService extends BaseService {
                     .countryCode(shop.getCountryCode())
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
+                    .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -194,9 +199,17 @@ public class ShopService extends BaseService {
                 .address(shop.getAddress())
                 .slug(shop.getSlug())
                 .phone(shop.getPhone())
+                .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                 .active(shop.isActive())
                 .industry(shop.getType().getIndustry())
                 .businessModel(shop.getBusinessModel())
                 .build();
+    }
+
+    private static String normalizeTaxRegistrationNumber(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        return raw.trim();
     }
 }

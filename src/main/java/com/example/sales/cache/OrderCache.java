@@ -5,6 +5,7 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Order;
 import com.example.sales.repository.OrderRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
@@ -22,5 +23,10 @@ public class OrderCache {
         return orderRepository.findByIdAndDeletedFalse(orderId)
                 .filter(o -> o.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
+    }
+
+    @CacheEvict(value = "orders", key = "#shopId + ':' + #orderId")
+    public void evict(String orderId, String shopId) {
+        // cache cleared
     }
 }

@@ -52,7 +52,7 @@ public class InventoryController {
 
         int newQuantity = inventoryService.importProductQuantity(
                 user.getId(), shopId, request.getBranchId(), request.getBranchProductId(),
-                request.getQuantity(), request.getNote());
+                request.getVariantId(), request.getQuantity(), request.getNote());
 
         return ApiResponseDto.success(ApiCode.SUCCESS, newQuantity);
     }
@@ -79,7 +79,7 @@ public class InventoryController {
 
         int newQuantity = inventoryService.exportProductQuantity(
                 user.getId(), shopId, request.getBranchId(), request.getBranchProductId(),
-                request.getQuantity(), request.getNote(), request.getReferenceId());
+                request.getVariantId(), request.getQuantity(), request.getNote(), request.getReferenceId());
 
         return ApiResponseDto.success(ApiCode.SUCCESS, newQuantity);
     }
@@ -107,7 +107,7 @@ public class InventoryController {
         // Đối với ADJUSTMENT, request.getQuantity() sẽ là newQuantity
         int newQuantity = inventoryService.adjustProductQuantity(
                 user.getId(), shopId, request.getBranchId(), request.getBranchProductId(),
-                request.getQuantity(), request.getNote());
+                request.getVariantId(), request.getQuantity(), request.getNote());
 
         return ApiResponseDto.success(ApiCode.SUCCESS, newQuantity);
     }

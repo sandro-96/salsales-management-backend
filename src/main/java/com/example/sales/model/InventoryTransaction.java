@@ -24,6 +24,9 @@ public class InventoryTransaction extends BaseEntity {
     private String branchId;
     private String productId;
 
+    /** null = giao dịch cấp BranchProduct; có giá trị = tồn theo biến thể */
+    private String variantId;
+
     private InventoryType type;  // IMPORT, EXPORT, ADJUSTMENT
 
     private int quantity;        // Số lượng thay đổi (delta cho IMPORT/EXPORT, newQuantity cho ADJUSTMENT)

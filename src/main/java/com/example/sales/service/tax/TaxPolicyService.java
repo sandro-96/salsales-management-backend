@@ -17,6 +17,15 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class TaxPolicyService {
 
+    /**
+     * MongoDB / BSON Date không chứa được {@link LocalDateTime#MIN}/{@link LocalDateTime#MAX}.
+     * Chỉ dùng các mốc này trong truy vấn chồng lấn — giá trị lưu DB vẫn có thể là null (mở đầu / mở cuối).
+     */
+    private static final LocalDateTime OVERLAP_QUERY_START =
+            LocalDateTime.of(1970, 1, 1, 0, 0);
+    private static final LocalDateTime OVERLAP_QUERY_END =
+            LocalDateTime.of(2100, 12, 31, 23, 59, 59);
+
     private final TaxPolicyRepository taxPolicyRepository;
     private final AuditLogService auditLogService;
 
@@ -92,11 +101,11 @@ public class TaxPolicyService {
 
         LocalDateTime from = policy.getEffectiveFrom() != null
                 ? policy.getEffectiveFrom()
-                : LocalDateTime.MIN;
+                : OVERLAP_QUERY_START;
 
         LocalDateTime to = policy.getEffectiveTo() != null
                 ? policy.getEffectiveTo()
-                : LocalDateTime.MAX;
+                : OVERLAP_QUERY_END;
 
         List<TaxPolicy> overlaps = taxPolicyRepository
                 .findActiveOverlappingPolicies(

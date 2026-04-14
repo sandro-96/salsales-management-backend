@@ -5,6 +5,7 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.dto.order.OrderFulfillmentPatchRequest;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.dto.order.OrderUpdateRequest;
@@ -145,6 +146,23 @@ public class OrderController {
             @Valid @RequestBody @Parameter(description = "Thông tin cập nhật đơn hàng") OrderUpdateRequest request) {
 
         OrderResponse response = orderService.updateOrder(user.getId(), shopId, orderId, request);
+        return ApiResponseDto.success(ApiCode.ORDER_UPDATED, response);
+    }
+
+    @PatchMapping("/{id}/fulfillment")
+    @RequirePermission(Permission.ORDER_UPDATE)
+    @Operation(summary = "Cập nhật giao hàng / tham chiếu đơn", description = "Ghi chú, khách hàng, vận đơn, đơn vị VC — cho phép cả đơn đã thanh toán (trừ đơn đã hủy)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
+            @ApiResponse(responseCode = "400", description = "Đơn đã hủy hoặc dữ liệu không hợp lệ"),
+            @ApiResponse(responseCode = "404", description = "Đơn hoặc khách không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> patchOrderFulfillment(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable("id") @Parameter(description = "ID đơn hàng") String orderId,
+            @RequestParam @Parameter(description = "ID cửa hàng") String shopId,
+            @Valid @RequestBody OrderFulfillmentPatchRequest request) {
+        OrderResponse response = orderService.patchOrderFulfillment(user.getId(), shopId, orderId, request);
         return ApiResponseDto.success(ApiCode.ORDER_UPDATED, response);
     }
 

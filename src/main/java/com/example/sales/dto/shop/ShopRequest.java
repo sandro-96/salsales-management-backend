@@ -26,5 +26,8 @@ public class ShopRequest {
 
     private Country countryCode;
 
+    /** Mã số thuế (MST), tùy chọn */
+    private String taxRegistrationNumber;
+
     private boolean active = true;
 }

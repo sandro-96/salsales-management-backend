@@ -221,6 +221,7 @@ public class ShopUserService extends BaseService {
                             .countryCode(shop.getCountryCode())
                             .address(shop.getAddress())
                             .phone(shop.getPhone())
+                            .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                             .active(shop.isActive())
                             .role(su != null ? su.getRole() : null)
                             .industry(shop.getType().getIndustry())

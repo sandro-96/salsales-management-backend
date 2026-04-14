@@ -29,6 +29,8 @@ public class BranchDetailResponse {
     private Integer capacity;
     private String description;
 
+    private String taxRegistrationNumber;
+
     private boolean active;
     private boolean isDefault;
 

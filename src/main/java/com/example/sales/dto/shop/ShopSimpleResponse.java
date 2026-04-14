@@ -14,6 +14,7 @@ public class ShopSimpleResponse {
     private String logoUrl;
     private Country countryCode;
     private String phone;
+    private String taxRegistrationNumber;
     private String address;
     private String slug;
     private boolean active;

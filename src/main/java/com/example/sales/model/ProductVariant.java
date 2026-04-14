@@ -2,6 +2,7 @@ package com.example.sales.model;
 
 import lombok.*;
 
+import java.util.List;
 import java.util.Map;
 
 @Getter
@@ -17,4 +18,6 @@ public class ProductVariant {
     private double price; // Giá bán mặc định của biến thể
     private double costPrice; // Giá nhập của biến thể
     private Map<String, Object> attributes; // Thuộc tính bổ sung
+    /** URL ảnh riêng của biến thể (tối đa do server/FE giới hạn) */
+    private List<String> images;
 }

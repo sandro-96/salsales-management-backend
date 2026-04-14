@@ -63,6 +63,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final ProductCatalogService productCatalogService;
 
     private static final int MAX_PRODUCT_IMAGES = 10;
+    /** Số file tối đa mỗi lần gọi upload ảnh biến thể (staging) */
+    private static final int MAX_VARIANT_STAGED_FILES = 10;
 
     @Override
     public ProductResponse createProduct(String shopId, ProductRequest request) {
@@ -204,6 +206,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .forEach(url -> {
                     try { fileUploadService.delete(url); } catch (Exception ignored) {}
                 });
+
+        deleteRemovedVariantImages(product, request);
 
         // Update Product fields only
         updateExistingProduct(product, request, userId);
@@ -693,6 +697,29 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     }
 
     @Override
+    public List<String> uploadStagedVariantImages(String userId, String shopId, List<MultipartFile> files) {
+        shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        if (files == null || files.isEmpty()) {
+            return List.of();
+        }
+        if (files.size() > MAX_VARIANT_STAGED_FILES) {
+            throw new BusinessException(ApiCode.PRODUCT_IMAGE_LIMIT_EXCEEDED);
+        }
+
+        String folder = "products/" + shopId + "/variant-staged";
+        List<String> urls = files.stream()
+                .map(f -> fileUploadService.upload(f, folder))
+                .toList();
+
+        auditLogService.log(userId, shopId, null, "PRODUCT", "VARIANT_IMAGES_STAGED",
+                String.format("Upload %d ảnh staging cho biến thể (shop %s)", urls.size(), shopId));
+
+        return urls;
+    }
+
+    @Override
     public void seedBranchProductsForNewBranch(String shopId, String branchId) {
         List<Product> products = productRepository.findAllByShopIdAndDeletedFalse(shopId);
         if (products.isEmpty()) return;
@@ -749,6 +776,33 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         product.getName(), product.getSku(), currentImages.size()));
 
         return currentImages;
+    }
+
+    private List<String> collectVariantImageUrls(List<ProductVariant> variants) {
+        if (variants == null || variants.isEmpty()) {
+            return List.of();
+        }
+        return variants.stream()
+                .filter(Objects::nonNull)
+                .map(ProductVariant::getImages)
+                .filter(Objects::nonNull)
+                .flatMap(Collection::stream)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+    }
+
+    private void deleteRemovedVariantImages(Product existing, ProductRequest request) {
+        List<String> oldUrls = collectVariantImageUrls(existing.getVariants());
+        List<String> newUrls = collectVariantImageUrls(request.getVariants());
+        oldUrls.stream()
+                .filter(url -> !newUrls.contains(url))
+                .forEach(url -> {
+                    try {
+                        fileUploadService.delete(url);
+                    } catch (Exception ignored) {
+                    }
+                });
     }
 
     /**

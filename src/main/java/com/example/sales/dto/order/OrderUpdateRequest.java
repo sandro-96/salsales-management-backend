@@ -29,6 +29,9 @@ public class OrderUpdateRequest {
         // ID của Product master, không phải BranchProduct ID
         private String productId;
 
+        /** Bắt buộc khi sản phẩm có biến thể */
+        private String variantId;
+
         @Min(value = 1, message = "Số lượng phải lớn hơn 0")
         private int quantity;
 

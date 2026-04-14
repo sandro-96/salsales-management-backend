@@ -79,6 +79,19 @@ public class ProductCrudController {
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_CREATED, response));
     }
 
+    @Operation(summary = "Upload ảnh biến thể (staging)",
+            description = "Upload ảnh lên storage trước khi lưu Product; trả về URL để gắn vào variants[].images trong JSON. "
+                    + "Tối đa 10 file mỗi lần gọi.")
+    @PostMapping(value = "/shops/{shopId}/products/variant-images/staged", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequirePermission(Permission.PRODUCT_UPDATE)
+    public ResponseEntity<ApiResponseDto<List<String>>> uploadStagedVariantImages(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable String shopId,
+            @RequestParam("files") List<MultipartFile> files) {
+        List<String> urls = productService.uploadStagedVariantImages(user.getId(), shopId, files);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_IMAGE_UPLOADED, urls));
+    }
+
     // ─────────────────────────────────────────────────────────────────
     // READ
     // ─────────────────────────────────────────────────────────────────

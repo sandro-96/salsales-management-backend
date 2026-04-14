@@ -54,6 +54,12 @@ public interface ProductService {
     List<String> deleteProductImage(String userId, String shopId, String productId, String imageUrl);
 
     /**
+     * Upload ảnh biến thể trước khi lưu Product (chưa cần productId).
+     * Trả về URL để gắn vào {@link com.example.sales.model.ProductVariant#setImages}.
+     */
+    List<String> uploadStagedVariantImages(String userId, String shopId, List<MultipartFile> files);
+
+    /**
      * Seed BranchProduct cho toàn bộ Products hiện có của shop khi tạo branch mới.
      * Mỗi Product sẽ có 1 BranchProduct với giá mặc định từ Product, tồn kho = 0.
      */

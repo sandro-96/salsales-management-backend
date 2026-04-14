@@ -2,6 +2,7 @@
 package com.example.sales.model;
 
 import com.example.sales.constant.OrderStatus;
+import com.example.sales.constant.PaymentStatus;
 import com.example.sales.model.base.BaseEntity;
 import com.example.sales.model.tax.OrderTaxSnapshot;
 import lombok.*;
@@ -22,6 +23,9 @@ import java.util.List;
 public class Order extends BaseEntity {
     @Id
     private String id;
+
+    /** Mã đơn hàng hiển thị (VD: DH-20260414-042), sinh khi tạo đơn — khác id nội bộ MongoDB. */
+    private String orderCode;
 
     private String shopId;
     private String branchId;
@@ -53,6 +57,10 @@ public class Order extends BaseEntity {
     private LocalDateTime paymentTime;
     private boolean isPaid;
 
+    /** Trạng thái thanh toán (COD chờ thu, đã thu, …). */
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
     private String note;
 
     private String customerId;
@@ -65,4 +73,13 @@ public class Order extends BaseEntity {
 
     @Builder.Default
     private double pointsDiscount = 0;
+
+    /** Đơn vị vận chuyển (GHN, GHTK, Shopee Xpress, …) — bán lẻ / online */
+    private String shippingCarrier;
+    /** Hình thức / loại giao (COD ngoài, Shopee, lấy tại quầy, …) */
+    private String shippingMethod;
+    /** Mã vận đơn */
+    private String trackingNumber;
+    /** Mã tham chiếu đơn ngoài (VD Shopee) */
+    private String externalOrderRef;
 }

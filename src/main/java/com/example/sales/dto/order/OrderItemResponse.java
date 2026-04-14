@@ -13,7 +13,12 @@ import lombok.NoArgsConstructor;
 public class OrderItemResponse {
     private String productId;       // ID của Product (master product)
     private String branchProductId; // ID của BranchProduct (sản phẩm cụ thể tại chi nhánh)
+    private String variantId;
     private String productName;
+    private String variantName;
+    private String sku;
+    private String promotionName;
+    private String promotionDiscountLabel;
     private int quantity;
     private double price;             // Giá gốc tại thời điểm đặt hàng
     private double priceAfterDiscount; // Giá sau khi áp dụng khuyến mãi

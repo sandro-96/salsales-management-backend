@@ -18,6 +18,7 @@ public class ShopResponse {
     private Country countryCode;
     private String address;
     private String phone;
+    private String taxRegistrationNumber;
     private String logoUrl;
     private boolean active;
     private SubscriptionPlan plan;

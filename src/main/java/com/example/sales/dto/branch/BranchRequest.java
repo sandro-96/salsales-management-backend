@@ -29,6 +29,9 @@ public class BranchRequest {
     private Integer capacity;
     private String description;
 
+    /** MST riêng chi nhánh; để trống = dùng MST cửa hàng */
+    private String taxRegistrationNumber;
+
     private boolean active = true;
     private boolean isDefault = false;
 }

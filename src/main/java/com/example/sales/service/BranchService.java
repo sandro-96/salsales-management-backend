@@ -13,6 +13,7 @@ import com.example.sales.repository.BranchRepository;
 import com.example.sales.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -43,6 +44,7 @@ public class BranchService {
                 .managerPhone(req.getManagerPhone())
                 .capacity(req.getCapacity())
                 .description(req.getDescription())
+                .taxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()))
                 .active(req.isActive())
                 .isDefault(req.isDefault())
                 .slug(generateUniqueBranchSlug(
@@ -84,6 +86,7 @@ public class BranchService {
         branch.setManagerPhone(req.getManagerPhone());
         branch.setCapacity(req.getCapacity());
         branch.setDescription(req.getDescription());
+        branch.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()));
         branch.setActive(req.isActive());
 
         Branch saved = branchRepository.save(branch);
@@ -157,6 +160,7 @@ public class BranchService {
                 .managerPhone(branch.getManagerPhone())
                 .capacity(branch.getCapacity())
                 .description(branch.getDescription())
+                .taxRegistrationNumber(branch.getTaxRegistrationNumber())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .createdAt(branch.getCreatedAt())
@@ -190,10 +194,18 @@ public class BranchService {
                 .managerPhone(branch.getManagerPhone())
                 .capacity(branch.getCapacity())
                 .description(branch.getDescription())
+                .taxRegistrationNumber(branch.getTaxRegistrationNumber())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .createdAt(branch.getCreatedAt())
                 .updatedAt(branch.getUpdatedAt())
                 .build();
+    }
+
+    private static String normalizeTaxRegistrationNumber(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        return raw.trim();
     }
 }
