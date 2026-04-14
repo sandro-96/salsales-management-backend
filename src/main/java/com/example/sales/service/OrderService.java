@@ -326,13 +326,23 @@ public class OrderService extends BaseService {
                 .orElse(null);
     }
 
-    public Page<OrderResponse> getShopOrders(String shopId, Pageable pageable) {
-        return orderRepository.findByShopIdOrderByCreatedAtDesc(shopId, pageable)
+    public Page<OrderResponse> getShopOrders(String shopId, String branchId, Pageable pageable) {
+        if (StringUtils.hasText(branchId)) {
+            return orderRepository
+                    .findByShopIdAndBranchIdAndDeletedFalseOrderByCreatedAtDesc(shopId, branchId, pageable)
+                    .map(this::toResponse);
+        }
+        return orderRepository.findByShopIdAndDeletedFalseOrderByCreatedAtDesc(shopId, pageable)
                 .map(this::toResponse);
     }
 
     public Page<OrderResponse> getOrdersByStatus(String shopId, OrderStatus status, String branchId, Pageable pageable) {
-        return orderRepository.findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)
+        if (StringUtils.hasText(branchId)) {
+            return orderRepository
+                    .findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)
+                    .map(this::toResponse);
+        }
+        return orderRepository.findByShopIdAndStatusAndDeletedFalseOrderByCreatedAtDesc(shopId, status, pageable)
                 .map(this::toResponse);
     }
 

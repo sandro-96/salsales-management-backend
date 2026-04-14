@@ -13,16 +13,26 @@ import java.util.Optional;
 @Repository
 public interface TaxPolicyRepository extends MongoRepository<TaxPolicy, String> {
 
+    /**
+     * effectiveFrom rỗng / null = áp dụng ngay; MongoDB không khớp
+     * {@code { effectiveFrom: { $lte: now } }} khi field null hoặc không tồn tại,
+     * nên dùng $or với null (null query cũng khớp field thiếu).
+     */
     @Query(
             value = """
           {
             'shopId': ?0,
             'branchId': ?1,
             'active': true,
-            'effectiveFrom': { $lte: ?2 },
-            $or: [
-              { 'effectiveTo': null },
-              { 'effectiveTo': { $gte: ?2 } }
+            $and: [
+              { $or: [
+                  { 'effectiveFrom': null },
+                  { 'effectiveFrom': { $lte: ?2 } }
+              ]},
+              { $or: [
+                  { 'effectiveTo': null },
+                  { 'effectiveTo': { $gte: ?2 } }
+              ]}
             ]
           }
           """,

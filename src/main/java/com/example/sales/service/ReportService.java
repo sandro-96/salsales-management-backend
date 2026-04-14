@@ -1,5 +1,6 @@
 package com.example.sales.service;
 
+import com.example.sales.constant.OrderStatus;
 import com.example.sales.dto.report.DailyReportResponse;
 import com.example.sales.dto.report.ReportRequest;
 import com.example.sales.dto.report.ReportResponse;
@@ -174,6 +175,9 @@ public class ReportService {
 
         if (request.getStatus() != null) {
             criteria = criteria.and("status").is(request.getStatus());
+        } else {
+            // Tổng quan / báo cáo không truyền status: không tính doanh thu đơn đã hủy
+            criteria = criteria.and("status").ne(OrderStatus.CANCELLED);
         }
 
         if (request.getStartDate() != null && request.getEndDate() != null) {

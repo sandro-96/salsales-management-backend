@@ -15,7 +15,7 @@ public class PermissionUtils {
     );
 
     private static final Set<Permission> ORDER_PERMS = Set.of(
-            ORDER_CREATE, ORDER_UPDATE, ORDER_PAYMENT_CONFIRM
+            ORDER_CREATE, ORDER_UPDATE, ORDER_PAYMENT_CONFIRM, ORDER_CANCEL
     );
 
     private static final Set<Permission> PRODUCT_BASE = Set.of(

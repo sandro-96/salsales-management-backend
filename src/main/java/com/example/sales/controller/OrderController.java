@@ -47,8 +47,9 @@ public class OrderController {
     public ApiResponseDto<Page<OrderResponse>> getShopOrders(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam(required = false) @Parameter(description = "Lọc theo chi nhánh; bỏ qua = tất cả chi nhánh") String branchId,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> orders = orderService.getShopOrders(shopId, pageable);
+        Page<OrderResponse> orders = orderService.getShopOrders(shopId, branchId, pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 
