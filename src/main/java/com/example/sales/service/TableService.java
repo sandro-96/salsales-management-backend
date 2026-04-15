@@ -17,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.Optional;
 
@@ -78,6 +79,18 @@ public class TableService {
         // Lấy danh sách bàn với phân trang
         return tableRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable)
                 .map(table -> toResponse(table, shop));
+    }
+
+    public String getCurrentOrderId(String userId, String shopId, String tableId) {
+        // Kiểm tra quyền truy cập
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+        if (!shopId.equals(table.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
+        }
+        return StringUtils.hasText(table.getCurrentOrderId()) ? table.getCurrentOrderId().trim() : null;
     }
 
     @Transactional

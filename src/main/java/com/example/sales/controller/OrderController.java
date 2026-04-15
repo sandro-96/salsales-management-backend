@@ -9,6 +9,8 @@ import com.example.sales.dto.order.OrderFulfillmentPatchRequest;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.dto.order.OrderUpdateRequest;
+import com.example.sales.dto.order.MoveTableRequest;
+import com.example.sales.dto.order.OrderSplitRequest;
 import com.example.sales.model.tax.OrderTaxSnapshot;
 import com.example.sales.service.tax.OrderTaxApplier;
 import com.example.sales.security.CustomUserDetails;
@@ -25,6 +27,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -50,6 +54,75 @@ public class OrderController {
             @RequestParam(required = false) @Parameter(description = "Lọc theo chi nhánh; bỏ qua = tất cả chi nhánh") String branchId,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
         Page<OrderResponse> orders = orderService.getShopOrders(shopId, branchId, pageable);
+        return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
+    }
+
+    @GetMapping("/{id}")
+    @RequirePermission(Permission.ORDER_VIEW)
+    @Operation(summary = "Lấy chi tiết đơn hàng", description = "Lấy đầy đủ thông tin đơn hàng theo ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đơn hàng được trả về thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Đơn hàng hoặc cửa hàng không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> getOrderById(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của đơn hàng") String id) {
+        OrderResponse order = orderService.getOrderById(shopId, id);
+        return ApiResponseDto.success(ApiCode.ORDER_LIST, order);
+    }
+
+    @PostMapping("/{orderId}/move-table")
+    @RequirePermission(Permission.ORDER_UPDATE)
+    @Operation(summary = "Đổi bàn cho đơn đang mở", description = "Chuyển đơn chưa thanh toán sang bàn khác (cập nhật currentOrderId của bàn)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đổi bàn thành công"),
+            @ApiResponse(responseCode = "400", description = "Đơn đã thanh toán hoặc bàn đích không hợp lệ/đang bận"),
+            @ApiResponse(responseCode = "404", description = "Đơn hoặc bàn không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> moveTable(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của đơn hàng") String orderId,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @Valid @RequestBody MoveTableRequest request) {
+        OrderResponse updated = orderService.moveTable(user.getId(), shopId, orderId, request.getToTableId());
+        return ApiResponseDto.success(ApiCode.ORDER_UPDATED, updated);
+    }
+
+    @PostMapping("/{orderId}/split")
+    @RequirePermission(Permission.ORDER_UPDATE)
+    @Operation(summary = "Tách món sang đơn mới", description = "Tách một phần món của đơn đang mở sang đơn mới (có thể gắn bàn đích)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tách đơn thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu tách không hợp lệ / đơn đã thanh toán"),
+            @ApiResponse(responseCode = "404", description = "Đơn hoặc bàn không tìm thấy")
+    })
+    public ApiResponseDto<Map<String, OrderResponse>> split(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable String orderId,
+            @RequestParam String shopId,
+            @Valid @RequestBody OrderSplitRequest request) {
+        Map<String, OrderResponse> res = orderService.splitOrder(user.getId(), shopId, orderId, request);
+        return ApiResponseDto.success(ApiCode.SUCCESS, res);
+    }
+
+    @GetMapping("/open")
+    @RequirePermission(Permission.ORDER_VIEW)
+    @Operation(summary = "Lấy danh sách đơn đang mở", description = "Danh sách đơn chưa thanh toán và chưa kết thúc theo chi nhánh")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách đơn đang mở được trả về thành công"),
+            @ApiResponse(responseCode = "400", description = "branchId không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này")
+    })
+    public ApiResponseDto<Page<OrderResponse>> getOpenOrders(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
+            @RequestParam @Parameter(description = "ID của chi nhánh") String branchId,
+            @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
+        Page<OrderResponse> orders = orderService.getOpenOrders(shopId, branchId, pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 

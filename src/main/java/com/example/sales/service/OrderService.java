@@ -163,7 +163,9 @@ public class OrderService extends BaseService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
-        orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        // Giải phóng bàn khi huỷ đơn (đơn chưa thanh toán)
+        releaseTable(saved);
         orderCache.evict(orderId, shopId);
 
         // Hoàn kho khi hủy đơn hàng nếu shop có quản lý tồn kho
@@ -344,6 +346,225 @@ public class OrderService extends BaseService {
         }
         return orderRepository.findByShopIdAndStatusAndDeletedFalseOrderByCreatedAtDesc(shopId, status, pageable)
                 .map(this::toResponse);
+    }
+
+    public OrderResponse getOrderById(String shopId, String orderId) {
+        Order order = orderCache.getOrderByShop(orderId, shopId);
+        return toResponse(order);
+    }
+
+    public Page<OrderResponse> getOpenOrders(String shopId, String branchId, Pageable pageable) {
+        if (!StringUtils.hasText(branchId)) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        List<OrderStatus> excluded = List.of(OrderStatus.CANCELLED, OrderStatus.COMPLETED);
+        return orderRepository
+                .findOpenOrdersByShopIdAndBranchId(shopId, branchId, excluded, pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public OrderResponse moveTable(String userId, String shopId, String orderId, String toTableId) {
+        Order order = orderCache.getOrderByShop(orderId, shopId);
+        if (order.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+        if (!StringUtils.hasText(toTableId)) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        Table toTable = tableRepository.findByIdAndDeletedFalse(toTableId.trim())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+        if (!shopId.equals(toTable.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
+        }
+        // Khóa theo branch: chỉ cho đổi trong cùng chi nhánh của order
+        if (StringUtils.hasText(order.getBranchId())
+                && StringUtils.hasText(toTable.getBranchId())
+                && !order.getBranchId().equals(toTable.getBranchId())) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        String current = toTable.getCurrentOrderId();
+        if (StringUtils.hasText(current) && !orderId.equals(current.trim())) {
+            throw new BusinessException(ApiCode.TABLE_OCCUPIED);
+        }
+
+        String fromTableId = order.getTableId();
+        if (StringUtils.hasText(fromTableId) && fromTableId.trim().equals(toTable.getId())) {
+            return toResponse(order);
+        }
+
+        // Release old table if any
+        if (StringUtils.hasText(fromTableId)) {
+            tableRepository.findByIdAndDeletedFalse(fromTableId.trim()).ifPresent(t -> {
+                if (shopId.equals(t.getShopId()) && orderId.equals(t.getCurrentOrderId())) {
+                    t.setCurrentOrderId(null);
+                    t.setStatus(TableStatus.AVAILABLE);
+                    tableRepository.save(t);
+                }
+            });
+        }
+
+        // Occupy new table
+        toTable.setCurrentOrderId(orderId);
+        toTable.setStatus(TableStatus.OCCUPIED);
+        tableRepository.save(toTable);
+
+        order.setTableId(toTable.getId());
+        Order saved = orderRepository.save(order);
+        orderCache.evict(orderId, shopId);
+        auditLogService.log(userId, shopId, orderId, "ORDER", "TABLE_MOVED",
+                "Đổi bàn cho đơn hàng từ %s sang %s".formatted(fromTableId, toTable.getId()));
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public Map<String, OrderResponse> splitOrder(String userId, String shopId, String orderId,
+                                                 com.example.sales.dto.order.OrderSplitRequest request) {
+        Order src = orderCache.getOrderByShop(orderId, shopId);
+        if (src.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+        if (src.getStatus() == OrderStatus.CANCELLED || src.getStatus() == OrderStatus.COMPLETED) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (src.getPointsRedeemed() > 0 || src.getPointsDiscount() > 0) {
+            // Split with loyalty discount is ambiguous; keep it simple for now.
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (request == null || request.getItemsToMove() == null || request.getItemsToMove().isEmpty()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        // Validate destination table if provided
+        String toTableId = StringUtils.hasText(request.getToTableId()) ? request.getToTableId().trim() : null;
+        if (toTableId != null) {
+            Table toTable = tableRepository.findByIdAndDeletedFalse(toTableId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+            if (!shopId.equals(toTable.getShopId()) || !src.getBranchId().equals(toTable.getBranchId())) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            if (StringUtils.hasText(toTable.getCurrentOrderId())) {
+                throw new BusinessException(ApiCode.TABLE_OCCUPIED);
+            }
+        }
+
+        // Validate move list and compute remaining/moved items
+        Map<String, Integer> moveQtyByKey = new HashMap<>();
+        for (var mv : request.getItemsToMove()) {
+            String k = mv.getProductId().trim() + "||" + (mv.getVariantId() == null ? "" : mv.getVariantId().trim());
+            moveQtyByKey.merge(k, mv.getQuantity(), Integer::sum);
+        }
+
+        List<OrderItem> moved = new java.util.ArrayList<>();
+        List<OrderItem> remaining = new java.util.ArrayList<>();
+
+        for (OrderItem it : (src.getItems() == null ? List.<OrderItem>of() : src.getItems())) {
+            String k = (it.getProductId() == null ? "" : it.getProductId())
+                    + "||" + (it.getVariantId() == null ? "" : it.getVariantId());
+            int moveQty = moveQtyByKey.getOrDefault(k, 0);
+            if (moveQty <= 0) {
+                remaining.add(it);
+                continue;
+            }
+            if (moveQty > it.getQuantity()) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            if (moveQty < it.getQuantity()) {
+                OrderItem kept = OrderItem.builder()
+                        .productId(it.getProductId())
+                        .branchProductId(it.getBranchProductId())
+                        .variantId(it.getVariantId())
+                        .productName(it.getProductName())
+                        .variantName(it.getVariantName())
+                        .sku(it.getSku())
+                        .promotionName(it.getPromotionName())
+                        .promotionDiscountLabel(it.getPromotionDiscountLabel())
+                        .quantity(it.getQuantity() - moveQty)
+                        .price(it.getPrice())
+                        .priceAfterDiscount(it.getPriceAfterDiscount())
+                        .appliedPromotionId(it.getAppliedPromotionId())
+                        .trackInventory(it.isTrackInventory())
+                        .build();
+                remaining.add(kept);
+            }
+            OrderItem movedLine = OrderItem.builder()
+                    .productId(it.getProductId())
+                    .branchProductId(it.getBranchProductId())
+                    .variantId(it.getVariantId())
+                    .productName(it.getProductName())
+                    .variantName(it.getVariantName())
+                    .sku(it.getSku())
+                    .promotionName(it.getPromotionName())
+                    .promotionDiscountLabel(it.getPromotionDiscountLabel())
+                    .quantity(moveQty)
+                    .price(it.getPrice())
+                    .priceAfterDiscount(it.getPriceAfterDiscount())
+                    .appliedPromotionId(it.getAppliedPromotionId())
+                    .trackInventory(it.isTrackInventory())
+                    .build();
+            moved.add(movedLine);
+        }
+
+        if (moved.isEmpty() || remaining.isEmpty()) {
+            // Disallow moving all items for now
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        // Create new order for moved items (re-export inventory for moved items)
+        Order newOrder = new Order();
+        newOrder.setShopId(shopId);
+        newOrder.setBranchId(src.getBranchId());
+        newOrder.setUserId(userId);
+        newOrder.setTableId(toTableId);
+        newOrder.setNote(src.getNote());
+        newOrder.setStatus(src.getStatus());
+        newOrder.setPaid(false);
+        newOrder.setPaymentStatus(PaymentStatus.UNPAID);
+        newOrder.setOrderCode(generateOrderCode(shopId));
+        newOrder.setItems(moved);
+
+        double[] totalsNew = {0, 0};
+        for (OrderItem it : moved) {
+            totalsNew[0] += it.getQuantity();
+            totalsNew[1] += it.getQuantity() * it.getPriceAfterDiscount();
+        }
+        newOrder.setTotalPrice(totalsNew[1]);
+        orderTaxApplier.applyTax(newOrder);
+        Order created = orderRepository.save(newOrder);
+
+        for (OrderItem it : created.getItems()) {
+            if (it.isTrackInventory()) {
+                inventoryService.exportProductQuantity(
+                        userId, shopId, created.getBranchId(), it.getBranchProductId(),
+                        it.getVariantId(),
+                        it.getQuantity(),
+                        "Xuất kho theo tách đơn " + OrderDisplayUtils.displayOrderCode(created),
+                        created.getId());
+            }
+        }
+        occupyTable(created);
+
+        // Update original order using existing logic (imports old, exports remaining)
+        com.example.sales.dto.order.OrderUpdateRequest upd = com.example.sales.dto.order.OrderUpdateRequest.builder()
+                .tableId(src.getTableId())
+                .note(src.getNote())
+                .items(remaining.stream().map(it -> com.example.sales.dto.order.OrderUpdateRequest.OrderItemUpdateRequest.builder()
+                        .productId(it.getProductId())
+                        .variantId(it.getVariantId())
+                        .quantity(it.getQuantity())
+                        .price(it.getPrice())
+                        .build()).toList())
+                .build();
+
+        OrderResponse srcUpdated = updateOrder(userId, shopId, orderId, upd);
+        OrderResponse newResp = toResponse(created);
+
+        auditLogService.log(userId, shopId, orderId, "ORDER", "SPLIT",
+                "Tách %d dòng hàng sang đơn %s".formatted(moved.size(), created.getId()));
+        orderCache.evict(orderId, shopId);
+        return Map.of("source", srcUpdated, "newOrder", newResp);
     }
 
     @Transactional

@@ -5,10 +5,12 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.Permission;
 import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.dto.table.TableRequest;
 import com.example.sales.dto.table.TableResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
+import com.example.sales.service.OrderService;
 import com.example.sales.service.TableService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 public class TableController {
 
     private final TableService tableService;
+    private final OrderService orderService;
 
     @PostMapping
     @Operation(summary = "Tạo bàn mới", description = "Tạo một bàn mới trong cửa hàng với thông tin bàn và chi nhánh")
@@ -60,6 +63,27 @@ public class TableController {
             @RequestParam @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
         return ApiResponseDto.success(ApiCode.SUCCESS, tableService.getByShop(user.getId(), shopId, branchId, pageable));
+    }
+
+    @GetMapping("/{id}/current-order")
+    @RequirePermission(Permission.ORDER_VIEW)
+    @Operation(summary = "Lấy đơn đang mở theo bàn", description = "Trả về đơn hiện tại của bàn (nếu có), dựa trên currentOrderId")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Trả về đơn hiện tại (hoặc null nếu bàn chưa có đơn)"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Bàn không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> getCurrentOrder(
+            @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của bàn") String id) {
+        String orderId = tableService.getCurrentOrderId(user.getId(), shopId, id);
+        if (orderId == null) {
+            return ApiResponseDto.success(ApiCode.SUCCESS, null);
+        }
+        OrderResponse order = orderService.getOrderById(shopId, orderId);
+        return ApiResponseDto.success(ApiCode.SUCCESS, order);
     }
 
     @PutMapping("/{id}/status")
