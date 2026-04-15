@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -31,6 +32,16 @@ public class S3Config {
 
     @Bean
     public S3Client s3Client() {
+        if (accessKey == null || accessKey.isBlank()
+                || secretKey == null || secretKey.isBlank()
+                || bucket == null || bucket.isBlank()) {
+            log.warn("Thiếu cấu hình AWS S3 (accessKey/secretKey/bucket). S3Client sẽ chạy ở chế độ no-op (các thao tác upload sẽ thất bại).");
+            return S3Client.builder()
+                    .region(Region.of(region))
+                    .credentialsProvider(AnonymousCredentialsProvider.create())
+                    .build();
+        }
+
         AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
         StaticCredentialsProvider credentialsProvider = StaticCredentialsProvider.create(credentials);
 
