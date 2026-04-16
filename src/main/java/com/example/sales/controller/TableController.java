@@ -67,7 +67,7 @@ public class TableController {
 
     @GetMapping("/{id}/current-order")
     @RequirePermission(Permission.ORDER_VIEW)
-    @Operation(summary = "Lấy đơn đang mở theo bàn", description = "Trả về đơn hiện tại của bàn (nếu có), dựa trên currentOrderId")
+    @Operation(summary = "Lấy đơn đang mở theo bàn", description = "Trả về đơn hiện tại của bàn (nếu có), dựa trên currentOrderId. Bàn “luôn trống” không dùng pointer — luôn trả về null.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trả về đơn hiện tại (hoặc null nếu bàn chưa có đơn)"),
             @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
@@ -83,6 +83,15 @@ public class TableController {
             return ApiResponseDto.success(ApiCode.SUCCESS, null);
         }
         OrderResponse order = orderService.getOrderById(shopId, orderId);
+        // Self-heal: if table.currentOrderId points to a closed order, clear it and return null.
+        if (order == null
+                || order.isPaid()
+                || order.getStatus() == null
+                || order.getStatus().name().equals("CANCELLED")
+                || order.getStatus().name().equals("COMPLETED")) {
+            tableService.clearCurrentOrderIfMatches(user.getId(), shopId, id, orderId);
+            return ApiResponseDto.success(ApiCode.SUCCESS, null);
+        }
         return ApiResponseDto.success(ApiCode.SUCCESS, order);
     }
 

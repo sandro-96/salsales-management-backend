@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +47,7 @@ public class OrderService extends BaseService {
 
     private final OrderRepository orderRepository;
     private final TableRepository tableRepository;
+    private final TableGroupRepository tableGroupRepository;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
     private final PromotionRepository promotionRepository;
@@ -208,6 +210,7 @@ public class OrderService extends BaseService {
 
         Order updated = orderRepository.save(order);
         releaseTable(updated); // Giải phóng bàn khi đơn hàng hoàn thành/thanh toán
+        releasePaidTableFromTableGroups(userId, shopId, updated);
 
         // Tích điểm cho khách hàng
         if (updated.getCustomerId() != null && !updated.getCustomerId().isBlank()) {
@@ -256,6 +259,9 @@ public class OrderService extends BaseService {
         }
 
         Order updated = orderRepository.save(order);
+        if (newStatus == OrderStatus.COMPLETED && updated.isPaid()) {
+            releasePaidTableFromTableGroups(userId, shopId, updated);
+        }
         orderCache.evict(orderId, shopId);
         if (!oldStatus.equals(newStatus)) {
             auditLogService.log(userId, shopId, order.getId(), "ORDER", "STATUS_UPDATED",
@@ -268,6 +274,10 @@ public class OrderService extends BaseService {
     private void occupyTable(Order order) {
         if (order.getTableId() != null && !order.getTableId().isBlank()) { // Kiểm tra null và blank
             tableRepository.findByIdAndDeletedFalse(order.getTableId()).ifPresent(table -> { // Tìm bàn không bị xóa
+                // Bàn “luôn trống”: không OCCUPIED, không gắn currentOrderId (nhiều đơn song song).
+                if (Boolean.TRUE.equals(table.getAlwaysAvailable())) {
+                    return;
+                }
                 table.setStatus(TableStatus.OCCUPIED);
                 table.setCurrentOrderId(order.getId());
                 tableRepository.save(table);
@@ -278,10 +288,61 @@ public class OrderService extends BaseService {
     private void releaseTable(Order order) {
         if (order.getTableId() != null && !order.getTableId().isBlank()) {
             tableRepository.findByIdAndDeletedFalse(order.getTableId()).ifPresent(table -> {
-                table.setStatus(TableStatus.AVAILABLE);
+                boolean always = Boolean.TRUE.equals(table.getAlwaysAvailable());
+                String cur = StringUtils.hasText(table.getCurrentOrderId())
+                        ? table.getCurrentOrderId().trim()
+                        : null;
+                // Bàn luôn trống: chỉ xóa pointer nếu đúng đơn này (tránh gỡ nhầm khi DB còn dữ liệu cũ).
+                if (always && cur != null && !order.getId().equals(cur)) {
+                    return;
+                }
                 table.setCurrentOrderId(null);
+                if (!always) {
+                    table.setStatus(TableStatus.AVAILABLE);
+                } else if (table.getStatus() == null) {
+                    table.setStatus(TableStatus.AVAILABLE);
+                }
                 tableRepository.save(table);
             });
+        }
+    }
+
+    /**
+     * Sau thanh toán: gỡ bàn của đơn khỏi mọi {@link TableGroup} (cùng shop/branch).
+     * Nếu nhóm còn dưới 2 bàn thì xóa (soft-delete) cả nhóm.
+     */
+    private void releasePaidTableFromTableGroups(String userId, String shopId, Order order) {
+        if (order == null || !StringUtils.hasText(order.getTableId()) || !StringUtils.hasText(order.getBranchId())) {
+            return;
+        }
+        String tableId = order.getTableId().trim();
+        String branchId = order.getBranchId().trim();
+        List<TableGroup> groups = tableGroupRepository
+                .findByShopIdAndBranchIdAndDeletedFalseAndTableIdsContains(shopId, branchId, tableId);
+        if (groups == null || groups.isEmpty()) {
+            return;
+        }
+        for (TableGroup g : groups) {
+            if (g.getTableIds() == null || g.getTableIds().isEmpty()) {
+                continue;
+            }
+            List<String> next = g.getTableIds().stream()
+                    .filter(StringUtils::hasText)
+                    .map(String::trim)
+                    .filter(id -> !id.equals(tableId))
+                    .distinct()
+                    .toList();
+            if (next.size() < 2) {
+                g.setDeleted(true);
+                tableGroupRepository.save(g);
+                auditLogService.log(userId, shopId, g.getId(), "TABLE_GROUP", "DELETED",
+                        "Giải nhóm tự động sau thanh toán (còn %d bàn)".formatted(next.size()));
+            } else {
+                g.setTableIds(new ArrayList<>(next));
+                tableGroupRepository.save(g);
+                auditLogService.log(userId, shopId, g.getId(), "TABLE_GROUP", "UPDATED",
+                        "Gỡ bàn khỏi nhóm sau thanh toán: %s".formatted(tableId));
+            }
         }
     }
 
@@ -386,7 +447,10 @@ public class OrderService extends BaseService {
         }
 
         String current = toTable.getCurrentOrderId();
-        if (StringUtils.hasText(current) && !orderId.equals(current.trim())) {
+        boolean alwaysAvail = Boolean.TRUE.equals(toTable.getAlwaysAvailable());
+        if (!alwaysAvail
+                && StringUtils.hasText(current)
+                && !orderId.equals(current.trim())) {
             throw new BusinessException(ApiCode.TABLE_OCCUPIED);
         }
 
@@ -400,19 +464,20 @@ public class OrderService extends BaseService {
             tableRepository.findByIdAndDeletedFalse(fromTableId.trim()).ifPresent(t -> {
                 if (shopId.equals(t.getShopId()) && orderId.equals(t.getCurrentOrderId())) {
                     t.setCurrentOrderId(null);
-                    t.setStatus(TableStatus.AVAILABLE);
+                    if (!Boolean.TRUE.equals(t.getAlwaysAvailable())) {
+                        t.setStatus(TableStatus.AVAILABLE);
+                    } else if (t.getStatus() == null) {
+                        t.setStatus(TableStatus.AVAILABLE);
+                    }
                     tableRepository.save(t);
                 }
             });
         }
 
-        // Occupy new table
-        toTable.setCurrentOrderId(orderId);
-        toTable.setStatus(TableStatus.OCCUPIED);
-        tableRepository.save(toTable);
-
         order.setTableId(toTable.getId());
         Order saved = orderRepository.save(order);
+        // Occupy new table (respect "always available" tables)
+        occupyTable(saved);
         orderCache.evict(orderId, shopId);
         auditLogService.log(userId, shopId, orderId, "ORDER", "TABLE_MOVED",
                 "Đổi bàn cho đơn hàng từ %s sang %s".formatted(fromTableId, toTable.getId()));
@@ -445,7 +510,8 @@ public class OrderService extends BaseService {
             if (!shopId.equals(toTable.getShopId()) || !src.getBranchId().equals(toTable.getBranchId())) {
                 throw new BusinessException(ApiCode.VALIDATION_ERROR);
             }
-            if (StringUtils.hasText(toTable.getCurrentOrderId())) {
+            if (!Boolean.TRUE.equals(toTable.getAlwaysAvailable())
+                    && StringUtils.hasText(toTable.getCurrentOrderId())) {
                 throw new BusinessException(ApiCode.TABLE_OCCUPIED);
             }
         }
@@ -565,6 +631,178 @@ public class OrderService extends BaseService {
                 "Tách %d dòng hàng sang đơn %s".formatted(moved.size(), created.getId()));
         orderCache.evict(orderId, shopId);
         return Map.of("source", srcUpdated, "newOrder", newResp);
+    }
+
+    /**
+     * Gộp nhiều đơn đang mở của các bàn trong cùng một {@link TableGroup} về một đơn đích.
+     * Các đơn nguồn sẽ bị huỷ (hoàn kho theo luồng huỷ đơn), sau đó đơn đích được cập nhật lại dòng hàng.
+     */
+    @Transactional
+    public OrderResponse mergeTableGroupOrders(
+            String userId, String shopId, com.example.sales.dto.order.OrderGroupMergeRequest request) {
+        if (request == null
+                || !StringUtils.hasText(request.getTargetOrderId())
+                || request.getSourceOrderIds() == null
+                || request.getSourceOrderIds().isEmpty()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        String targetId = request.getTargetOrderId().trim();
+        List<String> distinctIds = request.getSourceOrderIds().stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (distinctIds.size() < 2) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (!distinctIds.contains(targetId)) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        List<OrderStatus> excluded = List.of(OrderStatus.CANCELLED, OrderStatus.COMPLETED);
+        List<Order> loaded = orderRepository.findOpenOrdersByShopIdAndIdIn(shopId, excluded, distinctIds);
+        Map<String, Order> byId = loaded.stream().collect(Collectors.toMap(Order::getId, o -> o, (a, b) -> a));
+        if (byId.size() != distinctIds.size()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        Order target = byId.get(targetId);
+        if (target == null || !shopId.equals(target.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND);
+        }
+        if (!StringUtils.hasText(target.getBranchId())) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        String branchId = target.getBranchId();
+
+        for (String id : distinctIds) {
+            Order o = byId.get(id);
+            if (o == null || !shopId.equals(o.getShopId()) || !branchId.equals(o.getBranchId())) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            if (o.isPaid()) {
+                throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+            }
+            if (o.getStatus() == OrderStatus.CANCELLED || o.getStatus() == OrderStatus.COMPLETED) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            if (o.getPointsRedeemed() > 0 || o.getPointsDiscount() > 0) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+        }
+
+        // Customer consistency (OrderUpdateRequest cannot merge customer fields safely)
+        String customerId = StringUtils.hasText(target.getCustomerId()) ? target.getCustomerId().trim() : null;
+        for (String id : distinctIds) {
+            Order o = byId.get(id);
+            String cid = StringUtils.hasText(o.getCustomerId()) ? o.getCustomerId().trim() : null;
+            if (cid == null) continue;
+            if (customerId == null) {
+                customerId = cid;
+                continue;
+            }
+            if (!customerId.equals(cid)) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+        }
+
+        java.util.LinkedHashSet<String> tableIds = new java.util.LinkedHashSet<>();
+        for (String id : distinctIds) {
+            Order o = byId.get(id);
+            if (!StringUtils.hasText(o.getTableId())) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            tableIds.add(o.getTableId().trim());
+        }
+
+        TableGroup group = null;
+        for (TableGroup g : tableGroupRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId)) {
+            if (g.getTableIds() == null || g.getTableIds().size() < 2) continue;
+            java.util.HashSet<String> gid = g.getTableIds().stream()
+                    .filter(StringUtils::hasText)
+                    .map(String::trim)
+                    .collect(Collectors.toCollection(java.util.HashSet::new));
+            boolean allInGroup = tableIds.stream().allMatch(gid::contains);
+            if (allInGroup) {
+                group = g;
+                break;
+            }
+        }
+        if (group == null) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        // Snapshot lines BEFORE cancelling sources (cancel mutates persisted orders)
+        java.util.Map<String, Integer> qtyByKey = new java.util.HashMap<>();
+        java.util.Map<String, String> productIdByKey = new java.util.HashMap<>();
+        java.util.Map<String, String> variantIdByKey = new java.util.HashMap<>();
+        for (String id : distinctIds) {
+            Order o = byId.get(id);
+            for (OrderItem it : (o.getItems() == null ? List.<OrderItem>of() : o.getItems())) {
+                if (!StringUtils.hasText(it.getProductId())) {
+                    throw new BusinessException(ApiCode.VALIDATION_ERROR);
+                }
+                String key = mergeLineKey(it);
+                qtyByKey.merge(key, it.getQuantity(), Integer::sum);
+                productIdByKey.putIfAbsent(key, it.getProductId().trim());
+                String vid = it.getVariantId();
+                variantIdByKey.putIfAbsent(key, StringUtils.hasText(vid) ? vid.trim() : "");
+            }
+        }
+
+        // Cancel non-target orders first (refund inventory for those lines)
+        for (String id : distinctIds) {
+            if (id.equals(targetId)) continue;
+            cancelOrder(userId, shopId, id);
+        }
+
+        java.util.List<OrderUpdateRequest.OrderItemUpdateRequest> updItems = new java.util.ArrayList<>();
+        for (var e : qtyByKey.entrySet()) {
+            if (e.getValue() == null || e.getValue() <= 0) continue;
+            String key = e.getKey();
+            String productId = productIdByKey.get(key);
+            String variantStored = variantIdByKey.getOrDefault(key, "");
+            String variantId = StringUtils.hasText(variantStored) ? variantStored : null;
+            if (!StringUtils.hasText(productId)) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            updItems.add(OrderUpdateRequest.OrderItemUpdateRequest.builder()
+                    .productId(productId)
+                    .variantId(variantId)
+                    .quantity(e.getValue())
+                    .price(0)
+                    .build());
+        }
+        if (updItems.isEmpty()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        String mergedNote = target.getNote();
+        OrderUpdateRequest upd = OrderUpdateRequest.builder()
+                .tableId(target.getTableId())
+                .note(mergedNote)
+                .items(updItems)
+                .build();
+
+        OrderResponse updated = updateOrder(userId, shopId, targetId, upd);
+        auditLogService.log(userId, shopId, targetId, "ORDER", "MERGED_GROUP",
+                "Gộp bill nhóm (%s): %s".formatted(group.getId(), String.join(",", distinctIds)));
+        return updated;
+    }
+
+    private static String mergeLineKey(OrderItem it) {
+        String pid = it.getProductId() == null ? "" : it.getProductId().trim();
+        String vid = it.getVariantId() == null ? "" : it.getVariantId().trim();
+        String bp = it.getBranchProductId() == null ? "" : it.getBranchProductId().trim();
+        String prom = it.getAppliedPromotionId() == null ? "" : it.getAppliedPromotionId().trim();
+        // Keep separate buckets if pricing/promo differs (even for same product/variant)
+        return pid
+                + "###v=" + vid
+                + "###bp=" + bp
+                + "###p=" + it.getPrice()
+                + "###pad=" + it.getPriceAfterDiscount()
+                + "###prom=" + prom;
     }
 
     @Transactional

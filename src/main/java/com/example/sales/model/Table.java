@@ -27,5 +27,11 @@ public class Table extends BaseEntity {
     private Integer capacity;
     private String note;
     private String currentOrderId;
+
+    /**
+     * Bàn “luôn trống” (vd: Mang đi): không chuyển sang OCCUPIED, không dùng {@link #currentOrderId}
+     * để trỏ đơn — cho phép nhiều đơn cùng {@code tableId} song song (POS quản lý theo tab/đơn).
+     */
+    private Boolean alwaysAvailable;
 }
 

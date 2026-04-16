@@ -28,4 +28,8 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     @Query(value = "{ 'shopId': ?0, 'branchId': ?1, 'deleted': false, 'isPaid': false, 'status': { $nin: ?2 } }")
     Page<Order> findOpenOrdersByShopIdAndBranchId(
             String shopId, String branchId, List<OrderStatus> excludedStatuses, Pageable pageable);
+
+    @Query(value = "{ 'shopId': ?0, 'deleted': false, 'isPaid': false, 'status': { $nin: ?1 }, '_id': { $in: ?2 } }")
+    List<Order> findOpenOrdersByShopIdAndIdIn(
+            String shopId, List<OrderStatus> excludedStatuses, List<String> ids);
 }

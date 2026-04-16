@@ -60,6 +60,7 @@ public class TableService {
                 .status(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE))
                 .capacity(request.getCapacity())
                 .note(request.getNote())
+                .alwaysAvailable(Boolean.TRUE.equals(request.getAlwaysAvailable()))
                 .build();
 
         Table saved = tableRepository.save(table);
@@ -90,7 +91,35 @@ public class TableService {
         if (!shopId.equals(table.getShopId())) {
             throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
         }
+        // Bàn “luôn trống”: không có khái niệm “một đơn gắn bàn” — không dùng currentOrderId để resume.
+        if (Boolean.TRUE.equals(table.getAlwaysAvailable())) {
+            return null;
+        }
         return StringUtils.hasText(table.getCurrentOrderId()) ? table.getCurrentOrderId().trim() : null;
+    }
+
+    /**
+     * Clear currentOrderId for a table (self-heal) if it still points to a closed order.
+     * This is intentionally idempotent.
+     */
+    @Transactional
+    public void clearCurrentOrderIfMatches(String userId, String shopId, String tableId, String expectedOrderId) {
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        if (!StringUtils.hasText(expectedOrderId)) return;
+
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+        if (!shopId.equals(table.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
+        }
+
+        String current = StringUtils.hasText(table.getCurrentOrderId()) ? table.getCurrentOrderId().trim() : null;
+        if (current != null && current.equals(expectedOrderId.trim())) {
+            table.setCurrentOrderId(null);
+            // Defensive: if order is closed, the table should be available.
+            table.setStatus(TableStatus.AVAILABLE);
+            tableRepository.save(table);
+        }
     }
 
     @Transactional
@@ -144,6 +173,7 @@ public class TableService {
         table.setCapacity(request.getCapacity());
         table.setNote(request.getNote());
         table.setStatus(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE));
+        table.setAlwaysAvailable(Boolean.TRUE.equals(request.getAlwaysAvailable()));
 
         Table saved = tableRepository.save(table);
         auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "UPDATED",
@@ -171,6 +201,7 @@ public class TableService {
     }
 
     private TableResponse toResponse(Table table, Shop shop) {
+        boolean always = Boolean.TRUE.equals(table.getAlwaysAvailable());
         return TableResponse.builder()
                 .id(table.getId())
                 .name(table.getName())
@@ -180,7 +211,8 @@ public class TableService {
                 .shopName(shop != null ? shop.getName() : null)
                 .capacity(table.getCapacity())
                 .note(table.getNote())
-                .currentOrderId(table.getCurrentOrderId())
+                .currentOrderId(always ? null : table.getCurrentOrderId())
+                .alwaysAvailable(always)
                 .build();
     }
 }

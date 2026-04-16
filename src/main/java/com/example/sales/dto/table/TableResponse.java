@@ -17,6 +17,9 @@ public class TableResponse {
     private String note;
     private String currentOrderId;
     private String branchId; // Có thể null nếu không phân biệt chi nhánh
+
+    /** Bàn “luôn trống” (vd: Mang đi): không chuyển sang OCCUPIED khi có đơn. */
+    private Boolean alwaysAvailable;
 }
 
 

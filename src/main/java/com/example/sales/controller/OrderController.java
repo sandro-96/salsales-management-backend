@@ -11,6 +11,7 @@ import com.example.sales.dto.order.OrderResponse;
 import com.example.sales.dto.order.OrderUpdateRequest;
 import com.example.sales.dto.order.MoveTableRequest;
 import com.example.sales.dto.order.OrderSplitRequest;
+import com.example.sales.dto.order.OrderGroupMergeRequest;
 import com.example.sales.model.tax.OrderTaxSnapshot;
 import com.example.sales.service.tax.OrderTaxApplier;
 import com.example.sales.security.CustomUserDetails;
@@ -106,6 +107,22 @@ public class OrderController {
             @Valid @RequestBody OrderSplitRequest request) {
         Map<String, OrderResponse> res = orderService.splitOrder(user.getId(), shopId, orderId, request);
         return ApiResponseDto.success(ApiCode.SUCCESS, res);
+    }
+
+    @PostMapping("/merge-table-group")
+    @RequirePermission(Permission.ORDER_UPDATE)
+    @Operation(summary = "Gộp bill theo nhóm bàn", description = "Huỷ các đơn nguồn trong nhóm và gộp dòng hàng về đơn đích (cùng shop/branch, chưa thanh toán)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Gộp bill thành công"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ / không cùng nhóm bàn / đơn đã thanh toán"),
+            @ApiResponse(responseCode = "404", description = "Đơn không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> mergeTableGroup(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @RequestParam String shopId,
+            @Valid @RequestBody OrderGroupMergeRequest request) {
+        OrderResponse res = orderService.mergeTableGroupOrders(user.getId(), shopId, request);
+        return ApiResponseDto.success(ApiCode.ORDER_UPDATED, res);
     }
 
     @GetMapping("/open")
