@@ -36,7 +36,7 @@ public class TableService {
         String branchId = request.getBranchId();
 
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER);
 
         // Kiểm tra cửa hàng tồn tại
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
@@ -71,7 +71,7 @@ public class TableService {
 
     public Page<TableResponse> getByShop(String userId, String shopId, String branchId, Pageable pageable) {
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
 
         // Kiểm tra cửa hàng tồn tại
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
@@ -84,7 +84,7 @@ public class TableService {
 
     public String getCurrentOrderId(String userId, String shopId, String tableId) {
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
@@ -104,7 +104,7 @@ public class TableService {
      */
     @Transactional
     public void clearCurrentOrderIfMatches(String userId, String shopId, String tableId, String expectedOrderId) {
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
         if (!StringUtils.hasText(expectedOrderId)) return;
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
@@ -125,7 +125,7 @@ public class TableService {
     @Transactional
     public TableResponse updateStatus(String userId, String shopId, String tableId, TableStatus status) {
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
@@ -140,7 +140,7 @@ public class TableService {
     @Transactional
     public TableResponse updateTable(String userId, String tableId, TableRequest request) {
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(request.getShopId(), userId, ShopRole.OWNER);
+        shopUserService.requireAnyRole(request.getShopId(), userId, ShopRole.OWNER, ShopRole.MANAGER);
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
@@ -184,7 +184,7 @@ public class TableService {
     @Transactional
     public void deleteTable(String userId, String shopId, String tableId) {
         // Kiểm tra quyền truy cập
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER);
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));

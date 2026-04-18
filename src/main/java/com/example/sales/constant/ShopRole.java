@@ -4,5 +4,7 @@ package com.example.sales.constant;
 public enum ShopRole {
     OWNER,
     MANAGER,
-    STAFF
+    STAFF,
+    /** Thu ngân / POS: thanh toán & đơn hàng; không quản trị kho/sản phẩm mặc định. */
+    CASHIER
 }

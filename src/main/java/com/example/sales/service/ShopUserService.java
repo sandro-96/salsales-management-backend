@@ -239,11 +239,29 @@ public class ShopUserService extends BaseService {
         return new PageImpl<>(shopResponses, pageable, shopUsers.getTotalElements());
     }
 
+    /**
+     * OWNER quản mọi vai trò khác; MANAGER chỉ quản STAFF/CASHIER; STAFF/CASHIER không chỉnh người khác.
+     */
     private void ensureCanModifyRole(ShopRole actorRole, ShopRole targetRole) {
-        if (actorRole.ordinal() < targetRole.ordinal()) {
+        if (targetRole == ShopRole.OWNER) {
             auditLogService.log(null, null, null, "ROLE_MODIFICATION", "DENIED",
-                    String.format("User with role %s attempted to modify user with role %s.", actorRole, targetRole));
+                    String.format("User with role %s attempted to modify OWNER.", actorRole));
             throw new BusinessException(ApiCode.ACCESS_DENIED);
+        }
+        switch (actorRole) {
+            case OWNER -> { /* allowed for non-owner targets */ }
+            case MANAGER -> {
+                if (targetRole != ShopRole.STAFF && targetRole != ShopRole.CASHIER) {
+                    auditLogService.log(null, null, null, "ROLE_MODIFICATION", "DENIED",
+                            String.format("User with role %s attempted to modify user with role %s.", actorRole, targetRole));
+                    throw new BusinessException(ApiCode.ACCESS_DENIED);
+                }
+            }
+            case STAFF, CASHIER -> {
+                auditLogService.log(null, null, null, "ROLE_MODIFICATION", "DENIED",
+                        String.format("User with role %s attempted to modify user with role %s.", actorRole, targetRole));
+                throw new BusinessException(ApiCode.ACCESS_DENIED);
+            }
         }
     }
 

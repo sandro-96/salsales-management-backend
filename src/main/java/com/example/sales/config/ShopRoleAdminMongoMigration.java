@@ -20,6 +20,9 @@ import java.util.List;
 /**
  * Gỡ {@code ShopRole.ADMIN}: cập nhật bản ghi cũ trong {@code shop_users} thành MANAGER
  * và quyền mặc định của MANAGER. Quản trị hệ thống chỉ còn {@code UserRole.ROLE_ADMIN}.
+ * <p>
+ * {@code ShopRole.CASHIER}: không có migration tự động — thành viên cũ giữ role/quyền đã lưu;
+ * gán vai trò Thu ngân trong UI khi cần (quyền mặc định từ {@link com.example.sales.security.PermissionUtils}).
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)

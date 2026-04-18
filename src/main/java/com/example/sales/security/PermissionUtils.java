@@ -8,6 +8,10 @@ import java.util.Set;
 
 import static com.example.sales.constant.Permission.*;
 
+/**
+ * Quyền mặc định khi gán / đổi {@link ShopRole}.
+ * Bản ghi {@code shop_users} đã tồn tại giữ nguyên {@code permissions} cho đến khi đổi vai trò hoặc cập nhật quyền thủ công.
+ */
 public class PermissionUtils {
 
     private static final Set<Permission> COMMON_VIEW = Set.of(
@@ -44,6 +48,13 @@ public class PermissionUtils {
             SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_DELETE, SHOP_USER_VIEW
     );
 
+    /** Thu ngân: POS + thanh toán; không xem kho; không CRUD sản phẩm/KM/bàn. */
+    private static final Set<Permission> CASHIER_DEFAULT = merge(
+            Set.of(ORDER_VIEW, ORDER_CREATE, ORDER_UPDATE, ORDER_PAYMENT_CONFIRM, ORDER_CANCEL),
+            Set.of(PRODUCT_VIEW, PROMOTION_VIEW, TABLE_VIEW, BRANCH_VIEW, SHOP_VIEW,
+                    CUSTOMER_VIEW, CUSTOMER_UPDATE)
+    );
+
     public static Set<Permission> getDefaultPermissions(ShopRole role) {
         return switch (role) {
             case OWNER -> merge(
@@ -59,6 +70,7 @@ public class PermissionUtils {
             case STAFF -> merge(
                     Set.of(ORDER_CREATE, ORDER_UPDATE, CUSTOMER_VIEW), COMMON_VIEW
             );
+            case CASHIER -> CASHIER_DEFAULT;
         };
     }
 

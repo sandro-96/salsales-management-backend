@@ -31,7 +31,7 @@ public class TableGroupService {
 
     @Transactional
     public TableGroupResponse create(String userId, String shopId, String branchId, TableGroupRequest request) {
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
         if (!StringUtils.hasText(branchId)) throw new BusinessException(ApiCode.VALIDATION_ERROR);
 
         List<String> tableIds = normalizeIds(request.getTableIds());
@@ -68,7 +68,7 @@ public class TableGroupService {
     }
 
     public List<TableGroupResponse> list(String userId, String shopId, String branchId) {
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
         if (!StringUtils.hasText(branchId)) throw new BusinessException(ApiCode.VALIDATION_ERROR);
         return tableGroupRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId).stream()
                 .map(this::toResponse)
@@ -77,7 +77,7 @@ public class TableGroupService {
 
     @Transactional
     public TableGroupResponse update(String userId, String shopId, String branchId, String id, TableGroupUpdateRequest request) {
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
         TableGroup g = tableGroupRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.NOT_FOUND));
         if (!shopId.equals(g.getShopId()) || !branchId.equals(g.getBranchId())) {
@@ -118,7 +118,7 @@ public class TableGroupService {
 
     @Transactional
     public void delete(String userId, String shopId, String branchId, String id) {
-        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.STAFF);
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
         TableGroup g = tableGroupRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.NOT_FOUND));
         if (!shopId.equals(g.getShopId()) || !branchId.equals(g.getBranchId())) {
