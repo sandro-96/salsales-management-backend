@@ -58,6 +58,24 @@ public class OrderController {
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 
+    @GetMapping("/lookup")
+    @RequirePermission(Permission.ORDER_VIEW)
+    @Operation(summary = "Tra cứu đơn cho POS", description = "Theo orderCode hoặc orderId; chỉ đơn chưa thanh toán")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tìm thấy đơn"),
+            @ApiResponse(responseCode = "400", description = "Đơn đã thanh toán / trạng thái không hợp lệ / sai chi nhánh"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy")
+    })
+    public ApiResponseDto<OrderResponse> lookupOrderForPos(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestParam String shopId,
+            @RequestParam(required = false) String branchId,
+            @RequestParam(required = false) String orderCode,
+            @RequestParam(required = false) String orderId) {
+        OrderResponse order = orderService.lookupOrderForPosEdit(shopId, branchId, orderCode, orderId);
+        return ApiResponseDto.success(ApiCode.ORDER_LIST, order);
+    }
+
     @GetMapping("/{id}")
     @RequirePermission(Permission.ORDER_VIEW)
     @Operation(summary = "Lấy chi tiết đơn hàng", description = "Lấy đầy đủ thông tin đơn hàng theo ID")

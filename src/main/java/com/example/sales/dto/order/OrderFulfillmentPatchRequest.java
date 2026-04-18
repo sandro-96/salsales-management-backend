@@ -17,6 +17,10 @@ public class OrderFulfillmentPatchRequest {
 
     private String note;
     private String customerId;
+    /** Tên khách ghi nhận trên POS / walk-in (tách loyalty). */
+    private String guestName;
+    /** SĐT khách ghi nhận trên POS / walk-in. */
+    private String guestPhone;
     private String shippingCarrier;
     private String shippingMethod;
     private String trackingNumber;

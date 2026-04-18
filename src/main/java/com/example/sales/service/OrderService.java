@@ -80,6 +80,8 @@ public class OrderService extends BaseService {
             order.setStatus(OrderStatus.CONFIRMED);
         }
         order.setCustomerId(request.getCustomerId());
+        order.setGuestName(StringUtils.hasText(request.getGuestName()) ? request.getGuestName().trim() : null);
+        order.setGuestPhone(StringUtils.hasText(request.getGuestPhone()) ? request.getGuestPhone().trim() : null);
         if (StringUtils.hasText(request.getShippingCarrier())) {
             order.setShippingCarrier(request.getShippingCarrier().trim());
         }
@@ -411,6 +413,33 @@ public class OrderService extends BaseService {
 
     public OrderResponse getOrderById(String shopId, String orderId) {
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        return toResponse(order);
+    }
+
+    /**
+     * Mở đơn POS theo orderCode hoặc id đơn: chỉ đơn chưa thanh toán; nếu branchId có thì phải khớp chi nhánh đơn.
+     */
+    public OrderResponse lookupOrderForPosEdit(String shopId, String branchId, String orderCode, String orderId) {
+        Order order;
+        if (StringUtils.hasText(orderCode)) {
+            String trimmed = orderCode.trim();
+            order = orderRepository.findByShopIdAndOrderCodeIgnoreCaseAndDeletedFalse(shopId, trimmed)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND));
+        } else if (StringUtils.hasText(orderId)) {
+            order = orderCache.getOrderByShop(orderId.trim(), shopId);
+        } else {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (order.isPaid()) {
+            throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (StringUtils.hasText(branchId) && StringUtils.hasText(order.getBranchId())
+                && !branchId.equals(order.getBranchId())) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
         return toResponse(order);
     }
 
@@ -827,6 +856,13 @@ public class OrderService extends BaseService {
             order.setNote(request.getNote());
         }
 
+        if (request.getGuestName() != null) {
+            order.setGuestName(StringUtils.hasText(request.getGuestName()) ? request.getGuestName().trim() : null);
+        }
+        if (request.getGuestPhone() != null) {
+            order.setGuestPhone(StringUtils.hasText(request.getGuestPhone()) ? request.getGuestPhone().trim() : null);
+        }
+
         if (request.getItems() != null && !request.getItems().isEmpty()) {
             // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ (nếu shop có quản lý tồn kho)
             for (OrderItem oldItem : order.getItems()) {
@@ -927,6 +963,14 @@ public class OrderService extends BaseService {
             }
             order.setCustomerId(cid);
         }
+        if (request.getGuestName() != null) {
+            order.setGuestName(
+                    StringUtils.hasText(request.getGuestName()) ? request.getGuestName().trim() : null);
+        }
+        if (request.getGuestPhone() != null) {
+            order.setGuestPhone(
+                    StringUtils.hasText(request.getGuestPhone()) ? request.getGuestPhone().trim() : null);
+        }
 
         Order updated = orderRepository.save(order);
         orderCache.evict(orderId, shopId);
@@ -970,6 +1014,8 @@ public class OrderService extends BaseService {
                 .customerId(order.getCustomerId())
                 .customerName(customerName)
                 .customerPhone(customerPhone)
+                .guestName(order.getGuestName())
+                .guestPhone(order.getGuestPhone())
                 .pointsEarned(order.getPointsEarned())
                 .pointsRedeemed(order.getPointsRedeemed())
                 .pointsDiscount(order.getPointsDiscount())

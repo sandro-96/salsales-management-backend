@@ -9,14 +9,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.List;
 
 /**
- * Internal product catalog — bảng tra cứu thông tin sản phẩm theo barcode.
+ * Product catalog chuẩn hoá theo barcode — dữ liệu do system admin quản lý.
  *
- * Khi bất kỳ shop nào tạo / cập nhật sản phẩm có barcode, hệ thống tự động
- * upsert record vào đây. Các shop khác có thể tra cứu barcode để lấy thông tin
- * gợi ý khi nhập sản phẩm mới, giúp tiết kiệm thời gian nhập liệu.
+ * Shop chỉ tra cứu (read) qua API catalog để gợi ý khi tạo sản phẩm; không ghi
+ * vào collection này khi lưu sản phẩm hay import Excel.
  *
- * Last-write-wins: mỗi lần upsert sẽ overwrite name/category/description/images
- * bằng thông tin mới nhất từ shop vừa lưu.
+ * Last-write-wins: mỗi lần admin cập nhật sẽ ghi đè name/category/description/images.
  */
 @Getter
 @Setter

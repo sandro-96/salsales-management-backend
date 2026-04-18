@@ -95,6 +95,8 @@ public enum ApiCode {
     PRODUCT_IMAGE_LIMIT_EXCEEDED("4151", "Product image limit exceeded (max 10 images)"),
     CATALOG_NOT_FOUND("4152", "Barcode not found in catalog"),
     CATALOG_FOUND("2012", "Catalog entry found"),
+    CATALOG_SAVED("2014", "Product catalog entry saved"),
+    CATALOG_SEARCH_OK("2015", "Catalog search completed"),
     ORDER_TAX_PREVIEW("2013", "Order tax preview calculated"),
     PRODUCT_NOT_TRACK_INVENTORY("4153", "Product does not require inventory tracking"),
     STAFF_PROFILE_NOT_FOUND("4154", "Staff profile not found"),
@@ -102,7 +104,8 @@ public enum ApiCode {
     NOTIFICATION_NOT_FOUND("4156", "Notification not found"),
     ORDER_LINE_VARIANT_REQUIRED("4157", "This product has variants — variantId is required on each order line"),
     PRODUCT_VARIANT_NOT_FOUND("4158", "Variant not found for this branch product"),
-    ORDER_LINE_VARIANT_NOT_ALLOWED("4159", "This product has no variants — variantId must not be sent");
+    ORDER_LINE_VARIANT_NOT_ALLOWED("4159", "This product has no variants — variantId must not be sent"),
+    BARCODE_INVALID_GSIN("4160", "Mã vạch không hợp lệ chuẩn GS1 (sai chữ số kiểm tra). Hãy nhập đúng số in trên bao bì hoặc quét lại.");
 
     private final String code;
     private final String message;

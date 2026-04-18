@@ -56,9 +56,6 @@ public class PermissionUtils {
                     Set.of(SHOP_USER_CREATE, SHOP_USER_UPDATE, SHOP_USER_VIEW, BRANCH_VIEW, REPORT_VIEW, INVENTORY_MANAGE, INVENTORY_VIEW, SHOP_UPDATE, SHOP_VIEW, BRANCH_MANAGE),
                     PROMOTION_FULL, TABLE_FULL
             );
-            case ADMIN -> merge(
-                    ORDER_PERMS, Set.of(CUSTOMER_VIEW, PRODUCT_EXPORT), COMMON_VIEW, Set.of(INVENTORY_MANAGE)
-            );
             case STAFF -> merge(
                     Set.of(ORDER_CREATE, ORDER_UPDATE, CUSTOMER_VIEW), COMMON_VIEW
             );

@@ -29,6 +29,11 @@ public class OrderRequest {
 
     private String customerId;          // Khách hàng (tuỳ chọn, để tích điểm)
 
+    /** Tên khách trên đơn (ghi nhận) — khách hàng loyalty. */
+    private String guestName;
+    /** SĐT khách trên đơn (ghi nhận). */
+    private String guestPhone;
+
     /** Tuỳ chọn — ghi nhận khi tạo đơn bán online / ship ngoài */
     private String shippingCarrier;
     private String shippingMethod;

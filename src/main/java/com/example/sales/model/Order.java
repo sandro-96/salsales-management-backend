@@ -65,6 +65,11 @@ public class Order extends BaseEntity {
 
     private String customerId;
 
+    /** Tên khách ghi nhận trên đơn (POS) — tách với customerId (hồ sơ tích điểm). */
+    private String guestName;
+    /** SĐT khách ghi nhận trên đơn — tách với khách loyalty. */
+    private String guestPhone;
+
     @Builder.Default
     private long pointsEarned = 0;
 

@@ -38,7 +38,7 @@ public class SupportTicketController {
     }
 
     @GetMapping
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.ADMIN})
+    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER})
     @Operation(summary = "Danh sách tất cả ticket (quản lý)")
     public ApiResponseDto<?> getTickets(
             @PathVariable String shopId,
@@ -91,7 +91,7 @@ public class SupportTicketController {
     }
 
     @PutMapping("/{ticketId}/status")
-    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER, ShopRole.ADMIN})
+    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER})
     @Operation(summary = "Cập nhật trạng thái ticket")
     public ApiResponseDto<?> updateTicketStatus(
             @PathVariable String shopId,
@@ -104,7 +104,7 @@ public class SupportTicketController {
     }
 
     @DeleteMapping("/{ticketId}")
-    @RequireRole({ShopRole.OWNER, ShopRole.ADMIN})
+    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER})
     @Operation(summary = "Xoá ticket (soft delete)")
     public ApiResponseDto<?> deleteTicket(
             @PathVariable String shopId,

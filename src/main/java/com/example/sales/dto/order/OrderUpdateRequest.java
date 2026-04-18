@@ -18,6 +18,10 @@ public class OrderUpdateRequest {
     private String tableId;
     private String note;
 
+    /** Ghi nhận khách trên đơn (POS); gửi chuỗi rỗng để xoá. */
+    private String guestName;
+    private String guestPhone;
+
     @Valid
     private List<OrderItemUpdateRequest> items; // Có thể cập nhật danh sách sản phẩm
 

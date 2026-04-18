@@ -1,17 +1,21 @@
 package com.example.sales.service.impl;
 
 import com.example.sales.dto.product.ProductCatalogResponse;
+import com.example.sales.dto.product.ProductCatalogUpsertRequest;
 import com.example.sales.model.ProductCatalog;
 import com.example.sales.repository.ProductCatalogRepository;
 import com.example.sales.service.ProductCatalogService;
+import com.example.sales.util.CategoryUtils;
+import com.example.sales.util.GtinBarcodeValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -20,39 +24,63 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
 
     private final ProductCatalogRepository productCatalogRepository;
 
-    /**
-     * Upsert catalog — chạy async để không block luồng tạo/cập nhật sản phẩm.
-     * Nếu upsert lỗi (vd: duplicate key race condition) chỉ log warning, không throw.
-     */
     @Override
-    @Async
-    public void upsert(String barcode, String name, String category, String description, List<String> images) {
-        if (!StringUtils.hasText(barcode)) return;
+    public ProductCatalogResponse upsertFromAdmin(ProductCatalogUpsertRequest request) {
+        String barcode = GtinBarcodeValidator.resolveForProductSave(request.getBarcode());
 
-        try {
-            ProductCatalog catalog = productCatalogRepository.findByBarcode(barcode)
-                    .orElse(ProductCatalog.builder().barcode(barcode).build());
+        ProductCatalog catalog = productCatalogRepository.findByBarcode(barcode)
+                .orElse(ProductCatalog.builder().barcode(barcode).build());
 
-            catalog.setName(name);
-            catalog.setCategory(category);
-            catalog.setDescription(description);
-            // Chỉ overwrite images nếu request có ảnh (tránh xóa ảnh cũ khi shop khác update text only)
-            if (images != null && !images.isEmpty()) {
-                catalog.setImages(images);
-            }
-
-            productCatalogRepository.save(catalog);
-            log.debug("Upserted product catalog for barcode: {}", barcode);
-        } catch (Exception e) {
-            // Không throw — catalog là tính năng phụ trợ, không được làm fail luồng chính
-            log.warn("Failed to upsert product catalog for barcode '{}': {}", barcode, e.getMessage());
+        catalog.setName(request.getName().trim());
+        if (StringUtils.hasText(request.getCategory())) {
+            catalog.setCategory(CategoryUtils.normalize(request.getCategory()));
+        } else {
+            catalog.setCategory(null);
         }
+        catalog.setDescription(request.getDescription());
+        if (request.getImages() != null && !request.getImages().isEmpty()) {
+            catalog.setImages(request.getImages());
+        }
+
+        catalog = productCatalogRepository.save(catalog);
+        log.debug("Admin saved product catalog for barcode: {}", barcode);
+        return mapToResponse(catalog);
+    }
+
+    @Override
+    public List<ProductCatalogResponse> searchByNameKeyword(String keyword, int limit) {
+        if (!StringUtils.hasText(keyword)) {
+            return List.of();
+        }
+        String q = keyword.trim();
+        if (q.length() < 2) {
+            return List.of();
+        }
+        if (q.length() > 200) {
+            q = q.substring(0, 200);
+        }
+        int cap = Math.min(Math.max(limit, 1), 50);
+        Pattern pattern = Pattern.compile(
+                ".*" + Pattern.quote(q) + ".*",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+        );
+        return productCatalogRepository.findByNameRegex(pattern, PageRequest.of(0, cap))
+                .getContent()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     @Override
     public Optional<ProductCatalogResponse> findByBarcode(String barcode) {
-        return productCatalogRepository.findByBarcode(barcode)
-                .map(this::mapToResponse);
+        for (String candidate : GtinBarcodeValidator.catalogLookupCandidates(barcode)) {
+            Optional<ProductCatalogResponse> hit = productCatalogRepository.findByBarcode(candidate)
+                    .map(this::mapToResponse);
+            if (hit.isPresent()) {
+                return hit;
+            }
+        }
+        return Optional.empty();
     }
 
     private ProductCatalogResponse mapToResponse(ProductCatalog catalog) {
@@ -68,4 +96,3 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
                 .build();
     }
 }
-

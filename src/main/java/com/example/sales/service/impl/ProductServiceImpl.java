@@ -24,11 +24,12 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.AuditLogService;
 import com.example.sales.service.BaseService;
 import com.example.sales.service.FileUploadService;
-import com.example.sales.service.ProductCatalogService;
 import com.example.sales.service.ProductService;
 import com.example.sales.service.SequenceService;
 import com.example.sales.util.CategoryUtils;
+import com.example.sales.util.GtinBarcodeValidator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -47,6 +48,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductServiceImpl extends BaseService implements ProductService {
     private static final int MAX_PRICE_HISTORY = 50;
 
@@ -60,7 +62,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     private final ProductMapper productMapper;
     private final ProductSearchHelper productSearchHelper;
     private final FileUploadService fileUploadService;
-    private final ProductCatalogService productCatalogService;
 
     private static final int MAX_PRODUCT_IMAGES = 10;
     /** Số file tối đa mỗi lần gọi upload ảnh biến thể (staging) */
@@ -75,6 +76,11 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Lấy tất cả chi nhánh của shop
         List<String> branchIds = branchRepository.findAllByShopIdAndDeletedFalse(shopId)
                 .stream().map(Branch::getId).collect(Collectors.toList());
+
+        // Chuẩn hoá + kiểm tra checksum GS1 (EAN/UPC); UPC-12 hợp lệ → lưu EAN-13 có số 0 đầu
+        if (StringUtils.hasText(request.getBarcode())) {
+            request.setBarcode(GtinBarcodeValidator.resolveForProductSave(request.getBarcode()));
+        }
 
         // Validate barcode uniqueness
         if (StringUtils.hasText(request.getBarcode())) {
@@ -108,9 +114,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Log audit
         logProductCreation(shopId, product, branchIds);
 
-        // Upsert vào internal catalog nếu sản phẩm có barcode
-        catalogUpsert(product);
-
         // Evict toàn bộ cache của shop để danh sách được load lại từ DB
         productCache.evictByShop(shopId);
 
@@ -126,6 +129,10 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         branchRepository.findByIdAndShopIdAndDeletedFalse(branchId, shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.BRANCH_NOT_FOUND));
+
+        if (StringUtils.hasText(request.getBarcode())) {
+            request.setBarcode(GtinBarcodeValidator.resolveForProductSave(request.getBarcode()));
+        }
 
         // Validate barcode uniqueness
         if (StringUtils.hasText(request.getBarcode())) {
@@ -152,9 +159,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 String.format("Tạo sản phẩm '%s' (SKU: %s) từ chi nhánh %s",
                         product.getName(), product.getSku(), branchId));
 
-        // Upsert vào internal catalog nếu sản phẩm có barcode
-        catalogUpsert(product);
-
         productCache.evictByShop(shopId);
         return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
     }
@@ -164,6 +168,10 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Validate shop
         shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+
+        if (StringUtils.hasText(request.getBarcode())) {
+            request.setBarcode(GtinBarcodeValidator.resolveForProductSave(request.getBarcode()));
+        }
 
         // Validate barcode uniqueness (if changed)
         if (StringUtils.hasText(request.getBarcode())) {
@@ -215,9 +223,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Log audit
         logProductUpdate(userId, shopId, product, oldName, oldCategory, oldBarcode);
-
-        // Upsert vào internal catalog nếu sản phẩm có barcode
-        catalogUpsert(product);
 
         // Invalidate cache cho toàn shop (vì product info thay đổi ảnh hưởng mọi branch)
         productCache.evictByShop(shopId);
@@ -621,21 +626,6 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 String.format("Cập nhật thông tin chung sản phẩm '%s' (SKU: %s). " +
                                 "Thông tin cũ - Tên: %s, Danh mục: %s, Barcode: %s",
                         product.getName(), product.getSku(), oldName, oldCategory, oldBarcode));
-    }
-
-    /**
-     * Upsert thông tin sản phẩm vào internal catalog nếu có barcode.
-     * Chạy async nên không block luồng chính.
-     */
-    private void catalogUpsert(Product product) {
-        if (!StringUtils.hasText(product.getBarcode())) return;
-        productCatalogService.upsert(
-                product.getBarcode(),
-                product.getName(),
-                product.getCategory(),
-                product.getDescription(),
-                product.getImages()
-        );
     }
 
     private List<BranchProduct> saveAllBranchProducts(List<BranchProduct> branchProducts) {

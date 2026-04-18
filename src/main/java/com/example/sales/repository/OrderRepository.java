@@ -14,6 +14,8 @@ import java.util.Optional;
 public interface OrderRepository extends MongoRepository<Order, String> {
     Optional<Order> findByIdAndDeletedFalse(String id);
 
+    Optional<Order> findByShopIdAndOrderCodeIgnoreCaseAndDeletedFalse(String shopId, String orderCode);
+
     Page<Order> findByShopIdAndBranchIdAndStatusAndDeletedFalse(
             String shopId, String branchId, OrderStatus status, Pageable pageable);
 

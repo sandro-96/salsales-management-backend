@@ -1,11 +1,9 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
-import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.product.ProductCatalogResponse;
 import com.example.sales.exception.ResourceNotFoundException;
-import com.example.sales.security.RequirePermission;
 import com.example.sales.service.ProductCatalogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,30 +14,46 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/catalog")
 @RequiredArgsConstructor
-@Tag(name = "Product Catalog", description = "Internal catalog tra cứu thông tin sản phẩm theo barcode")
+@Tag(name = "Product Catalog", description = "Catalog chuẩn — tra cứu theo barcode hoặc tìm theo tên")
 public class ProductCatalogController {
 
     private final ProductCatalogService productCatalogService;
 
+    @GetMapping("/search")
+    @Operation(
+            summary = "Tìm kiếm catalog chuẩn theo tên (gợi ý khi tạo sản phẩm)",
+            description = "Substring không phân biệt hoa thường; keyword tối thiểu 2 ký tự."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Danh sách gợi ý (có thể rỗng)"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực")
+    })
+    public ApiResponseDto<List<ProductCatalogResponse>> searchByName(
+            @Parameter(description = "Từ khoá tên sản phẩm") @RequestParam String keyword,
+            @Parameter(description = "Số bản ghi tối đa (1–50, mặc định 8)") @RequestParam(defaultValue = "8") int size) {
+
+        List<ProductCatalogResponse> list = productCatalogService.searchByNameKeyword(keyword, size);
+        return ApiResponseDto.success(ApiCode.CATALOG_SEARCH_OK, list);
+    }
+
     /**
-     * Tra cứu thông tin sản phẩm từ internal catalog theo barcode.
+     * Tra cứu thông tin sản phẩm từ catalog chuẩn (do system admin duy trì) theo barcode.
      *
-     * Dùng khi người dùng quét / nhập barcode vào form tạo sản phẩm:
-     * nếu barcode đã từng được shop nào đó trong hệ thống lưu trước đó,
-     * endpoint này trả về name/category/description/images gợi ý để pre-fill form.
-     *
-     * HTTP 404 nếu barcode chưa có trong catalog (shop cần nhập thủ công lần đầu).
+     * HTTP 404 nếu barcode chưa có trong catalog.
      */
     @GetMapping("/barcode/{barcode}")
     @Operation(
-            summary = "Tra cứu thông tin sản phẩm theo barcode từ internal catalog",
-            description = "Trả về thông tin gợi ý (name, category, description, images) để pre-fill form tạo sản phẩm. " +
-                    "Catalog được tích lũy tự động mỗi khi bất kỳ shop nào lưu sản phẩm có barcode."
+            summary = "Tra cứu thông tin sản phẩm theo barcode từ catalog chuẩn",
+            description = "Trả về name/category/description/images gợi ý để pre-fill form tạo sản phẩm. " +
+                    "Nội dung catalog chỉ được tạo/cập nhật qua system admin (PUT /api/admin/catalog)."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tìm thấy thông tin catalog cho barcode này"),

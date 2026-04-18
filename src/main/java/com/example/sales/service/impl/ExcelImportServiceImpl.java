@@ -16,6 +16,7 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.ExcelImportService;
 import com.example.sales.service.SequenceService;
 import com.example.sales.util.CategoryUtils;
+import com.example.sales.util.GtinBarcodeValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -146,7 +147,9 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                         product.setCategory(category);
                         product.setUnit(unit);
                         product.setDescription(description);
-                        if (StringUtils.hasText(barcode)) product.setBarcode(barcode);
+                        if (StringUtils.hasText(barcode)) {
+                            product.setBarcode(safeResolveBarcodeFromExcel(barcode));
+                        }
                         if (costPrice >= 0) product.setCostPrice(costPrice);
                         if (defaultPrice > 0) product.setDefaultPrice(defaultPrice);
                         product.setActive(true);
@@ -165,7 +168,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
                                 .category(category)
                                 .unit(unit)
                                 .description(description)
-                                .barcode(StringUtils.hasText(barcode) ? barcode : null)
+                                .barcode(StringUtils.hasText(barcode) ? safeResolveBarcodeFromExcel(barcode) : null)
                                 .costPrice(costPrice)
                                 .defaultPrice(defaultPrice)
                                 .build();
@@ -340,6 +343,15 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             }
         }
         return null;
+    }
+
+    private String safeResolveBarcodeFromExcel(String barcode) {
+        try {
+            return GtinBarcodeValidator.resolveForProductSave(barcode);
+        } catch (BusinessException ex) {
+            log.warn("Excel: bỏ qua barcode '{}' ({})", barcode, ex.getError());
+            return null;
+        }
     }
 }
 

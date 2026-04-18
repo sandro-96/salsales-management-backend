@@ -40,6 +40,10 @@ public class OrderResponse {
     /** Tên khách (suy ra khi trả API, không lưu trên Order). */
     private String customerName;
     private String customerPhone;
+
+    /** Tên khách ghi trực tiếp trên đơn (POS), tách loyalty. */
+    private String guestName;
+    private String guestPhone;
     private long pointsEarned;
     private long pointsRedeemed;
     private double pointsDiscount;
