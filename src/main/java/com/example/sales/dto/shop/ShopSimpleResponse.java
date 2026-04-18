@@ -15,6 +15,11 @@ public class ShopSimpleResponse {
     private Country countryCode;
     private String phone;
     private String taxRegistrationNumber;
+    private String zaloPageUrl;
+    private String facebookUrl;
+    private String tiktokUrl;
+    private String shopeeUrl;
+    private boolean toppingsEnabled;
     private String address;
     private String slug;
     private boolean active;

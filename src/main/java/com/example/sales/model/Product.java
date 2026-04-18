@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
@@ -64,5 +63,11 @@ public class Product extends BaseEntity {
     private String supplierId; // ID nhà cung cấp
 
     private List<ProductVariant> variants; // Biến thể sản phẩm
+
+    /**
+     * ID topping shop ({@link ShopTopping#toppingId}) được phép chọn khi bán món này.
+     */
+    private List<String> assignedToppingIds;
+
     private List<PriceHistory> priceHistory; // Lịch sử giá
 }

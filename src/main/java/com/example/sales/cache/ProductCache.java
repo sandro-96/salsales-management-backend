@@ -5,8 +5,10 @@ import com.example.sales.dto.product.ProductSearchRequest;
 import com.example.sales.helper.ProductSearchHelper;
 import com.example.sales.model.BranchProduct;
 import com.example.sales.model.Product;
+import com.example.sales.model.Shop;
 import com.example.sales.repository.BranchProductRepository;
 import com.example.sales.repository.ProductRepository;
+import com.example.sales.repository.ShopRepository;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -40,17 +42,20 @@ public class ProductCache {
 
     private final BranchProductRepository branchProductRepository;
     private final ProductRepository productRepository;
+    private final ShopRepository shopRepository;
     private final ProductMapper productMapper;
     private final ProductSearchHelper productSearchHelper;
     private final CacheManager cacheManager;
 
     public ProductCache(BranchProductRepository branchProductRepository,
                         ProductRepository productRepository,
+                        ShopRepository shopRepository,
                         ProductMapper productMapper,
                         ProductSearchHelper productSearchHelper,
                         CacheManager cacheManager) {
         this.branchProductRepository = branchProductRepository;
         this.productRepository = productRepository;
+        this.shopRepository = shopRepository;
         this.productMapper = productMapper;
         this.productSearchHelper = productSearchHelper;
         this.cacheManager = cacheManager;
@@ -66,8 +71,9 @@ public class ProductCache {
         if (!StringUtils.hasText(keyword)) {
             // Fast path: không có keyword → query trực tiếp
             Page<Product> productsPage = productRepository.findByShopIdAndDeletedFalse(shopId, pageable);
+            Shop shop = loadShop(shopId);
             List<ProductResponse> responses = productsPage.getContent().stream()
-                    .map(p -> productMapper.toResponse(null, p))
+                    .map(p -> productMapper.toResponse(null, p, shop))
                     .collect(Collectors.toList());
             return new PageImpl<>(responses, pageable, productsPage.getTotalElements());
         }
@@ -126,8 +132,9 @@ public class ProductCache {
         Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
+        Shop shop = loadShop(shopId);
         List<ProductResponse> responses = branchProducts.stream()
-                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId())))
+                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId()), shop))
                 .collect(Collectors.toList());
 
         return new PageImpl<>(responses, pageable, total);
@@ -142,11 +149,20 @@ public class ProductCache {
         Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
+        String shopId = branchProductsPage.getContent().isEmpty()
+                ? null
+                : branchProductsPage.getContent().get(0).getShopId();
+        Shop shop = shopId != null ? loadShop(shopId) : null;
+
         List<ProductResponse> productResponses = branchProductsPage.getContent().stream()
-                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId())))
+                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId()), shop))
                 .collect(Collectors.toList());
 
         return new PageImpl<>(productResponses, pageable, branchProductsPage.getTotalElements());
+    }
+
+    private Shop loadShop(String shopId) {
+        return shopRepository.findByIdAndDeletedFalse(shopId).orElse(null);
     }
 
     /**

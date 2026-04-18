@@ -41,5 +41,8 @@ public class OrderUpdateRequest {
 
         @Min(value = 0, message = "Giá sản phẩm không được âm")
         private double price; // Giá tại thời điểm cập nhật (có thể khác giá hiện tại của sản phẩm)
+
+        /** Topping đi kèm dòng hàng (ID {@code ShopTopping#toppingId}) */
+        private List<String> toppingIds;
     }
 }

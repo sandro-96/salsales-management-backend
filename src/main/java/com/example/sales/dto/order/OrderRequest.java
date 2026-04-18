@@ -69,5 +69,10 @@ public class OrderRequest {
 
         @Min(value = 1, message = "Số lượng phải lớn hơn 0")
         private int quantity;
+
+        /**
+         * ID topping shop đã chọn (trùng {@code ShopTopping#toppingId}), thứ tự không quan trọng — server chuẩn hoá.
+         */
+        private List<String> toppingIds;
     }
 }

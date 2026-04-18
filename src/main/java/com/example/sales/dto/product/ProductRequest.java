@@ -55,6 +55,9 @@ public class ProductRequest {
 
     private List<ProductVariant> variants;
 
+    /** ID topping shop được phép chọn khi bán (khi shop bật topping) */
+    private List<String> assignedToppingIds;
+
     private String reason; // Lý do thay đổi giá (tùy chọn, dùng khi update)
 
     @Builder.Default

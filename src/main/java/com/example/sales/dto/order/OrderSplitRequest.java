@@ -30,6 +30,9 @@ public class OrderSplitRequest {
         private String variantId;
         @Min(value = 1, message = "quantity phải >= 1")
         private int quantity;
+
+        /** Phân biệt dòng cùng product + variant nhưng khác topping */
+        private List<String> toppingIds;
     }
 }
 

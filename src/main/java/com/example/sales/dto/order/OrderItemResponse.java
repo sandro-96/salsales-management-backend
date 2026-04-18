@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,6 +18,8 @@ public class OrderItemResponse {
     private String variantId;
     private String productName;
     private String variantName;
+    /** Thuộc tính biến thể (chuỗi ghép từ catalog khi xem đơn), có thể null */
+    private String variantAttributesText;
     private String sku;
     private String promotionName;
     private String promotionDiscountLabel;
@@ -23,4 +27,6 @@ public class OrderItemResponse {
     private double price;             // Giá gốc tại thời điểm đặt hàng
     private double priceAfterDiscount; // Giá sau khi áp dụng khuyến mãi
     private String appliedPromotionId; // ID của khuyến mãi đã áp dụng
+
+    private List<OrderLineToppingResponse> toppings;
 }

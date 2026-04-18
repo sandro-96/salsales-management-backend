@@ -45,6 +45,8 @@ public class BranchService {
                 .capacity(req.getCapacity())
                 .description(req.getDescription())
                 .taxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()))
+                .wifiSsid(normalizeOptionalString(req.getWifiSsid()))
+                .wifiPassword(normalizeOptionalString(req.getWifiPassword()))
                 .active(req.isActive())
                 .isDefault(req.isDefault())
                 .slug(generateUniqueBranchSlug(
@@ -87,6 +89,8 @@ public class BranchService {
         branch.setCapacity(req.getCapacity());
         branch.setDescription(req.getDescription());
         branch.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()));
+        branch.setWifiSsid(normalizeOptionalString(req.getWifiSsid()));
+        branch.setWifiPassword(normalizeOptionalString(req.getWifiPassword()));
         branch.setActive(req.isActive());
 
         Branch saved = branchRepository.save(branch);
@@ -161,6 +165,8 @@ public class BranchService {
                 .capacity(branch.getCapacity())
                 .description(branch.getDescription())
                 .taxRegistrationNumber(branch.getTaxRegistrationNumber())
+                .wifiSsid(branch.getWifiSsid())
+                .wifiPassword(branch.getWifiPassword())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .createdAt(branch.getCreatedAt())
@@ -174,6 +180,8 @@ public class BranchService {
                 .name(branch.getName())
                 .address(branch.getAddress())
                 .phone(branch.getPhone())
+                .wifiSsid(branch.getWifiSsid())
+                .wifiPassword(branch.getWifiPassword())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .build();
@@ -195,6 +203,8 @@ public class BranchService {
                 .capacity(branch.getCapacity())
                 .description(branch.getDescription())
                 .taxRegistrationNumber(branch.getTaxRegistrationNumber())
+                .wifiSsid(branch.getWifiSsid())
+                .wifiPassword(branch.getWifiPassword())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .createdAt(branch.getCreatedAt())
@@ -203,6 +213,13 @@ public class BranchService {
     }
 
     private static String normalizeTaxRegistrationNumber(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        return raw.trim();
+    }
+
+    private static String normalizeOptionalString(String raw) {
         if (!StringUtils.hasText(raw)) {
             return null;
         }

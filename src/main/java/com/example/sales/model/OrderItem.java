@@ -3,6 +3,8 @@ package com.example.sales.model;
 
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @ToString
@@ -28,4 +30,7 @@ public class OrderItem {
     private double priceAfterDiscount; // Giá sau khi áp dụng khuyến mãi
     private String appliedPromotionId; // ID của khuyến mãi đã áp dụng
     private boolean trackInventory; // Có theo dõi tồn kho không
+
+    /** Topping đã chọn (snapshot); null hoặc rỗng = không có */
+    private List<OrderLineTopping> toppings;
 }

@@ -11,6 +11,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -41,6 +42,12 @@ public class Shop extends BaseEntity {
      */
     private String taxRegistrationNumber;
 
+    /** Liên kết ngoài (tuỳ chọn) — hiển thị cài đặt cửa hàng / marketing */
+    private String zaloPageUrl;
+    private String facebookUrl;
+    private String tiktokUrl;
+    private String shopeeUrl;
+
     @Builder.Default
     private boolean active = true;
 
@@ -57,5 +64,14 @@ public class Shop extends BaseEntity {
     private SubscriptionPlan plan = SubscriptionPlan.FREE;
 
     private LocalDateTime planExpiry;
+
+    /**
+     * Bật tính năng topping (POS + gán topping cho sản phẩm). Mặc định tắt.
+     */
+    @Builder.Default
+    private boolean toppingsEnabled = false;
+
+    /** Danh mục topping dùng chung toàn shop (khi {@code toppingsEnabled}). */
+    private List<ShopTopping> shopToppings;
 }
 

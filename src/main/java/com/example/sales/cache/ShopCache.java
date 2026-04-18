@@ -6,6 +6,7 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.BaseService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
@@ -34,5 +35,10 @@ public class ShopCache extends BaseService {
     public Shop getShopBySlug(String slug) {
         return shopRepository.findBySlugAndDeletedFalse(slug)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
+
+    @CacheEvict(value = "shops", key = "#shopId")
+    public void evictShopById(String shopId) {
+        // Evict entry keyed by shopId (used by ShopService.updateShopById / topping catalog).
     }
 }

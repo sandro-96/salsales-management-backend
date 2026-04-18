@@ -31,6 +31,9 @@ public class BranchResponse {
 
     private String taxRegistrationNumber;
 
+    private String wifiSsid;
+    private String wifiPassword;
+
     private boolean active;
     private boolean isDefault;
 

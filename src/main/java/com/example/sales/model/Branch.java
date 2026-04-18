@@ -45,6 +45,10 @@ public class Branch extends BaseEntity {
      */
     private String taxRegistrationNumber;
 
+    /** Wi‑Fi phục vụ khách tại điểm bán — có thể in trên hóa đơn */
+    private String wifiSsid;
+    private String wifiPassword;
+
     @Builder.Default
     private boolean isDefault = false;
     @Builder.Default

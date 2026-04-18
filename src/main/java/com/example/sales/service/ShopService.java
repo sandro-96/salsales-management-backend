@@ -48,6 +48,10 @@ public class ShopService extends BaseService {
         shop.setOwnerId(userId);
         shop.setCountryCode(request.getCountryCode());
         shop.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(request.getTaxRegistrationNumber()));
+        shop.setZaloPageUrl(normalizeOptionalString(request.getZaloPageUrl()));
+        shop.setFacebookUrl(normalizeOptionalString(request.getFacebookUrl()));
+        shop.setTiktokUrl(normalizeOptionalString(request.getTiktokUrl()));
+        shop.setShopeeUrl(normalizeOptionalString(request.getShopeeUrl()));
         BusinessModel model = request.getBusinessModel() != null
                 ? request.getBusinessModel()
                 : request.getType().getDefaultBusinessModel();
@@ -99,8 +103,15 @@ public class ShopService extends BaseService {
         shop.setPhone(request.getPhone());
         shop.setCountryCode(request.getCountryCode());
         shop.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(request.getTaxRegistrationNumber()));
+        shop.setZaloPageUrl(normalizeOptionalString(request.getZaloPageUrl()));
+        shop.setFacebookUrl(normalizeOptionalString(request.getFacebookUrl()));
+        shop.setTiktokUrl(normalizeOptionalString(request.getTiktokUrl()));
+        shop.setShopeeUrl(normalizeOptionalString(request.getShopeeUrl()));
         shop.setBusinessModel(request.getBusinessModel());
         shop.setActive(request.isActive());
+        if (request.getToppingsEnabled() != null) {
+            shop.setToppingsEnabled(request.getToppingsEnabled());
+        }
 
         if (request.getBusinessModel() != null) {
             request.setBusinessModel(request.getBusinessModel());
@@ -111,6 +122,7 @@ public class ShopService extends BaseService {
         }
 
         Shop saved = shopRepository.save(shop);
+        shopCache.evictShopById(shopId);
         auditLogService.log(user.getId(), saved.getId(), saved.getId(), "SHOP", "UPDATED",
                 String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
         return getShopSimpleResponse(saved);
@@ -161,6 +173,11 @@ public class ShopService extends BaseService {
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
                     .taxRegistrationNumber(shop.getTaxRegistrationNumber())
+                    .zaloPageUrl(shop.getZaloPageUrl())
+                    .facebookUrl(shop.getFacebookUrl())
+                    .tiktokUrl(shop.getTiktokUrl())
+                    .shopeeUrl(shop.getShopeeUrl())
+                    .toppingsEnabled(shop.isToppingsEnabled())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -180,6 +197,11 @@ public class ShopService extends BaseService {
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
                     .taxRegistrationNumber(shop.getTaxRegistrationNumber())
+                    .zaloPageUrl(shop.getZaloPageUrl())
+                    .facebookUrl(shop.getFacebookUrl())
+                    .tiktokUrl(shop.getTiktokUrl())
+                    .shopeeUrl(shop.getShopeeUrl())
+                    .toppingsEnabled(shop.isToppingsEnabled())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -200,6 +222,11 @@ public class ShopService extends BaseService {
                 .slug(shop.getSlug())
                 .phone(shop.getPhone())
                 .taxRegistrationNumber(shop.getTaxRegistrationNumber())
+                .zaloPageUrl(shop.getZaloPageUrl())
+                .facebookUrl(shop.getFacebookUrl())
+                .tiktokUrl(shop.getTiktokUrl())
+                .shopeeUrl(shop.getShopeeUrl())
+                .toppingsEnabled(shop.isToppingsEnabled())
                 .active(shop.isActive())
                 .industry(shop.getType().getIndustry())
                 .businessModel(shop.getBusinessModel())
@@ -207,6 +234,13 @@ public class ShopService extends BaseService {
     }
 
     private static String normalizeTaxRegistrationNumber(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        return raw.trim();
+    }
+
+    private static String normalizeOptionalString(String raw) {
         if (!StringUtils.hasText(raw)) {
             return null;
         }

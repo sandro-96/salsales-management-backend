@@ -3,6 +3,7 @@ package com.example.sales.dto.product;
 
 import com.example.sales.model.BranchProductVariant;
 import com.example.sales.model.PriceHistory;
+import com.example.sales.dto.shop.ShopToppingResponse;
 import com.example.sales.model.ProductVariant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -47,6 +48,15 @@ public class ProductResponse {
     private String supplierId;
     private List<ProductVariant> variants;
     private List<PriceHistory> priceHistory;
+
+    /** Theo cấu hình shop — có bật topping hay không */
+    private Boolean toppingsEnabled;
+
+    /** ID topping shop đã gán cho sản phẩm */
+    private List<String> assignedToppingIds;
+
+    /** Topping shop áp dụng được cho món này (đã lọc theo gán + đang bán) — dùng cho POS */
+    private List<ShopToppingResponse> applicableToppings;
 
     // Các trường từ BranchProduct (chi tiết tại chi nhánh)
     private int quantity;

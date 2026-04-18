@@ -9,7 +9,9 @@ import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -74,16 +76,23 @@ public class RequirePermissionAspect {
                 if (annotation instanceof AuthenticationPrincipal && args[i] instanceof CustomUserDetails details) {
                     user = details;
                 } else if (annotation instanceof PathVariable pv) {
-                    String value = pv.value();
-                    if ("shopId".equals(value) || (value.isEmpty() && "shopId".equals(paramNames[i]))) {
+                    String marker = pathVariableName(pv, paramNames[i]);
+                    if ("shopId".equals(marker)) {
                         shopId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
                 } else if (annotation instanceof RequestParam rp) {
-                    String value = rp.value();
-                    if ("shopId".equals(value) || (value.isEmpty() && "shopId".equals(paramNames[i]))) {
+                    String marker = requestParamName(rp, paramNames[i]);
+                    if ("shopId".equals(marker)) {
                         shopId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
                 }
+            }
+        }
+
+        if (user == null) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof CustomUserDetails details) {
+                user = details;
             }
         }
 
@@ -94,5 +103,32 @@ public class RequirePermissionAspect {
     }
 
     private record ExtractedParams(CustomUserDetails user, String shopId) {
+    }
+
+    /** Spring dùng {@code value} hoặc {@code name} (alias); khi rỗng thì dùng tên tham số bytecode (cần {@code -parameters}). */
+    private static String pathVariableName(PathVariable pv, String paramName) {
+        if (pv == null) {
+            return "";
+        }
+        if (!pv.name().isEmpty()) {
+            return pv.name();
+        }
+        if (!pv.value().isEmpty()) {
+            return pv.value();
+        }
+        return paramName != null ? paramName : "";
+    }
+
+    private static String requestParamName(RequestParam rp, String paramName) {
+        if (rp == null) {
+            return "";
+        }
+        if (!rp.name().isEmpty()) {
+            return rp.name();
+        }
+        if (!rp.value().isEmpty()) {
+            return rp.value();
+        }
+        return paramName != null ? paramName : "";
     }
 }

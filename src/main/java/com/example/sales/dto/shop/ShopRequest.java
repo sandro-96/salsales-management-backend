@@ -29,5 +29,13 @@ public class ShopRequest {
     /** Mã số thuế (MST), tùy chọn */
     private String taxRegistrationNumber;
 
+    private String zaloPageUrl;
+    private String facebookUrl;
+    private String tiktokUrl;
+    private String shopeeUrl;
+
+    /** Bật topping cho cửa hàng (mặc định false khi không gửi) */
+    private Boolean toppingsEnabled;
+
     private boolean active = true;
 }

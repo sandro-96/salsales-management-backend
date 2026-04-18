@@ -32,6 +32,10 @@ public class BranchRequest {
     /** MST riêng chi nhánh; để trống = dùng MST cửa hàng */
     private String taxRegistrationNumber;
 
+    /** Wi‑Fi khách — tuỳ chọn, có thể in trên hóa đơn */
+    private String wifiSsid;
+    private String wifiPassword;
+
     private boolean active = true;
     private boolean isDefault = false;
 }

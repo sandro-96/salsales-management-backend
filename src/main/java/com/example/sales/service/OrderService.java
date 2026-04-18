@@ -9,6 +9,7 @@ import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.PaymentStatus;
 import com.example.sales.constant.TableStatus;
 import com.example.sales.dto.order.OrderFulfillmentPatchRequest;
+import com.example.sales.dto.order.OrderLineToppingResponse;
 import com.example.sales.dto.order.OrderItemResponse;
 import com.example.sales.dto.order.OrderRequest;
 import com.example.sales.dto.order.OrderResponse;
@@ -32,7 +33,9 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -102,6 +105,9 @@ public class OrderService extends BaseService {
         order.setBranchId(branchId);
         order.setOrderCode(generateOrderCode(shopId));
 
+        Shop orderShop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
         double[] totals = {0, 0};
 
         List<OrderItem> orderItems = request.getItems().stream().map(reqItem -> {
@@ -116,7 +122,14 @@ public class OrderService extends BaseService {
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
             OrderItem item = buildOrderItemLine(
-                    masterProduct, branchProduct, reqItem.getVariantId(), reqItem.getQuantity(), shopId, branchId);
+                    orderShop,
+                    masterProduct,
+                    branchProduct,
+                    reqItem.getVariantId(),
+                    reqItem.getToppingIds(),
+                    reqItem.getQuantity(),
+                    shopId,
+                    branchId);
 
             totals[0] += reqItem.getQuantity();
             totals[1] += reqItem.getQuantity() * item.getPriceAfterDiscount();
@@ -548,7 +561,7 @@ public class OrderService extends BaseService {
         // Validate move list and compute remaining/moved items
         Map<String, Integer> moveQtyByKey = new HashMap<>();
         for (var mv : request.getItemsToMove()) {
-            String k = mv.getProductId().trim() + "||" + (mv.getVariantId() == null ? "" : mv.getVariantId().trim());
+            String k = splitLineKey(mv.getProductId(), mv.getVariantId(), mv.getToppingIds());
             moveQtyByKey.merge(k, mv.getQuantity(), Integer::sum);
         }
 
@@ -556,8 +569,7 @@ public class OrderService extends BaseService {
         List<OrderItem> remaining = new java.util.ArrayList<>();
 
         for (OrderItem it : (src.getItems() == null ? List.<OrderItem>of() : src.getItems())) {
-            String k = (it.getProductId() == null ? "" : it.getProductId())
-                    + "||" + (it.getVariantId() == null ? "" : it.getVariantId());
+            String k = splitLineKey(it.getProductId(), it.getVariantId(), toppingIdsFromSnapshots(it.getToppings()));
             int moveQty = moveQtyByKey.getOrDefault(k, 0);
             if (moveQty <= 0) {
                 remaining.add(it);
@@ -581,6 +593,7 @@ public class OrderService extends BaseService {
                         .priceAfterDiscount(it.getPriceAfterDiscount())
                         .appliedPromotionId(it.getAppliedPromotionId())
                         .trackInventory(it.isTrackInventory())
+                        .toppings(it.getToppings())
                         .build();
                 remaining.add(kept);
             }
@@ -598,6 +611,7 @@ public class OrderService extends BaseService {
                     .priceAfterDiscount(it.getPriceAfterDiscount())
                     .appliedPromotionId(it.getAppliedPromotionId())
                     .trackInventory(it.isTrackInventory())
+                    .toppings(it.getToppings())
                     .build();
             moved.add(movedLine);
         }
@@ -650,6 +664,7 @@ public class OrderService extends BaseService {
                         .variantId(it.getVariantId())
                         .quantity(it.getQuantity())
                         .price(it.getPrice())
+                        .toppingIds(toppingIdsFromSnapshots(it.getToppings()))
                         .build()).toList())
                 .build();
 
@@ -766,6 +781,7 @@ public class OrderService extends BaseService {
         java.util.Map<String, Integer> qtyByKey = new java.util.HashMap<>();
         java.util.Map<String, String> productIdByKey = new java.util.HashMap<>();
         java.util.Map<String, String> variantIdByKey = new java.util.HashMap<>();
+        java.util.Map<String, List<String>> toppingIdsByKey = new java.util.HashMap<>();
         for (String id : distinctIds) {
             Order o = byId.get(id);
             for (OrderItem it : (o.getItems() == null ? List.<OrderItem>of() : o.getItems())) {
@@ -777,6 +793,7 @@ public class OrderService extends BaseService {
                 productIdByKey.putIfAbsent(key, it.getProductId().trim());
                 String vid = it.getVariantId();
                 variantIdByKey.putIfAbsent(key, StringUtils.hasText(vid) ? vid.trim() : "");
+                toppingIdsByKey.putIfAbsent(key, toppingIdsFromSnapshots(it.getToppings()));
             }
         }
 
@@ -801,6 +818,7 @@ public class OrderService extends BaseService {
                     .variantId(variantId)
                     .quantity(e.getValue())
                     .price(0)
+                    .toppingIds(toppingIdsByKey.get(key))
                     .build());
         }
         if (updItems.isEmpty()) {
@@ -825,13 +843,57 @@ public class OrderService extends BaseService {
         String vid = it.getVariantId() == null ? "" : it.getVariantId().trim();
         String bp = it.getBranchProductId() == null ? "" : it.getBranchProductId().trim();
         String prom = it.getAppliedPromotionId() == null ? "" : it.getAppliedPromotionId().trim();
+        String tp = toppingKeyFromSnapshots(it.getToppings());
         // Keep separate buckets if pricing/promo differs (even for same product/variant)
         return pid
                 + "###v=" + vid
                 + "###bp=" + bp
                 + "###p=" + it.getPrice()
                 + "###pad=" + it.getPriceAfterDiscount()
-                + "###prom=" + prom;
+                + "###prom=" + prom
+                + "###tp=" + tp;
+    }
+
+    private static String splitLineKey(String productId, String variantId, List<String> toppingIds) {
+        String pid = productId == null ? "" : productId.trim();
+        String vid = variantId == null ? "" : variantId.trim();
+        String tk = toppingKeyFromIdList(toppingIds);
+        return pid + "||" + vid + "||" + tk;
+    }
+
+    private static String toppingKeyFromIdList(List<String> toppingIds) {
+        if (toppingIds == null || toppingIds.isEmpty()) {
+            return "";
+        }
+        return toppingIds.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .sorted()
+                .collect(Collectors.joining(","));
+    }
+
+    private static String toppingKeyFromSnapshots(List<OrderLineTopping> toppings) {
+        if (toppings == null || toppings.isEmpty()) {
+            return "";
+        }
+        return toppings.stream()
+                .map(OrderLineTopping::getToppingId)
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .sorted()
+                .collect(Collectors.joining(","));
+    }
+
+    private static List<String> toppingIdsFromSnapshots(List<OrderLineTopping> toppings) {
+        if (toppings == null || toppings.isEmpty()) {
+            return List.of();
+        }
+        return toppings.stream()
+                .map(OrderLineTopping::getToppingId)
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .sorted()
+                .toList();
     }
 
     @Transactional
@@ -877,6 +939,9 @@ public class OrderService extends BaseService {
             // 🔁 2. Áp dụng lại tồn kho cho danh sách mới và tính toán lại tổng tiền
             double[] totals = {0, 0};
 
+            Shop orderShopForItems = shopRepository.findByIdAndDeletedFalse(shopId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.SHOP_NOT_FOUND));
+
             List<OrderItem> updatedItems = request.getItems().stream().map(reqItem -> {
                 // Lấy Product master
                 Product masterProduct = productRepository.findByIdAndDeletedFalse(reqItem.getProductId())
@@ -889,9 +954,11 @@ public class OrderService extends BaseService {
                         .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
                 OrderItem item = buildOrderItemLine(
+                        orderShopForItems,
                         masterProduct,
                         branchProduct,
                         reqItem.getVariantId(),
+                        reqItem.getToppingIds(),
                         reqItem.getQuantity(),
                         shopId,
                         order.getBranchId());
@@ -1076,6 +1143,7 @@ public class OrderService extends BaseService {
             Map<String, Promotion> promotionById) {
         String variantName = item.getVariantName();
         String sku = item.getSku();
+        String variantAttributesText = null;
         if (StringUtils.hasText(item.getVariantId())) {
             Product p = productById != null ? productById.get(item.getProductId()) : null;
             if (p != null) {
@@ -1086,6 +1154,10 @@ public class OrderService extends BaseService {
                 if (!StringUtils.hasText(sku)) {
                     sku = resolveLineSku(p, item.getVariantId());
                 }
+                variantAttributesText = findProductVariant(p, item.getVariantId())
+                        .map(v -> formatVariantAttributes(v.getAttributes()))
+                        .filter(StringUtils::hasText)
+                        .orElse(null);
             } else if (!StringUtils.hasText(variantName)) {
                 variantName = "Biến thể (mã): " + shortenVariantIdForDisplay(item.getVariantId());
             }
@@ -1105,12 +1177,24 @@ public class OrderService extends BaseService {
             }
         }
 
+        List<OrderLineToppingResponse> toppingResp = null;
+        if (item.getToppings() != null && !item.getToppings().isEmpty()) {
+            toppingResp = item.getToppings().stream()
+                    .map(t -> OrderLineToppingResponse.builder()
+                            .toppingId(t.getToppingId())
+                            .name(t.getName())
+                            .extraPrice(t.getExtraPrice())
+                            .build())
+                    .toList();
+        }
+
         return OrderItemResponse.builder()
                 .productId(item.getProductId())
                 .branchProductId(item.getBranchProductId()) // Thêm branchProductId vào response
                 .variantId(item.getVariantId())
                 .productName(item.getProductName())
                 .variantName(variantName)
+                .variantAttributesText(variantAttributesText)
                 .sku(sku)
                 .promotionName(promoName)
                 .promotionDiscountLabel(promoLabel)
@@ -1118,6 +1202,7 @@ public class OrderService extends BaseService {
                 .price(item.getPrice())
                 .priceAfterDiscount(item.getPriceAfterDiscount())
                 .appliedPromotionId(item.getAppliedPromotionId())
+                .toppings(toppingResp)
                 .build();
     }
 
@@ -1126,17 +1211,23 @@ public class OrderService extends BaseService {
     }
 
     private OrderItem buildOrderItemLine(
+            Shop shop,
             Product masterProduct,
             BranchProduct branchProduct,
             String requestVariantId,
+            List<String> requestToppingIds,
             int quantity,
             String shopId,
             String branchId) {
         validateOrderLineVariant(branchProduct, requestVariantId);
         String effectiveVariantId = hasTrackedVariants(branchProduct) ? requestVariantId : null;
 
-        double basePrice = resolveLineBasePrice(branchProduct, requestVariantId);
-        double finalPrice = basePrice;
+        List<OrderLineTopping> toppingSnapshots = resolveToppingSnapshots(shop, masterProduct, requestToppingIds);
+        double toppingUnitSum = toppingSnapshots.stream().mapToDouble(OrderLineTopping::getExtraPrice).sum();
+
+        double baseVariantUnit = resolveLineBasePrice(branchProduct, requestVariantId);
+        double unitBeforePromo = baseVariantUnit + toppingUnitSum;
+        double finalPrice = unitBeforePromo;
         String promoId = null;
         String promoName = null;
         String promoLabel = null;
@@ -1147,9 +1238,9 @@ public class OrderService extends BaseService {
             promoName = promo.getName();
             promoLabel = formatPromotionDiscountLabel(promo);
             if (promo.getDiscountType() == DiscountType.PERCENT) {
-                finalPrice = basePrice * (1 - promo.getDiscountValue() / 100.0);
+                finalPrice = unitBeforePromo * (1 - promo.getDiscountValue() / 100.0);
             } else if (promo.getDiscountType() == DiscountType.AMOUNT) {
-                finalPrice = Math.max(0, basePrice - promo.getDiscountValue());
+                finalPrice = Math.max(0, unitBeforePromo - promo.getDiscountValue());
             }
         }
 
@@ -1164,13 +1255,80 @@ public class OrderService extends BaseService {
                 .variantName(variantName)
                 .sku(sku)
                 .quantity(quantity)
-                .price(basePrice)
+                .price(unitBeforePromo)
                 .priceAfterDiscount(finalPrice)
                 .appliedPromotionId(promoId)
                 .promotionName(promoName)
                 .promotionDiscountLabel(promoLabel)
                 .trackInventory(masterProduct.isTrackInventory())
+                .toppings(toppingSnapshots.isEmpty() ? null : toppingSnapshots)
                 .build();
+    }
+
+    private List<OrderLineTopping> resolveToppingSnapshots(Shop shop, Product product, List<String> requestedRaw) {
+        if (requestedRaw == null || requestedRaw.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<String> unique = new LinkedHashSet<>();
+        for (String raw : requestedRaw) {
+            if (StringUtils.hasText(raw)) {
+                unique.add(raw.trim());
+            }
+        }
+        if (unique.isEmpty()) {
+            return List.of();
+        }
+        if (shop == null || !shop.isToppingsEnabled()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        List<ShopTopping> defs = shop.getShopToppings();
+        if (defs == null || defs.isEmpty()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        List<String> assigned = product.getAssignedToppingIds();
+        if (assigned == null || assigned.isEmpty()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        Set<String> allowedLower = assigned.stream()
+                .filter(StringUtils::hasText)
+                .map(s -> s.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+
+        List<OrderLineTopping> out = new ArrayList<>();
+        for (String tid : unique) {
+            ShopTopping def = findShopTopping(defs, tid)
+                    .orElseThrow(() -> new BusinessException(ApiCode.VALIDATION_ERROR));
+            if (!def.isActive()) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            String defKey = def.getToppingId() != null ? def.getToppingId().trim().toLowerCase(Locale.ROOT) : "";
+            if (!allowedLower.contains(defKey)) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            out.add(OrderLineTopping.builder()
+                    .toppingId(def.getToppingId())
+                    .name(def.getName())
+                    .extraPrice(def.getExtraPrice())
+                    .build());
+        }
+        out.sort(Comparator.comparing(OrderLineTopping::getToppingId, Comparator.nullsLast(String::compareToIgnoreCase)));
+        return out;
+    }
+
+    private Optional<ShopTopping> findShopTopping(List<ShopTopping> defs, String toppingId) {
+        if (!StringUtils.hasText(toppingId) || defs == null || defs.isEmpty()) {
+            return Optional.empty();
+        }
+        String raw = toppingId.trim();
+        Optional<ShopTopping> exact = defs.stream()
+                .filter(t -> t.getToppingId() != null && raw.equals(t.getToppingId().trim()))
+                .findFirst();
+        if (exact.isPresent()) {
+            return exact;
+        }
+        return defs.stream()
+                .filter(t -> t.getToppingId() != null && raw.equalsIgnoreCase(t.getToppingId().trim()))
+                .findFirst();
     }
 
     /**

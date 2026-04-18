@@ -14,6 +14,9 @@ public class BranchListResponse {
     private String address;
     private String phone;
 
+    private String wifiSsid;
+    private String wifiPassword;
+
     private boolean active;
     private boolean isDefault;
 }

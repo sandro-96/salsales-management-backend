@@ -17,6 +17,7 @@ import com.example.sales.model.PriceHistory;
 import com.example.sales.model.Product;
 import com.example.sales.model.ProductVariant;
 import com.example.sales.model.Shop;
+import com.example.sales.model.ShopTopping;
 import com.example.sales.repository.BranchProductRepository;
 import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ProductRepository;
@@ -103,7 +104,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 });
 
         // Create Product
-        Product product = createNewProduct(shopId, sku, request);
+        Product product = createNewProduct(shop, sku, request);
         product = productRepository.save(product);
         sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
         sequenceService.updateNextSequence(shopId, AppConstants.SequencePrefixes.BARCODE_GLOBAL, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
@@ -118,7 +119,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         productCache.evictByShop(shopId);
 
         // Return response — trả về BranchProduct đầu tiên hoặc product-only nếu không có branch nào
-        return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
+        return toProductResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
     }
 
     @Override
@@ -148,7 +149,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         productRepository.findByShopIdAndSkuAndDeletedFalse(shopId, sku)
                 .ifPresent(p -> { throw new BusinessException(ApiCode.SKU_EXISTS); });
 
-        Product product = createNewProduct(shopId, sku, request);
+        Product product = createNewProduct(shop, sku, request);
         product = productRepository.save(product);
         sequenceService.updateNextSequence(shopId, prefix, AppConstants.SequenceTypes.SEQUENCE_TYPE_SKU);
         sequenceService.updateNextSequence(shopId, AppConstants.SequencePrefixes.BARCODE_GLOBAL, AppConstants.SequenceTypes.SEQUENCE_TYPE_BARCODE);
@@ -160,13 +161,13 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         product.getName(), product.getSku(), branchId));
 
         productCache.evictByShop(shopId);
-        return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
+        return toProductResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
     }
 
     @Override
     public ProductResponse updateProduct(String userId, String shopId, String id, ProductRequest request, List<MultipartFile> files) {
         // Validate shop
-        shopRepository.findByIdAndDeletedFalse(shopId)
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
 
         if (StringUtils.hasText(request.getBarcode())) {
@@ -218,7 +219,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         deleteRemovedVariantImages(product, request);
 
         // Update Product fields only
-        updateExistingProduct(product, request, userId);
+        updateExistingProduct(product, request, userId, shop);
         product = productRepository.save(product);
 
         // Log audit
@@ -229,7 +230,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Trả về response: lấy BranchProduct đầu tiên làm đại diện (nếu có)
         List<BranchProduct> branchProducts = branchProductRepository.findByProductIdAndDeletedFalse(product.getId());
-        return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
+        return toProductResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
     }
 
     @Override
@@ -274,7 +275,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         product.getName(), product.getSku(), branchId, branchProduct.getPrice(), branchProduct.getQuantity()));
 
         // Update cache
-        ProductResponse response = productMapper.toResponse(branchProduct, product);
+        ProductResponse response = toProductResponse(branchProduct, product);
         productCache.evictByShop(shopId);
 
         return response;
@@ -325,7 +326,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Product product = productRepository.findByIdAndShopIdAndDeletedFalse(branchProduct.getProductId(), shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
 
-        return productMapper.toResponse(branchProduct, product);
+        return toProductResponse(branchProduct, product);
     }
 
     @Override
@@ -360,7 +361,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         product.getName(), product.getSku(), branchId));
 
         // Update cache
-        ProductResponse response = productMapper.toResponse(branchProduct, product);
+        ProductResponse response = toProductResponse(branchProduct, product);
         productCache.evictByShop(shopId);
         return response;
     }
@@ -400,7 +401,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
 
         // Trả về response đại diện (BranchProduct đầu tiên nếu có)
         List<BranchProduct> branchProducts = branchProductRepository.findByProductIdAndDeletedFalse(productId);
-        return productMapper.toResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
+        return toProductResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
     }
 
     @Override
@@ -425,7 +426,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         newTrackInventoryState ? "" : " — đã tắt quantity tại tất cả chi nhánh"));
         // Update cache
         productCache.evictByShop(shopId);
-        return productMapper.toResponse(null, product);
+        return toProductResponse(null, product);
     }
 
     @Override
@@ -450,8 +451,10 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Map<String, Product> productsMap = productRepository.findAllById(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         List<ProductResponse> responses = branchProducts.stream()
-                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId())))
+                .map(bp -> productMapper.toResponse(bp, productsMap.get(bp.getProductId()), shop))
                 .collect(Collectors.toList());
 
         return new PageImpl<>(responses, pageable, total);
@@ -462,8 +465,10 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         Set<String> productIds = branchProductRepository.findByShopIdAndBranchIdAndQuantityLessThanAndDeletedFalse(shopId, branchId, threshold).stream()
                 .map(BranchProduct::getProductId)
                 .collect(Collectors.toSet());
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         return productRepository.findAllById(productIds).stream()
-                .map(product -> productMapper.toResponse(null, product))
+                .map(product -> productMapper.toResponse(null, product, shop))
                 .collect(Collectors.toList());
     }
 
@@ -508,9 +513,15 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 : shop.getType().getIndustry().name().toUpperCase();
     }
 
-    private Product createNewProduct(String shopId, String sku, ProductRequest request) {
+    private ProductResponse toProductResponse(BranchProduct branchProduct, Product product) {
+        Shop shop = shopRepository.findByIdAndDeletedFalse(product.getShopId())
+                .orElse(null);
+        return productMapper.toResponse(branchProduct, product, shop);
+    }
+
+    private Product createNewProduct(Shop shop, String sku, ProductRequest request) {
         return Product.builder()
-                .shopId(shopId)
+                .shopId(shop.getId())
                 .name(request.getName())
                 .nameTranslations(request.getNameTranslations())
                 .category(CategoryUtils.normalize(request.getCategory()))
@@ -523,13 +534,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .barcode(request.getBarcode())
                 .supplierId(request.getSupplierId())
                 .variants(assignVariantIds(request.getVariants()))
+                .assignedToppingIds(resolveAssignedToppingIdsForSave(shop, request.getAssignedToppingIds()))
                 .priceHistory(new ArrayList<>()) // Bắt đầu rỗng — history sẽ được ghi khi giá thay đổi
                 .active(request.isActive())
                 .trackInventory(request.isTrackInventory()) // Có theo dõi tồn kho không
                 .build();
     }
 
-    private void updateExistingProduct(Product existing, ProductRequest request, String userId) {
+    private void updateExistingProduct(Product existing, ProductRequest request, String userId, Shop shop) {
         // Auto-track thay đổi giá trước khi ghi đè
         appendProductPriceHistory(existing, request, userId);
 
@@ -544,9 +556,54 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         existing.setBarcode(request.getBarcode());
         existing.setSupplierId(request.getSupplierId());
         existing.setVariants(assignVariantIds(request.getVariants()));
+        if (request.getAssignedToppingIds() != null) {
+            existing.setAssignedToppingIds(resolveAssignedToppingIdsForSave(shop, request.getAssignedToppingIds()));
+        }
         existing.setActive(request.isActive());
         existing.setTrackInventory(request.isTrackInventory()); // Có theo dõi tồn kho không
         // priceHistory KHÔNG lấy từ request — được quản lý bởi appendProductPriceHistory()
+    }
+
+    /**
+     * Chuẩn hoá ID topping shop gán cho sản phẩm. {@code rawFromRequest} không {@code null}:
+     * rỗng → xóa gán; có phần tử → phải khớp danh mục shop khi bật topping.
+     */
+    private List<String> resolveAssignedToppingIdsForSave(Shop shop, List<String> rawFromRequest) {
+        if (rawFromRequest == null) {
+            return null;
+        }
+        List<String> trimmed = rawFromRequest.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .toList();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (!shop.isToppingsEnabled()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        List<ShopTopping> defs = shop.getShopToppings();
+        if (defs == null || defs.isEmpty()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        Map<String, ShopTopping> byLower = new HashMap<>();
+        for (ShopTopping t : defs) {
+            if (t != null && StringUtils.hasText(t.getToppingId())) {
+                byLower.put(t.getToppingId().trim().toLowerCase(Locale.ROOT), t);
+            }
+        }
+        List<String> out = new ArrayList<>();
+        for (String id : trimmed) {
+            ShopTopping st = byLower.get(id.toLowerCase(Locale.ROOT));
+            if (st == null) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            String canonical = st.getToppingId().trim();
+            if (!out.contains(canonical)) {
+                out.add(canonical);
+            }
+        }
+        return out;
     }
 
     /**
