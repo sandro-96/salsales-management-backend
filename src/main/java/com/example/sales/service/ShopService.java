@@ -125,7 +125,7 @@ public class ShopService extends BaseService {
         shopCache.evictShopById(shopId);
         auditLogService.log(user.getId(), saved.getId(), saved.getId(), "SHOP", "UPDATED",
                 String.format("Cập nhật cửa hàng: %s (%s)", saved.getName(), saved.getType()));
-        return getShopSimpleResponse(saved);
+        return getShopSimpleResponse(saved, user.getId());
     }
 
     public void deleteShop(String ownerId, String shopId) {
@@ -212,7 +212,11 @@ public class ShopService extends BaseService {
     }
 
     public ShopSimpleResponse getShopSimpleResponse(Shop shop) {
-        return ShopSimpleResponse.builder()
+        return getShopSimpleResponse(shop, null);
+    }
+
+    public ShopSimpleResponse getShopSimpleResponse(Shop shop, String currentUserId) {
+        ShopSimpleResponse.ShopSimpleResponseBuilder builder = ShopSimpleResponse.builder()
                 .id(shop.getId())
                 .name(shop.getName())
                 .type(shop.getType())
@@ -229,8 +233,21 @@ public class ShopService extends BaseService {
                 .toppingsEnabled(shop.isToppingsEnabled())
                 .active(shop.isActive())
                 .industry(shop.getType().getIndustry())
-                .businessModel(shop.getBusinessModel())
-                .build();
+                .businessModel(shop.getBusinessModel());
+
+        if (currentUserId != null) {
+            shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shop.getId(), currentUserId)
+                    .ifPresent(su -> {
+                        builder.role(su.getRole());
+                        if (su.getPermissions() != null && !su.getPermissions().isEmpty()) {
+                            builder.permissions(su.getPermissions());
+                        } else if (su.getRole() != null) {
+                            builder.permissions(PermissionUtils.getDefaultPermissions(su.getRole()));
+                        }
+                    });
+        }
+
+        return builder.build();
     }
 
     private static String normalizeTaxRegistrationNumber(String raw) {

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Cập nhật trạng thái ticket</title>
+</head>
+<body style="font-family: Arial, sans-serif; background: #f5f6f8; margin: 0; padding: 24px;">
+<div style="max-width: 640px; margin: auto; background: #fff; padding: 24px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+    <h2 style="color: #28a745; margin-top: 0;">✅ Ticket đã cập nhật trạng thái</h2>
+
+    <p>Chào <strong th:text="${recipientName}">Khách hàng</strong>,</p>
+
+    <p>Ticket
+        "<strong th:text="${subject}">Tiêu đề</strong>"
+        đã được chuyển sang trạng thái
+        <span style="display: inline-block; padding: 2px 8px; background: #e6f4ea; color: #28a745; border-radius: 4px; font-weight: bold;"
+              th:text="${status}">RESOLVED</span>.</p>
+
+    <p style="margin-top: 16px;">Nếu bạn cần hỗ trợ thêm, vui lòng mở lại ticket hoặc gửi yêu cầu mới.</p>
+
+    <p style="margin-top: 24px;">
+        <a th:href="${ticketUrl}" href="#"
+           style="display: inline-block; background: #28a745; color: #fff; padding: 10px 18px; border-radius: 6px; text-decoration: none;">
+            Xem ticket
+        </a>
+    </p>
+
+    <hr style="margin-top: 28px; border: none; border-top: 1px solid #eee;">
+    <p style="font-size: 12px; color: #999;">Đây là email tự động từ SalesApp — hệ thống hỗ trợ khách hàng.</p>
+</div>
+</body>
+</html>

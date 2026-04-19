@@ -5,6 +5,8 @@ import com.example.sales.constant.*;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.Set;
+
 @Data
 @Builder
 public class ShopSimpleResponse {
@@ -27,4 +29,5 @@ public class ShopSimpleResponse {
     private BusinessModel businessModel;
     private ShopRole role;
     private ShopIndustry industry;
+    private Set<Permission> permissions;
 }

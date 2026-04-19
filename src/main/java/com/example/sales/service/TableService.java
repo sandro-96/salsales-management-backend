@@ -4,6 +4,7 @@ package com.example.sales.service;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.ShopRole;
 import com.example.sales.constant.TableStatus;
+import com.example.sales.constant.WebSocketMessageType;
 import com.example.sales.dto.table.TableRequest;
 import com.example.sales.dto.table.TableResponse;
 import com.example.sales.exception.BusinessException;
@@ -12,6 +13,7 @@ import com.example.sales.model.Shop;
 import com.example.sales.model.Table;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.TableRepository;
+import com.example.sales.service.realtime.RealtimeEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,7 @@ public class TableService {
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
     private final ShopUserService shopUserService;
+    private final RealtimeEventPublisher realtimeEventPublisher;
 
     @Transactional
     public TableResponse create(String userId, TableRequest request) {
@@ -66,7 +69,9 @@ public class TableService {
         Table saved = tableRepository.save(table);
         auditLogService.log(userId, shopId, saved.getId(), "TABLE", "CREATED",
                 String.format("Tạo bàn: %s (Chi nhánh: %s)", saved.getName(), saved.getBranchId()));
-        return toResponse(saved, shop);
+        TableResponse resp = toResponse(saved, shop);
+        publishTable(saved, resp, WebSocketMessageType.TABLE_CREATED);
+        return resp;
     }
 
     public Page<TableResponse> getByShop(String userId, String shopId, String branchId, Pageable pageable) {
@@ -118,7 +123,8 @@ public class TableService {
             table.setCurrentOrderId(null);
             // Defensive: if order is closed, the table should be available.
             table.setStatus(TableStatus.AVAILABLE);
-            tableRepository.save(table);
+            Table saved = tableRepository.save(table);
+            publishTable(saved, toResponse(saved, null), WebSocketMessageType.TABLE_STATUS_CHANGED);
         }
     }
 
@@ -134,7 +140,10 @@ public class TableService {
         Table saved = tableRepository.save(table);
         auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "STATUS_UPDATED",
                 String.format("Cập nhật trạng thái bàn: %s → %s", table.getName(), status));
-        return toResponse(saved, shopRepository.findByIdAndDeletedFalse(table.getShopId()).orElse(null));
+        TableResponse resp = toResponse(saved,
+                shopRepository.findByIdAndDeletedFalse(table.getShopId()).orElse(null));
+        publishTable(saved, resp, WebSocketMessageType.TABLE_STATUS_CHANGED);
+        return resp;
     }
 
     @Transactional
@@ -178,7 +187,9 @@ public class TableService {
         Table saved = tableRepository.save(table);
         auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "UPDATED",
                 String.format("Cập nhật thông tin bàn: %s", table.getName()));
-        return toResponse(saved, shop);
+        TableResponse resp = toResponse(saved, shop);
+        publishTable(saved, resp, WebSocketMessageType.TABLE_UPDATED);
+        return resp;
     }
 
     @Transactional
@@ -195,9 +206,15 @@ public class TableService {
         }
 
         table.setDeleted(true);
-        tableRepository.save(table);
+        Table saved = tableRepository.save(table);
         auditLogService.log(userId, table.getShopId(), tableId, "TABLE", "DELETED",
                 String.format("Xóa bàn: %s", table.getName()));
+        publishTable(saved, toResponse(saved, null), WebSocketMessageType.TABLE_DELETED);
+    }
+
+    private void publishTable(Table table, TableResponse payload, WebSocketMessageType type) {
+        if (table == null) return;
+        realtimeEventPublisher.publishTableEvent(table.getShopId(), table.getBranchId(), type, payload);
     }
 
     private TableResponse toResponse(Table table, Shop shop) {

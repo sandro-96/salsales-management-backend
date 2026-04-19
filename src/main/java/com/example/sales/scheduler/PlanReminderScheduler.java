@@ -1,31 +1,37 @@
 // File: src/main/java/com/example/sales/scheduler/PlanReminderScheduler.java
 package com.example.sales.scheduler;
 
+import com.example.sales.constant.NotificationType;
+import com.example.sales.dto.notification.NotificationEnvelope;
 import com.example.sales.model.Shop;
-import com.example.sales.model.User;
 import com.example.sales.repository.ShopRepository;
-import com.example.sales.repository.UserRepository;
-import com.example.sales.service.MailService;
+import com.example.sales.service.notification.NotificationDispatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 
+/**
+ * Mỗi sáng 7h: nhắc các shop có gói hết hạn trong 3 ngày nữa.
+ *
+ * Sau migration: thay vì gọi MailService trực tiếp, scheduler build
+ * {@link NotificationEnvelope} và giao cho {@link NotificationDispatcher}.
+ * Dedupe key theo (shopId + ngày hết hạn) đảm bảo nếu scheduler lỡ chạy
+ * lại trong cùng ngày (restart, retry) cũng không gửi trùng.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class PlanReminderScheduler {
 
     private final ShopRepository shopRepository;
-    private final UserRepository userRepository;
-    private final MailService mailService;
+    private final NotificationDispatcher notificationDispatcher;
 
-    // Chạy mỗi ngày lúc 7h sáng
     @Scheduled(cron = "0 0 7 * * *")
     public void remindExpiringPlans() {
         LocalDateTime targetDate = LocalDateTime.now().plusDays(3).truncatedTo(ChronoUnit.DAYS);
@@ -36,24 +42,26 @@ public class PlanReminderScheduler {
         );
 
         for (Shop shop : shops) {
-            User owner = userRepository.findById(shop.getOwnerId()).orElse(null);
-            if (owner == null || owner.getEmail() == null) continue;
+            if (shop.getOwnerId() == null) continue;
 
-            Map<String, Object> model = Map.of(
-                    "fullName", owner.getFullName(),
-                    "shopName", shop.getName(),
-                    "expiryDate", shop.getPlanExpiry().toLocalDate(),
-                    "currentPlan", shop.getPlan().name()
-            );
+            LocalDate expiryDate = shop.getPlanExpiry().toLocalDate();
 
-            mailService.sendHtmlTemplate(
-                    owner.getEmail(),
-                    "⏳ Gói " + shop.getPlan() + " sắp hết hạn",
-                    "emails/plan-expiry-reminder",
-                    model
-            );
+            notificationDispatcher.dispatch(NotificationEnvelope.builder()
+                    .type(NotificationType.BILLING_PLAN_EXPIRING_SOON)
+                    .shopId(shop.getId())
+                    .recipient(shop.getOwnerId())
+                    .title("Gói " + shop.getPlan() + " sắp hết hạn")
+                    .message("Gói " + shop.getPlan() + " của shop \"" + shop.getName()
+                            + "\" sẽ hết hạn vào " + expiryDate)
+                    .referenceId(shop.getId())
+                    .referenceType("SUBSCRIPTION")
+                    .templateVar("shopName", shop.getName())
+                    .templateVar("currentPlan", shop.getPlan().name())
+                    .templateVar("expiryDate", expiryDate)
+                    .dedupeKey("BILLING_PLAN_EXPIRING_SOON:" + shop.getId() + ":" + expiryDate)
+                    .build());
 
-            log.info("📧 Đã gửi email nhắc hạn cho shop {}", shop.getName());
+            log.info("📧 Dispatched plan-expiring-soon for shop {}", shop.getName());
         }
     }
 }

@@ -34,6 +34,7 @@ public class TableController {
     private final OrderService orderService;
 
     @PostMapping
+    @RequirePermission(Permission.TABLE_CREATE)
     @Operation(summary = "Tạo bàn mới", description = "Tạo một bàn mới trong cửa hàng với thông tin bàn và chi nhánh")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Bàn được tạo thành công"),
@@ -49,7 +50,7 @@ public class TableController {
     }
 
     @GetMapping
-    @RequirePermission(Permission.TABLE_CREATE)
+    @RequirePermission(Permission.TABLE_VIEW)
     @Operation(summary = "Lấy danh sách bàn", description = "Lấy danh sách bàn của cửa hàng với phân trang")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Danh sách bàn được trả về thành công"),

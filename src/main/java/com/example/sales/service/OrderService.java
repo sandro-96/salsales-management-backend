@@ -8,6 +8,8 @@ import com.example.sales.constant.DiscountType;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.PaymentStatus;
 import com.example.sales.constant.TableStatus;
+import com.example.sales.constant.WebSocketMessageType;
+import com.example.sales.service.realtime.RealtimeEventPublisher;
 import com.example.sales.dto.order.OrderFulfillmentPatchRequest;
 import com.example.sales.dto.order.OrderLineToppingResponse;
 import com.example.sales.dto.order.OrderItemResponse;
@@ -62,6 +64,7 @@ public class OrderService extends BaseService {
     private final LoyaltyService loyaltyService;
     private final CustomerRepository customerRepository;
     private final SequenceService sequenceService;
+    private final RealtimeEventPublisher realtimeEventPublisher;
 
     private static final DateTimeFormatter ORDER_CODE_DATE = DateTimeFormatter.BASIC_ISO_DATE;
 
@@ -169,7 +172,7 @@ public class OrderService extends BaseService {
         }
         occupyTable(created);
         auditLogService.log(userId, shopId, created.getId(), "ORDER", "CREATED", "Tạo đơn hàng mới");
-        return toResponse(created);
+        return publishOrderEvent(created, toResponse(created), WebSocketMessageType.ORDER_CREATED);
     }
 
     public void cancelOrder(String userId, String shopId, String orderId) {
@@ -207,6 +210,7 @@ public class OrderService extends BaseService {
         }
 
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "CANCELLED", "Huỷ đơn hàng");
+        publishOrderEvent(saved, toResponse(saved), WebSocketMessageType.ORDER_STATUS_CHANGED);
     }
 
     public OrderResponse confirmPayment(String userId, String shopId, String orderId, String paymentId, String paymentMethod) {
@@ -245,7 +249,10 @@ public class OrderService extends BaseService {
         auditLogService.log(userId, shopId, order.getId(), "ORDER", "PAYMENT_CONFIRMED",
                 "Xác nhận thanh toán đơn hàng với ID: %s".formatted(orderId));
         orderCache.evict(orderId, shopId);
-        return toResponse(updated);
+        OrderResponse resp = toResponse(updated);
+        realtimeEventPublisher.publishPaymentEvent(updated.getShopId(), updated.getBranchId(),
+                WebSocketMessageType.PAYMENT_SUCCEEDED, resp);
+        return publishOrderEvent(updated, resp, WebSocketMessageType.ORDER_STATUS_CHANGED);
     }
 
     public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
@@ -283,7 +290,7 @@ public class OrderService extends BaseService {
                     "Cập nhật trạng thái từ %s → %s".formatted(oldStatus, newStatus));
         }
 
-        return toResponse(updated);
+        return publishOrderEvent(updated, toResponse(updated), WebSocketMessageType.ORDER_STATUS_CHANGED);
     }
 
     private void occupyTable(Order order) {
@@ -296,6 +303,7 @@ public class OrderService extends BaseService {
                 table.setStatus(TableStatus.OCCUPIED);
                 table.setCurrentOrderId(order.getId());
                 tableRepository.save(table);
+                publishTableStatusChanged(order.getShopId(), order.getBranchId(), table.getId());
             });
         }
     }
@@ -318,6 +326,7 @@ public class OrderService extends BaseService {
                     table.setStatus(TableStatus.AVAILABLE);
                 }
                 tableRepository.save(table);
+                publishTableStatusChanged(order.getShopId(), order.getBranchId(), table.getId());
             });
         }
     }
@@ -523,7 +532,10 @@ public class OrderService extends BaseService {
         orderCache.evict(orderId, shopId);
         auditLogService.log(userId, shopId, orderId, "ORDER", "TABLE_MOVED",
                 "Đổi bàn cho đơn hàng từ %s sang %s".formatted(fromTableId, toTable.getId()));
-        return toResponse(saved);
+        // Bàn cũ (release thủ công ở trên, không qua releaseTable helper) — push để đồng bộ.
+        publishTableStatusChanged(shopId, saved.getBranchId(), fromTableId);
+        // Bàn mới đã tự push trong occupyTable().
+        return publishOrderEvent(saved, toResponse(saved), WebSocketMessageType.ORDER_UPDATED);
     }
 
     @Transactional
@@ -669,7 +681,7 @@ public class OrderService extends BaseService {
                 .build();
 
         OrderResponse srcUpdated = updateOrder(userId, shopId, orderId, upd);
-        OrderResponse newResp = toResponse(created);
+        OrderResponse newResp = publishOrderEvent(created, toResponse(created), WebSocketMessageType.ORDER_CREATED);
 
         auditLogService.log(userId, shopId, orderId, "ORDER", "SPLIT",
                 "Tách %d dòng hàng sang đơn %s".formatted(moved.size(), created.getId()));
@@ -985,7 +997,7 @@ public class OrderService extends BaseService {
         Order updated = orderRepository.save(order);
         orderCache.evict(orderId, shopId);
         auditLogService.log(userId, shopId, orderId, "ORDER", "UPDATED", "Cập nhật đơn hàng");
-        return toResponse(updated);
+        return publishOrderEvent(updated, toResponse(updated), WebSocketMessageType.ORDER_UPDATED);
     }
 
     /**
@@ -1042,7 +1054,7 @@ public class OrderService extends BaseService {
         Order updated = orderRepository.save(order);
         orderCache.evict(orderId, shopId);
         auditLogService.log(userId, shopId, orderId, "ORDER", "FULFILLMENT_PATCHED", "Cập nhật giao hàng / tham chiếu đơn hàng");
-        return toResponse(updated);
+        return publishOrderEvent(updated, toResponse(updated), WebSocketMessageType.ORDER_UPDATED);
     }
 
     private OrderResponse toResponse(Order order) {
@@ -1440,6 +1452,38 @@ public class OrderService extends BaseService {
         sequenceService.updateNextSequence(shopId, "DH", AppConstants.SequenceTypes.SEQUENCE_TYPE_ORDER);
         String tail = raw.contains("_") ? raw.substring(raw.lastIndexOf('_') + 1) : raw;
         return "DH-" + LocalDate.now().format(ORDER_CODE_DATE) + "-" + tail;
+    }
+
+    /**
+     * Push event đơn hàng lên topic per-branch để mọi staff đang mở shop/branch
+     * này nhận cập nhật. Trả về chính {@code response} để caller dễ chain.
+     */
+    private OrderResponse publishOrderEvent(Order order, OrderResponse response, WebSocketMessageType type) {
+        if (order == null || response == null) return response;
+        realtimeEventPublisher.publishOrderEvent(order.getShopId(), order.getBranchId(), type, response);
+        return response;
+    }
+
+    /**
+     * Push table status changed event khi order làm thay đổi trạng thái bàn
+     * (occupy/release/move). Best-effort: không dừng flow nếu không tìm thấy bàn.
+     */
+    private void publishTableStatusChanged(String shopId, String branchId, String tableId) {
+        if (!StringUtils.hasText(shopId) || !StringUtils.hasText(branchId) || !StringUtils.hasText(tableId)) {
+            return;
+        }
+        tableRepository.findByIdAndDeletedFalse(tableId.trim()).ifPresent(t -> {
+            if (!shopId.equals(t.getShopId())) return;
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("id", t.getId());
+            payload.put("shopId", t.getShopId());
+            payload.put("branchId", t.getBranchId());
+            payload.put("status", t.getStatus());
+            payload.put("currentOrderId", Boolean.TRUE.equals(t.getAlwaysAvailable()) ? null : t.getCurrentOrderId());
+            payload.put("alwaysAvailable", Boolean.TRUE.equals(t.getAlwaysAvailable()));
+            realtimeEventPublisher.publishTableEvent(shopId, branchId,
+                    WebSocketMessageType.TABLE_STATUS_CHANGED, payload);
+        });
     }
 
 }

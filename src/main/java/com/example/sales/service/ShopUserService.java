@@ -213,6 +213,7 @@ public class ShopUserService extends BaseService {
                             .findFirst()
                             .orElse(null);
 
+                    Set<Permission> perms = resolvePermissions(su);
                     return ShopSimpleResponse.builder()
                             .id(shop.getId())
                             .name(shop.getName())
@@ -229,6 +230,7 @@ public class ShopUserService extends BaseService {
                             .toppingsEnabled(shop.isToppingsEnabled())
                             .active(shop.isActive())
                             .role(su != null ? su.getRole() : null)
+                            .permissions(perms)
                             .industry(shop.getType().getIndustry())
                             .businessModel(shop.getBusinessModel())
                             .slug(shop.getSlug())
@@ -269,6 +271,29 @@ public class ShopUserService extends BaseService {
         return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .map(ShopUser::getRole)
                 .orElseThrow(() -> new BusinessException(ApiCode.UNAUTHORIZED));
+    }
+
+    /**
+     * Lấy tập quyền hiệu lực của người dùng trong shop (fallback về default theo role khi chưa persist quyền).
+     * Trả về empty set nếu user không thuộc shop.
+     */
+    public Set<Permission> getEffectivePermissions(String shopId, String userId) {
+        return shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
+                .map(ShopUserService::resolvePermissions)
+                .orElse(Collections.emptySet());
+    }
+
+    private static Set<Permission> resolvePermissions(ShopUser su) {
+        if (su == null) {
+            return Collections.emptySet();
+        }
+        if (su.getPermissions() != null && !su.getPermissions().isEmpty()) {
+            return su.getPermissions();
+        }
+        if (su.getRole() != null) {
+            return PermissionUtils.getDefaultPermissions(su.getRole());
+        }
+        return Collections.emptySet();
     }
 
     public void validateRoleHierarchy(String shopId, String actorUserId, String targetUserId) {
