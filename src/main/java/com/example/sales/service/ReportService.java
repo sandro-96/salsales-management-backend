@@ -106,14 +106,20 @@ public class ReportService {
     public List<TopProductResponse> getTopProducts(String shopId, ReportRequest request, int limit) {
         MatchOperation match = buildMatchOperation(shopId, request);
 
+        // Multiplier phản ánh trọng lượng cho sản phẩm bán theo cân (fallback quantity cho đơn cũ).
+        Document effectiveQtyExpr = new Document("$cond", List.of(
+                new Document("$eq", List.of("$items.sellByWeight", true)),
+                new Document("$ifNull", List.of("$items.weight", 0)),
+                "$items.quantity"));
+
         Aggregation aggregation = newAggregation(
                 match,
                 unwind("items"),
                 group("items.productId")
                         .first("items.productName").as("productName")
-                        .sum("items.quantity").as("totalQuantitySold")
+                        .sum(context -> effectiveQtyExpr).as("totalQuantitySold")
                         .sum(context -> new Document("$multiply",
-                                List.of("$items.quantity", "$items.priceAfterDiscount"))).as("totalRevenue"),
+                                List.of(effectiveQtyExpr, "$items.priceAfterDiscount"))).as("totalRevenue"),
                 sort(Sort.Direction.DESC, "totalQuantitySold"),
                 limit(limit),
                 project()

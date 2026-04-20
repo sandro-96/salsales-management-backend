@@ -120,6 +120,7 @@ public class NotificationRouter {
                 NotificationType.STAFF_ADDED,
                 NotificationType.STAFF_REMOVED,
                 NotificationType.SYSTEM,
+                NotificationType.BROADCAST,
                 NotificationType.BILLING_PLAN_DOWNGRADED}) {
             t.putIfAbsent(type, RouteConfig.builder()
                     .channel(NotificationChannel.IN_APP, ChannelPlan.inApp())

@@ -1,7 +1,9 @@
 package com.example.sales.service.impl;
 
+import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.product.ProductCatalogResponse;
 import com.example.sales.dto.product.ProductCatalogUpsertRequest;
+import com.example.sales.exception.BusinessException;
 import com.example.sales.model.ProductCatalog;
 import com.example.sales.repository.ProductCatalogRepository;
 import com.example.sales.service.ProductCatalogService;
@@ -9,7 +11,13 @@ import com.example.sales.util.CategoryUtils;
 import com.example.sales.util.GtinBarcodeValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -23,6 +31,7 @@ import java.util.regex.Pattern;
 public class ProductCatalogServiceImpl implements ProductCatalogService {
 
     private final ProductCatalogRepository productCatalogRepository;
+    private final MongoTemplate mongoTemplate;
 
     @Override
     public ProductCatalogResponse upsertFromAdmin(ProductCatalogUpsertRequest request) {
@@ -81,6 +90,40 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Page<ProductCatalogResponse> list(String keyword, String category, Pageable pageable) {
+        Criteria c = new Criteria();
+        if (StringUtils.hasText(keyword)) {
+            String q = keyword.trim();
+            Pattern p = Pattern.compile(
+                    ".*" + Pattern.quote(q) + ".*",
+                    Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+            );
+            c.orOperator(
+                    Criteria.where("name").regex(p),
+                    Criteria.where("barcode").regex(p)
+            );
+        }
+        if (StringUtils.hasText(category)) {
+            c.and("category").is(CategoryUtils.normalize(category));
+        }
+        long total = mongoTemplate.count(Query.query(c), ProductCatalog.class);
+        List<ProductCatalog> rows = mongoTemplate.find(
+                Query.query(c).with(pageable),
+                ProductCatalog.class
+        );
+        List<ProductCatalogResponse> items = rows.stream().map(this::mapToResponse).toList();
+        return new PageImpl<>(items, pageable, total);
+    }
+
+    @Override
+    public void deleteById(String id) {
+        ProductCatalog existing = productCatalogRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ApiCode.NOT_FOUND));
+        productCatalogRepository.delete(existing);
+        log.info("Admin deleted product catalog id={} barcode={}", id, existing.getBarcode());
     }
 
     private ProductCatalogResponse mapToResponse(ProductCatalog catalog) {

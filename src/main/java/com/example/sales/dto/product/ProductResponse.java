@@ -44,6 +44,7 @@ public class ProductResponse {
     private String description;
     private List<String> images;
     private boolean active;
+    private boolean sellByWeight;
     private String barcode;
     private String supplierId;
     private List<ProductVariant> variants;
@@ -60,6 +61,8 @@ public class ProductResponse {
 
     // Các trường từ BranchProduct (chi tiết tại chi nhánh)
     private int quantity;
+    /** Tồn base unit cho SP bán theo cân (gram/ml). null nếu chưa setup. */
+    private Long stockInBaseUnits;
     private int minQuantity;
     private double price;
     private double branchCostPrice;

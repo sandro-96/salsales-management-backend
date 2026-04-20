@@ -2,6 +2,7 @@
 package com.example.sales.config;
 
 import com.example.sales.security.PlanInterceptor;
+import com.example.sales.security.SubscriptionGuardInterceptor;
 import jakarta.servlet.MultipartConfigElement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
@@ -25,6 +26,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private PlanInterceptor planInterceptor;
 
+    @Autowired
+    private SubscriptionGuardInterceptor subscriptionGuardInterceptor;
+
     @Bean
     public AcceptHeaderLocaleResolver localeResolver() {
         AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();
@@ -42,7 +46,11 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // Giữ PlanInterceptor cho tương thích ngược (no-op khi không còn @RequirePlan).
         registry.addInterceptor(planInterceptor)
+                .addPathPatterns("/api/**");
+        // Chặn mọi write API khi subscription EXPIRED/CANCELLED — whitelist xử lý trong interceptor.
+        registry.addInterceptor(subscriptionGuardInterceptor)
                 .addPathPatterns("/api/**");
     }
 

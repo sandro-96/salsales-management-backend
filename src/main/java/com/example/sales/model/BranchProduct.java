@@ -41,10 +41,19 @@ public class BranchProduct extends BaseEntity {
     private String branchId;
 
     @Min(value = 0, message = "Số lượng không được âm")
-    private int quantity; // Số lượng tồn kho tại chi nhánh
+    private int quantity; // Số lượng tồn kho tại chi nhánh (dùng cho SP đếm đơn vị)
 
     @Min(value = 0, message = "Số lượng tối thiểu không được âm")
     private int minQuantity; // Số lượng tối thiểu để cảnh báo nhập hàng
+
+    /**
+     * Tồn kho tính theo đơn vị cơ sở (base unit) cho SP bán theo cân/volume:
+     * gram với kg/g, ml với l/ml, hoặc đơn vị chuyên biệt. null = legacy, chưa migrate.
+     * <p>
+     * Dùng cho {@code Product.sellByWeight == true}. Khi đặt đơn, hệ thống sẽ
+     * quy đổi {@code weight} ra base unit và trừ vào trường này thay cho {@code quantity}.
+     */
+    private Long stockInBaseUnits;
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá bán phải lớn hơn 0")
     private double price; // Giá bán tại chi nhánh

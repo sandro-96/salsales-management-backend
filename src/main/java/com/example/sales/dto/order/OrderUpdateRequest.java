@@ -2,6 +2,7 @@
 package com.example.sales.dto.order;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,11 +37,15 @@ public class OrderUpdateRequest {
         /** Bắt buộc khi sản phẩm có biến thể */
         private String variantId;
 
-        @Min(value = 1, message = "Số lượng phải lớn hơn 0")
+        @Min(value = 0, message = "Số lượng không được âm")
         private int quantity;
 
         @Min(value = 0, message = "Giá sản phẩm không được âm")
         private double price; // Giá tại thời điểm cập nhật (có thể khác giá hiện tại của sản phẩm)
+
+        /** Trọng lượng cho dòng hàng bán theo cân (chỉ có giá trị khi {@code Product.sellByWeight = true}) */
+        @DecimalMin(value = "0.0", inclusive = false, message = "Trọng lượng phải lớn hơn 0")
+        private Double weight;
 
         /** Topping đi kèm dòng hàng (ID {@code ShopTopping#toppingId}) */
         private List<String> toppingIds;

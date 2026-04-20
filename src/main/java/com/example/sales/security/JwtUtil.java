@@ -21,6 +21,7 @@ public class JwtUtil {
     private Key key;
 
     private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24h
+    private static final long IMPERSONATION_EXPIRATION = 1000 * 60 * 60; // 1h
 
     @PostConstruct
     public void init() {
@@ -41,6 +42,24 @@ public class JwtUtil {
                 .compact();
     }
 
+    /**
+     * Issue a short-lived impersonation token. Subject = target user id, role =
+     * target role; {@code impersonatedBy} claim carries the admin id for audit &
+     * banner display on FE.
+     */
+    public String generateImpersonationToken(User target, String adminId, String adminEmail) {
+        return Jwts.builder()
+                .setSubject(target.getId())
+                .claim("email", target.getEmail())
+                .claim("role", target.getRole().name())
+                .claim("impersonatedBy", adminId)
+                .claim("impersonatorEmail", adminEmail)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + IMPERSONATION_EXPIRATION))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
     public String extractUserId(String token) {
         return getClaims(token).getSubject();
     }
@@ -51,6 +70,22 @@ public class JwtUtil {
 
     public String extractEmail(String token) {
         return getClaims(token).get("email", String.class);
+    }
+
+    public String extractImpersonatedBy(String token) {
+        try {
+            return getClaims(token).get("impersonatedBy", String.class);
+        } catch (JwtException e) {
+            return null;
+        }
+    }
+
+    public String extractImpersonatorEmail(String token) {
+        try {
+            return getClaims(token).get("impersonatorEmail", String.class);
+        } catch (JwtException e) {
+            return null;
+        }
     }
 
     public boolean isTokenValid(String token) {
@@ -70,4 +105,3 @@ public class JwtUtil {
                 .getBody();
     }
 }
-

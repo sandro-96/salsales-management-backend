@@ -58,6 +58,14 @@ public class Product extends BaseEntity {
     @Builder.Default
     private boolean trackInventory = false; // Có theo dõi tồn kho không
 
+    /**
+     * Bán theo cân/trọng lượng. Khi true, POS sẽ nhập số thập phân (weight) thay vì
+     * quantity nguyên; subtotal = price × weight. Đơn vị trọng lượng lấy từ {@link #unit}
+     * (khuyến nghị: kg, g, l, ml).
+     */
+    @Builder.Default
+    private boolean sellByWeight = false;
+
     @Pattern(regexp = "^([A-Z0-9_]*|[0-9]{12,13})$", message = "Barcode phải là chữ in hoa, số, dấu _ hoặc 12-13 chữ số")
     private String barcode; // Mã vạch (cho bán lẻ)
     private String supplierId; // ID nhà cung cấp

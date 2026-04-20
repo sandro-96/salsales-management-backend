@@ -2,6 +2,7 @@
 package com.example.sales.dto.order;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -67,8 +68,19 @@ public class OrderRequest {
          */
         private String variantId;
 
-        @Min(value = 1, message = "Số lượng phải lớn hơn 0")
+        /**
+         * Số lượng đơn vị (sản phẩm thường). Khi sản phẩm bán theo cân ({@code sellByWeight}),
+         * server sẽ đặt = 1 và sử dụng {@link #weight}.
+         */
+        @Min(value = 0, message = "Số lượng không được âm")
         private int quantity;
+
+        /**
+         * Trọng lượng/thể tích thực cho sản phẩm bán theo cân (VD 0.5 khi unit=kg = 500g).
+         * Bắt buộc > 0 khi {@code Product.sellByWeight = true}, null cho sản phẩm thường.
+         */
+        @DecimalMin(value = "0.0", inclusive = false, message = "Trọng lượng phải lớn hơn 0")
+        private Double weight;
 
         /**
          * ID topping shop đã chọn (trùng {@code ShopTopping#toppingId}), thứ tự không quan trọng — server chuẩn hoá.

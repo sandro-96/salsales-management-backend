@@ -65,5 +65,9 @@ public class ProductRequest {
 
     @Builder.Default
     private boolean trackInventory = false;
+
+    /** Bán theo cân/trọng lượng. Đơn vị trọng lượng lấy từ {@link #unit}. */
+    @Builder.Default
+    private boolean sellByWeight = false;
 }
 

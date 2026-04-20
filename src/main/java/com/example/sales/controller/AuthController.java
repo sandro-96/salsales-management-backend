@@ -3,8 +3,10 @@ package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.*;
+import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.AuthService;
 import com.example.sales.service.TokenService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -106,6 +108,22 @@ public class AuthController {
         String newAccessToken = tokenService.refreshAccessToken(request.getRefreshToken());
         JwtResponse response = new JwtResponse(newAccessToken, request.getRefreshToken());
         return ApiResponseDto.success(ApiCode.SUCCESS, response);
+    }
+
+    @GetMapping("/session")
+    @Operation(summary = "Thông tin session hiện tại (kể cả impersonation)")
+    public ApiResponseDto<SessionResponse> session(
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        if (user == null) return ApiResponseDto.success(ApiCode.SUCCESS, null);
+        return ApiResponseDto.success(ApiCode.SUCCESS, SessionResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .impersonating(user.isImpersonating())
+                .impersonatedBy(user.getImpersonatedBy())
+                .impersonatorEmail(user.getImpersonatorEmail())
+                .build());
     }
 
     @PostMapping("/logout")

@@ -31,6 +31,16 @@ public class OrderItem {
     private String appliedPromotionId; // ID của khuyến mãi đã áp dụng
     private boolean trackInventory; // Có theo dõi tồn kho không
 
+    /** true nếu dòng hàng bán theo cân/trọng lượng (snapshot từ {@code Product.sellByWeight}). */
+    private boolean sellByWeight;
+    /**
+     * Trọng lượng/thể tích thực của dòng hàng khi {@link #sellByWeight} = true
+     * (VD 0.5 cho 500g khi unit = kg). Null khi bán theo quantity thông thường.
+     */
+    private Double weight;
+    /** Đơn vị trọng lượng snapshot từ {@code Product.unit} (kg, g, l, ml...). */
+    private String weightUnit;
+
     /** Topping đã chọn (snapshot); null hoặc rỗng = không có */
     private List<OrderLineTopping> toppings;
 }

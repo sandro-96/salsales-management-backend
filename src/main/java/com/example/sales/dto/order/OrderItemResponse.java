@@ -28,5 +28,12 @@ public class OrderItemResponse {
     private double priceAfterDiscount; // Giá sau khi áp dụng khuyến mãi
     private String appliedPromotionId; // ID của khuyến mãi đã áp dụng
 
+    /** true nếu dòng hàng bán theo cân (subtotal = price × weight). */
+    private boolean sellByWeight;
+    /** Trọng lượng/thể tích khi {@link #sellByWeight} = true (VD 0.5 cho 500g khi unit=kg). */
+    private Double weight;
+    /** Đơn vị trọng lượng (kg, g, l, ml) - snapshot từ product.unit. */
+    private String weightUnit;
+
     private List<OrderLineToppingResponse> toppings;
 }

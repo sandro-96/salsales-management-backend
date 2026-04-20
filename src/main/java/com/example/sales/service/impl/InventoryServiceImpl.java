@@ -314,6 +314,123 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
+    @Transactional
+    public long exportProductWeightBaseUnits(String userId, String shopId, String branchId,
+                                             String branchProductId, long baseUnits,
+                                             String note, String referenceId) {
+        if (baseUnits <= 0) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        BranchProduct bp = findBranchProduct(shopId, branchId, branchProductId);
+        Product master = getMasterProduct(bp.getProductId(), shopId);
+        if (!master.isTrackInventory()) {
+            throw new BusinessException(ApiCode.PRODUCT_NOT_TRACK_INVENTORY);
+        }
+        if (!master.isSellByWeight()) {
+            // Caller đã chọn nhầm path — fail rõ ràng thay vì trộn tồn kho.
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        long current = bp.getStockInBaseUnits() != null ? bp.getStockInBaseUnits() : 0L;
+        if (current < baseUnits) {
+            log.warn("Không đủ tồn (base units) để xuất SP cân {}: có {}, yêu cầu {}",
+                    master.getName(), current, baseUnits);
+            throw new BusinessException(ApiCode.INSUFFICIENT_STOCK);
+        }
+        long next = current - baseUnits;
+        bp.setStockInBaseUnits(next);
+        branchProductRepository.save(bp);
+
+        saveInventoryTransaction(
+                shopId, branchId, bp.getId(), null,
+                master, null, InventoryType.EXPORT, toIntQuantity(baseUnits), toIntQuantity(next),
+                note, referenceId);
+        productCache.evictByBranch(shopId, branchId);
+        auditLogService.log(userId, shopId, bp.getId(), "BRANCH_PRODUCT", "INVENTORY_EXPORT_WEIGHT",
+                String.format("Xuất %d %s SP cân '%s' (SKU: %s) tại chi nhánh %s. Tồn cũ: %d, mới: %d. Ref: %s.",
+                        baseUnits,
+                        com.example.sales.util.WeightUnitConverter.baseUnitLabel(master.getUnit()),
+                        master.getName(), master.getSku(), branchId, current, next, referenceId));
+        return next;
+    }
+
+    @Override
+    @Transactional
+    public long importProductWeightBaseUnits(String userId, String shopId, String branchId,
+                                             String branchProductId, long baseUnits,
+                                             String note) {
+        if (baseUnits <= 0) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        BranchProduct bp = findBranchProduct(shopId, branchId, branchProductId);
+        Product master = getMasterProduct(bp.getProductId(), shopId);
+        if (!master.isTrackInventory()) {
+            throw new BusinessException(ApiCode.PRODUCT_NOT_TRACK_INVENTORY);
+        }
+        if (!master.isSellByWeight()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        long current = bp.getStockInBaseUnits() != null ? bp.getStockInBaseUnits() : 0L;
+        long next = current + baseUnits;
+        bp.setStockInBaseUnits(next);
+        branchProductRepository.save(bp);
+
+        saveInventoryTransaction(
+                shopId, branchId, bp.getId(), null,
+                master, null, InventoryType.IMPORT, toIntQuantity(baseUnits), toIntQuantity(next),
+                note, null);
+        productCache.evictByBranch(shopId, branchId);
+        auditLogService.log(userId, shopId, bp.getId(), "BRANCH_PRODUCT", "INVENTORY_IMPORT_WEIGHT",
+                String.format("Nhập %d %s SP cân '%s' (SKU: %s) tại chi nhánh %s. Tồn cũ: %d, mới: %d.",
+                        baseUnits,
+                        com.example.sales.util.WeightUnitConverter.baseUnitLabel(master.getUnit()),
+                        master.getName(), master.getSku(), branchId, current, next));
+        return next;
+    }
+
+    @Override
+    @Transactional
+    public long exportProductWeight(String userId, String shopId, String branchId,
+                                    String branchProductId, double weight, String unit,
+                                    String note, String referenceId) {
+        long baseUnits = resolveBaseUnits(shopId, branchId, branchProductId, weight, unit);
+        return exportProductWeightBaseUnits(userId, shopId, branchId, branchProductId,
+                baseUnits, note, referenceId);
+    }
+
+    @Override
+    @Transactional
+    public long importProductWeight(String userId, String shopId, String branchId,
+                                    String branchProductId, double weight, String unit,
+                                    String note) {
+        long baseUnits = resolveBaseUnits(shopId, branchId, branchProductId, weight, unit);
+        return importProductWeightBaseUnits(userId, shopId, branchId, branchProductId,
+                baseUnits, note);
+    }
+
+    private long resolveBaseUnits(String shopId, String branchId, String branchProductId,
+                                  double weight, String unit) {
+        if (weight <= 0) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        BranchProduct bp = findBranchProduct(shopId, branchId, branchProductId);
+        Product master = getMasterProduct(bp.getProductId(), shopId);
+        String effectiveUnit = StringUtils.hasText(unit) ? unit : master.getUnit();
+        long baseUnits = com.example.sales.util.WeightUnitConverter
+                .toBaseUnits(weight, effectiveUnit);
+        if (baseUnits <= 0) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        return baseUnits;
+    }
+
+    /** InventoryTransaction.quantity/currentStock hiện là int; clamp để tránh overflow. */
+    private static int toIntQuantity(long v) {
+        if (v > Integer.MAX_VALUE) return Integer.MAX_VALUE;
+        if (v < Integer.MIN_VALUE) return Integer.MIN_VALUE;
+        return (int) v;
+    }
+
+    @Override
     public Page<InventoryTransactionResponse> getTransactionHistory(String userId, String shopId, String branchId, String branchProductId, Pageable pageable) {
         BranchProduct bp = findBranchProduct(shopId, branchId, branchProductId);
 

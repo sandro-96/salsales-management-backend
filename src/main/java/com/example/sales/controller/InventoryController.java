@@ -7,6 +7,7 @@ import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.inventory.InventoryRequest;
 import com.example.sales.dto.inventory.InventoryTransactionResponse;
+import com.example.sales.dto.inventory.InventoryWeightRequest;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
 import com.example.sales.service.InventoryService;
@@ -110,6 +111,48 @@ public class InventoryController {
                 request.getVariantId(), request.getQuantity(), request.getNote());
 
         return ApiResponseDto.success(ApiCode.SUCCESS, newQuantity);
+    }
+
+    // ✅ Endpoint nhập tồn theo cân (SP sellByWeight). Trả về tồn base unit mới.
+    @PostMapping("/import-weight")
+    @RequirePermission(Permission.INVENTORY_MANAGE)
+    @Operation(summary = "Nhập tồn kho theo cân cho SP sellByWeight",
+            description = "Payload dùng weight + unit (kg/g/l/ml). Server quy đổi về base unit (gram/ml) và trừ vào BranchProduct.stockInBaseUnits.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Nhập tồn thành công — trả về tồn base unit mới"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ (weight <= 0 hoặc SP không phải sellByWeight)"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền"),
+            @ApiResponse(responseCode = "404", description = "Shop/Branch/Product không tìm thấy")
+    })
+    public ApiResponseDto<Long> importWeight(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable String shopId,
+            @RequestBody @Valid InventoryWeightRequest request) {
+        long newStock = inventoryService.importProductWeight(
+                user.getId(), shopId, request.getBranchId(), request.getBranchProductId(),
+                request.getWeight(), request.getUnit(), request.getNote());
+        return ApiResponseDto.success(ApiCode.SUCCESS, newStock);
+    }
+
+    // ✅ Endpoint xuất tồn theo cân. Chủ yếu dùng cho kiểm kê / hao hụt; đơn hàng đi qua OrderService.
+    @PostMapping("/export-weight")
+    @RequirePermission(Permission.INVENTORY_MANAGE)
+    @Operation(summary = "Xuất tồn kho theo cân cho SP sellByWeight",
+            description = "Tương tự import-weight nhưng trừ tồn. Kiểm tra INSUFFICIENT_STOCK nếu không đủ.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xuất tồn thành công — trả về tồn base unit mới"),
+            @ApiResponse(responseCode = "400", description = "Không đủ tồn hoặc SP không phải sellByWeight"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền"),
+            @ApiResponse(responseCode = "404", description = "Shop/Branch/Product không tìm thấy")
+    })
+    public ApiResponseDto<Long> exportWeight(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable String shopId,
+            @RequestBody @Valid InventoryWeightRequest request) {
+        long newStock = inventoryService.exportProductWeight(
+                user.getId(), shopId, request.getBranchId(), request.getBranchProductId(),
+                request.getWeight(), request.getUnit(), request.getNote(), request.getReferenceId());
+        return ApiResponseDto.success(ApiCode.SUCCESS, newStock);
     }
 
     // ✅ Endpoint để lấy lịch sử giao dịch tồn kho

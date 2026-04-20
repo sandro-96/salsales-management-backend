@@ -29,10 +29,14 @@ public class BranchProductRequest {
     private double branchCostPrice; // Giá nhập tại chi nhánh
 
     @Min(value = 0, message = "Số lượng không được âm")
-    private int quantity; // Số lượng tồn kho tại chi nhánh
+    private int quantity; // Số lượng tồn kho tại chi nhánh (SP đếm đơn vị)
 
     @Min(value = 0, message = "Số lượng tối thiểu không được âm")
     private int minQuantity; // Ngưỡng cảnh báo tồn kho thấp
+
+    /** Tồn theo base unit (gram/ml) cho SP bán theo cân. Null = không thay đổi. */
+    @Min(value = 0, message = "Tồn base unit không được âm")
+    private Long stockInBaseUnits;
 
     private Double discountPrice; // Giá khuyến mãi (null = không có khuyến mãi)
     private Double discountPercentage; // Phần trăm giảm giá (null = không có)

@@ -1,5 +1,6 @@
 package com.example.sales.model;
 
+import com.example.sales.constant.AdminPermission;
 import com.example.sales.constant.Gender;
 import com.example.sales.constant.UserRole;
 import com.example.sales.model.base.BaseEntity;
@@ -15,6 +16,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -74,6 +77,13 @@ public class User extends BaseEntity {
     @Builder.Default
     private UserRole role = UserRole.ROLE_USER;
 
+    /**
+     * Chỉ dùng khi {@link #role} là {@link UserRole#ROLE_ADMIN}. Với user thường
+     * field này để rỗng. Dùng {@link EnumSet} để tiết kiệm và tuần tự hoá ổn định.
+     */
+    @Builder.Default
+    private Set<AdminPermission> adminPermissions = EnumSet.noneOf(AdminPermission.class);
+
     @JsonIgnore
     private String resetToken;
     private Instant resetTokenExpiry;
@@ -90,6 +100,11 @@ public class User extends BaseEntity {
 
     @Indexed(unique = true, sparse = true)
     private String googleId;
+
+    @JsonIgnore
+    private String totpSecret;
+    @Builder.Default
+    private boolean totpEnabled = false;
 
     @JsonIgnore
     public String getFullName() {

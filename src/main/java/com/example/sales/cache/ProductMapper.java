@@ -44,6 +44,7 @@ public class ProductMapper {
                 .priceHistory(product.getPriceHistory())
                 .active(product.isActive())
                 .trackInventory(product.isTrackInventory())
+                .sellByWeight(product.isSellByWeight())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt());
 
@@ -52,6 +53,7 @@ public class ProductMapper {
         if (branchProduct != null) {
             builder.id(branchProduct.getId())
                     .quantity(branchProduct.getQuantity())
+                    .stockInBaseUnits(branchProduct.getStockInBaseUnits())
                     .minQuantity(branchProduct.getMinQuantity())
                     .price(branchProduct.getPrice())
                     .branchCostPrice(branchProduct.getBranchCostPrice())

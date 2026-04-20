@@ -96,6 +96,7 @@ public enum ApiCode {
     CATALOG_NOT_FOUND("4152", "Barcode not found in catalog"),
     CATALOG_FOUND("2012", "Catalog entry found"),
     CATALOG_SAVED("2014", "Product catalog entry saved"),
+    CATALOG_DELETED("2016", "Product catalog entry deleted"),
     CATALOG_SEARCH_OK("2015", "Catalog search completed"),
     ORDER_TAX_PREVIEW("2013", "Order tax preview calculated"),
     PRODUCT_NOT_TRACK_INVENTORY("4153", "Product does not require inventory tracking"),
@@ -105,7 +106,10 @@ public enum ApiCode {
     ORDER_LINE_VARIANT_REQUIRED("4157", "This product has variants — variantId is required on each order line"),
     PRODUCT_VARIANT_NOT_FOUND("4158", "Variant not found for this branch product"),
     ORDER_LINE_VARIANT_NOT_ALLOWED("4159", "This product has no variants — variantId must not be sent"),
-    BARCODE_INVALID_GSIN("4160", "Mã vạch không hợp lệ chuẩn GS1 (sai chữ số kiểm tra). Hãy nhập đúng số in trên bao bì hoặc quét lại.");
+    BARCODE_INVALID_GSIN("4160", "Mã vạch không hợp lệ chuẩn GS1 (sai chữ số kiểm tra). Hãy nhập đúng số in trên bao bì hoặc quét lại."),
+    SUBSCRIPTION_EXPIRED("4161", "Gói dịch vụ đã hết hạn. Vui lòng thanh toán để tiếp tục sử dụng."),
+    SUBSCRIPTION_NOT_FOUND("4162", "Không tìm thấy gói dịch vụ của cửa hàng."),
+    PAYMENT_GATEWAY_ERROR("4163", "Không khởi tạo được cổng thanh toán, vui lòng thử lại sau.");
 
     private final String code;
     private final String message;

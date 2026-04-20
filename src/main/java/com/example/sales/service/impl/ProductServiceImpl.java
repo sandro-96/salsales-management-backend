@@ -265,7 +265,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         branchProduct.setExpiryDate(request.getExpiryDate());
         branchProduct.setVariants(request.getBranchVariants());
         if (product.isTrackInventory()) {
-            branchProduct.setQuantity(request.getQuantity());
+            if (product.isSellByWeight()) {
+                // SP bán theo cân dùng stockInBaseUnits; bỏ qua quantity.
+                if (request.getStockInBaseUnits() != null) {
+                    branchProduct.setStockInBaseUnits(request.getStockInBaseUnits());
+                }
+            } else {
+                branchProduct.setQuantity(request.getQuantity());
+            }
         }
         branchProduct = branchProductRepository.save(branchProduct);
 
@@ -538,6 +545,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .priceHistory(new ArrayList<>()) // Bắt đầu rỗng — history sẽ được ghi khi giá thay đổi
                 .active(request.isActive())
                 .trackInventory(request.isTrackInventory()) // Có theo dõi tồn kho không
+                .sellByWeight(request.isSellByWeight())
                 .build();
     }
 
@@ -561,6 +569,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         }
         existing.setActive(request.isActive());
         existing.setTrackInventory(request.isTrackInventory()); // Có theo dõi tồn kho không
+        existing.setSellByWeight(request.isSellByWeight());
         // priceHistory KHÔNG lấy từ request — được quản lý bởi appendProductPriceHistory()
     }
 

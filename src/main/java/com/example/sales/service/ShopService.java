@@ -33,6 +33,7 @@ public class ShopService extends BaseService {
     private final ShopCache shopCache;
     private final ShopUserService shopUserService;
     private final BranchService branchService;
+    private final SubscriptionService subscriptionService;
 
     public Shop createShop(String userId, ShopRequest request, String logoUrl) {
         if (shopRepository.existsByNameAndDeletedFalse(request.getName())) {
@@ -60,6 +61,8 @@ public class ShopService extends BaseService {
         shop.setSlug(generateUniqueShopSlug(baseSlug));
 
         Shop savedShop = shopRepository.save(shop);
+
+        subscriptionService.startTrial(savedShop);
 
         auditLogService.log(userId, savedShop.getId(), savedShop.getId(), "SHOP", "CREATED",
                 String.format("Tạo cửa hàng: %s (%s)", savedShop.getName(), savedShop.getType()));

@@ -131,11 +131,13 @@ public class OrderService extends BaseService {
                     reqItem.getVariantId(),
                     reqItem.getToppingIds(),
                     reqItem.getQuantity(),
+                    reqItem.getWeight(),
                     shopId,
                     branchId);
 
-            totals[0] += reqItem.getQuantity();
-            totals[1] += reqItem.getQuantity() * item.getPriceAfterDiscount();
+            double lineQty = effectiveLineQty(item);
+            totals[0] += lineQty;
+            totals[1] += lineQty * item.getPriceAfterDiscount();
 
             return item;
         }).toList();
@@ -160,7 +162,7 @@ public class OrderService extends BaseService {
 
         // Điều chỉnh tồn kho sau khi tạo đơn hàng
         for (OrderItem item : created.getItems()) {
-            if (item.isTrackInventory()) {
+            if (shouldAdjustInventory(item)) {
                 // Sử dụng BranchProduct ID để điều chỉnh tồn kho
                 inventoryService.exportProductQuantity(
                         userId, shopId, created.getBranchId(), item.getBranchProductId(),
@@ -168,6 +170,9 @@ public class OrderService extends BaseService {
                         item.getQuantity(),
                         "Xuất kho theo đơn hàng " + OrderDisplayUtils.displayOrderCode(created),
                         created.getId());
+            } else if (shouldAdjustWeightInventory(item)) {
+                exportWeightInventoryForLine(userId, shopId, created.getBranchId(),
+                        item, OrderDisplayUtils.displayOrderCode(created), created.getId());
             }
         }
         occupyTable(created);
@@ -190,12 +195,16 @@ public class OrderService extends BaseService {
 
         // Hoàn kho khi hủy đơn hàng nếu shop có quản lý tồn kho
         for (OrderItem item : order.getItems()) {
-            if (item.isTrackInventory()) {
+            if (shouldAdjustInventory(item)) {
                 inventoryService.importProductQuantity(
                         userId, shopId, order.getBranchId(), item.getBranchProductId(),
                         item.getVariantId(),
                         item.getQuantity(),
                         "Hoàn kho khi hủy đơn hàng " + OrderDisplayUtils.displayOrderCode(order));
+            } else if (shouldAdjustWeightInventory(item)) {
+                importWeightInventoryForLine(userId, shopId, order.getBranchId(), item,
+                        "Hoàn tồn cân khi hủy đơn hàng "
+                                + OrderDisplayUtils.displayOrderCode(order));
             }
         }
 
@@ -590,6 +599,10 @@ public class OrderService extends BaseService {
             if (moveQty > it.getQuantity()) {
                 throw new BusinessException(ApiCode.VALIDATION_ERROR);
             }
+            // Không cho tách dòng bán theo cân (quantity luôn = 1, không chia cân được bằng qty).
+            if (it.isSellByWeight()) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
             if (moveQty < it.getQuantity()) {
                 OrderItem kept = OrderItem.builder()
                         .productId(it.getProductId())
@@ -605,6 +618,9 @@ public class OrderService extends BaseService {
                         .priceAfterDiscount(it.getPriceAfterDiscount())
                         .appliedPromotionId(it.getAppliedPromotionId())
                         .trackInventory(it.isTrackInventory())
+                        .sellByWeight(it.isSellByWeight())
+                        .weight(it.getWeight())
+                        .weightUnit(it.getWeightUnit())
                         .toppings(it.getToppings())
                         .build();
                 remaining.add(kept);
@@ -623,6 +639,9 @@ public class OrderService extends BaseService {
                     .priceAfterDiscount(it.getPriceAfterDiscount())
                     .appliedPromotionId(it.getAppliedPromotionId())
                     .trackInventory(it.isTrackInventory())
+                    .sellByWeight(it.isSellByWeight())
+                    .weight(it.getWeight())
+                    .weightUnit(it.getWeightUnit())
                     .toppings(it.getToppings())
                     .build();
             moved.add(movedLine);
@@ -648,21 +667,25 @@ public class OrderService extends BaseService {
 
         double[] totalsNew = {0, 0};
         for (OrderItem it : moved) {
-            totalsNew[0] += it.getQuantity();
-            totalsNew[1] += it.getQuantity() * it.getPriceAfterDiscount();
+            double lineQty = effectiveLineQty(it);
+            totalsNew[0] += lineQty;
+            totalsNew[1] += lineQty * it.getPriceAfterDiscount();
         }
         newOrder.setTotalPrice(totalsNew[1]);
         orderTaxApplier.applyTax(newOrder);
         Order created = orderRepository.save(newOrder);
 
         for (OrderItem it : created.getItems()) {
-            if (it.isTrackInventory()) {
+            if (shouldAdjustInventory(it)) {
                 inventoryService.exportProductQuantity(
                         userId, shopId, created.getBranchId(), it.getBranchProductId(),
                         it.getVariantId(),
                         it.getQuantity(),
                         "Xuất kho theo tách đơn " + OrderDisplayUtils.displayOrderCode(created),
                         created.getId());
+            } else if (shouldAdjustWeightInventory(it)) {
+                exportWeightInventoryForLine(userId, shopId, created.getBranchId(), it,
+                        OrderDisplayUtils.displayOrderCode(created), created.getId());
             }
         }
         occupyTable(created);
@@ -676,6 +699,7 @@ public class OrderService extends BaseService {
                         .variantId(it.getVariantId())
                         .quantity(it.getQuantity())
                         .price(it.getPrice())
+                        .weight(it.getWeight())
                         .toppingIds(toppingIdsFromSnapshots(it.getToppings()))
                         .build()).toList())
                 .build();
@@ -791,6 +815,7 @@ public class OrderService extends BaseService {
 
         // Snapshot lines BEFORE cancelling sources (cancel mutates persisted orders)
         java.util.Map<String, Integer> qtyByKey = new java.util.HashMap<>();
+        java.util.Map<String, Double> weightByKey = new java.util.HashMap<>();
         java.util.Map<String, String> productIdByKey = new java.util.HashMap<>();
         java.util.Map<String, String> variantIdByKey = new java.util.HashMap<>();
         java.util.Map<String, List<String>> toppingIdsByKey = new java.util.HashMap<>();
@@ -802,6 +827,9 @@ public class OrderService extends BaseService {
                 }
                 String key = mergeLineKey(it);
                 qtyByKey.merge(key, it.getQuantity(), Integer::sum);
+                if (it.isSellByWeight() && it.getWeight() != null) {
+                    weightByKey.merge(key, it.getWeight(), Double::sum);
+                }
                 productIdByKey.putIfAbsent(key, it.getProductId().trim());
                 String vid = it.getVariantId();
                 variantIdByKey.putIfAbsent(key, StringUtils.hasText(vid) ? vid.trim() : "");
@@ -825,11 +853,14 @@ public class OrderService extends BaseService {
             if (!StringUtils.hasText(productId)) {
                 throw new BusinessException(ApiCode.VALIDATION_ERROR);
             }
+            Double mergedWeight = weightByKey.get(key);
+            int mergedQty = mergedWeight != null ? 1 : e.getValue();
             updItems.add(OrderUpdateRequest.OrderItemUpdateRequest.builder()
                     .productId(productId)
                     .variantId(variantId)
-                    .quantity(e.getValue())
+                    .quantity(mergedQty)
                     .price(0)
+                    .weight(mergedWeight)
                     .toppingIds(toppingIdsByKey.get(key))
                     .build());
         }
@@ -940,12 +971,16 @@ public class OrderService extends BaseService {
         if (request.getItems() != null && !request.getItems().isEmpty()) {
             // 🔁 1. Hoàn tác lại tồn kho theo đơn hàng cũ (nếu shop có quản lý tồn kho)
             for (OrderItem oldItem : order.getItems()) {
-                if (oldItem.isTrackInventory()) {
+                if (shouldAdjustInventory(oldItem)) {
                     inventoryService.importProductQuantity(
                         userId, shopId, order.getBranchId(), oldItem.getBranchProductId(), // Sử dụng BranchProduct ID
                         oldItem.getVariantId(),
                         oldItem.getQuantity(),
                         "Hoàn kho khi cập nhật đơn hàng " + OrderDisplayUtils.displayOrderCode(order));
+                } else if (shouldAdjustWeightInventory(oldItem)) {
+                    importWeightInventoryForLine(userId, shopId, order.getBranchId(), oldItem,
+                            "Hoàn tồn cân khi cập nhật đơn hàng "
+                                    + OrderDisplayUtils.displayOrderCode(order));
                 }
             }
             // 🔁 2. Áp dụng lại tồn kho cho danh sách mới và tính toán lại tổng tiền
@@ -972,20 +1007,25 @@ public class OrderService extends BaseService {
                         reqItem.getVariantId(),
                         reqItem.getToppingIds(),
                         reqItem.getQuantity(),
+                        reqItem.getWeight(),
                         shopId,
                         order.getBranchId());
 
                 // Trừ kho mới (nếu shop có quản lý tồn kho)
-                if (item.isTrackInventory()) {
+                if (shouldAdjustInventory(item)) {
                     inventoryService.exportProductQuantity(
                             userId, shopId, order.getBranchId(), item.getBranchProductId(), // Sử dụng BranchProduct ID
                             item.getVariantId(),
                             item.getQuantity(),
                             "Xuất kho khi cập nhật đơn hàng " + OrderDisplayUtils.displayOrderCode(order),
                             orderId);
+                } else if (shouldAdjustWeightInventory(item)) {
+                    exportWeightInventoryForLine(userId, shopId, order.getBranchId(), item,
+                            OrderDisplayUtils.displayOrderCode(order), orderId);
                 }
-                totals[0] += reqItem.getQuantity();
-                totals[1] += reqItem.getQuantity() * item.getPriceAfterDiscount();
+                double lineQty = effectiveLineQty(item);
+                totals[0] += lineQty;
+                totals[1] += lineQty * item.getPriceAfterDiscount();
                 return item;
             }).toList();    
 
@@ -1214,6 +1254,9 @@ public class OrderService extends BaseService {
                 .price(item.getPrice())
                 .priceAfterDiscount(item.getPriceAfterDiscount())
                 .appliedPromotionId(item.getAppliedPromotionId())
+                .sellByWeight(item.isSellByWeight())
+                .weight(item.getWeight())
+                .weightUnit(item.getWeightUnit())
                 .toppings(toppingResp)
                 .build();
     }
@@ -1229,6 +1272,7 @@ public class OrderService extends BaseService {
             String requestVariantId,
             List<String> requestToppingIds,
             int quantity,
+            Double weight,
             String shopId,
             String branchId) {
         validateOrderLineVariant(branchProduct, requestVariantId);
@@ -1259,6 +1303,21 @@ public class OrderService extends BaseService {
         String variantName = resolveVariantDisplayNameRich(masterProduct, effectiveVariantId);
         String sku = resolveLineSku(masterProduct, effectiveVariantId);
 
+        // Sản phẩm bán theo cân: dùng weight (bắt buộc > 0), quantity cố định = 1.
+        boolean sellByWeight = masterProduct.isSellByWeight();
+        int effectiveQuantity = sellByWeight ? 1 : quantity;
+        Double effectiveWeight = null;
+        String effectiveWeightUnit = null;
+        if (sellByWeight) {
+            if (weight == null || weight <= 0.0) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            effectiveWeight = weight;
+            effectiveWeightUnit = masterProduct.getUnit();
+        } else if (quantity < 1) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
         return OrderItem.builder()
                 .productId(masterProduct.getId())
                 .branchProductId(branchProduct.getId())
@@ -1266,15 +1325,65 @@ public class OrderService extends BaseService {
                 .productName(masterProduct.getName())
                 .variantName(variantName)
                 .sku(sku)
-                .quantity(quantity)
+                .quantity(effectiveQuantity)
                 .price(unitBeforePromo)
                 .priceAfterDiscount(finalPrice)
                 .appliedPromotionId(promoId)
                 .promotionName(promoName)
                 .promotionDiscountLabel(promoLabel)
                 .trackInventory(masterProduct.isTrackInventory())
+                .sellByWeight(sellByWeight)
+                .weight(effectiveWeight)
+                .weightUnit(effectiveWeightUnit)
                 .toppings(toppingSnapshots.isEmpty() ? null : toppingSnapshots)
                 .build();
+    }
+
+    /**
+     * Trả về "số lượng quy đổi" của dòng hàng để nhân với giá (subtotal).
+     * Dòng bán theo cân: dùng {@code weight}; ngược lại dùng {@code quantity}.
+     */
+    private static double effectiveLineQty(OrderItem item) {
+        if (item.isSellByWeight() && item.getWeight() != null) {
+            return item.getWeight();
+        }
+        return item.getQuantity();
+    }
+
+    /**
+     * Có theo dõi tồn kho cho dòng này không. Tạm thời bỏ qua tồn kho với sản phẩm bán theo cân
+     * vì {@code BranchProduct.quantity} hiện là số nguyên — cần refactor riêng để lưu decimal.
+     */
+    private static boolean shouldAdjustInventory(OrderItem item) {
+        return item.isTrackInventory() && !item.isSellByWeight();
+    }
+
+    /** Dòng SP bán theo cân có track tồn kho thì trừ/hoàn theo base unit. */
+    private static boolean shouldAdjustWeightInventory(OrderItem item) {
+        return item.isTrackInventory() && item.isSellByWeight()
+                && item.getWeight() != null && item.getWeight() > 0;
+    }
+
+    private void exportWeightInventoryForLine(String userId, String shopId, String branchId,
+                                              OrderItem item, String orderCode, String orderId) {
+        long baseUnits = com.example.sales.util.WeightUnitConverter
+                .toBaseUnits(item.getWeight(), item.getWeightUnit());
+        if (baseUnits <= 0) return;
+        inventoryService.exportProductWeightBaseUnits(
+                userId, shopId, branchId, item.getBranchProductId(),
+                baseUnits,
+                "Xuất tồn cân theo đơn hàng " + orderCode,
+                orderId);
+    }
+
+    private void importWeightInventoryForLine(String userId, String shopId, String branchId,
+                                              OrderItem item, String reason) {
+        long baseUnits = com.example.sales.util.WeightUnitConverter
+                .toBaseUnits(item.getWeight(), item.getWeightUnit());
+        if (baseUnits <= 0) return;
+        inventoryService.importProductWeightBaseUnits(
+                userId, shopId, branchId, item.getBranchProductId(),
+                baseUnits, reason);
     }
 
     private List<OrderLineTopping> resolveToppingSnapshots(Shop shop, Product product, List<String> requestedRaw) {

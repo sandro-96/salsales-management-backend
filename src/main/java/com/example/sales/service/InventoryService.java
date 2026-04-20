@@ -49,6 +49,39 @@ public interface InventoryService {
     int adjustProductQuantity(String userId, String shopId, String branchId, String branchProductId, String variantId, int newQuantity, String note);
 
     /**
+     * Trừ tồn kho theo base unit (gram/ml) cho sản phẩm bán theo cân.
+     * Tạo {@link com.example.sales.constant.InventoryType#EXPORT}.
+     * Lưu ý: tham số không dùng variant vì SP bán theo cân hiện chưa hỗ trợ biến thể.
+     *
+     * @param baseUnits Số base unit trừ đi (phải &gt; 0).
+     * @return Tồn base unit mới.
+     */
+    long exportProductWeightBaseUnits(String userId, String shopId, String branchId,
+                                      String branchProductId, long baseUnits,
+                                      String note, String referenceId);
+
+    /**
+     * Hoàn tồn kho theo base unit (gram/ml) — dùng khi huỷ hoặc chỉnh đơn.
+     *
+     * @return Tồn base unit mới.
+     */
+    long importProductWeightBaseUnits(String userId, String shopId, String branchId,
+                                      String branchProductId, long baseUnits,
+                                      String note);
+
+    /**
+     * Xuất/nhập theo đơn vị tự nhiên (kg/g/l/ml). Server tự quy đổi sang base unit.
+     * Nếu {@code unit = null} → dùng {@code Product.unit} của SP.
+     */
+    long exportProductWeight(String userId, String shopId, String branchId,
+                             String branchProductId, double weight, String unit,
+                             String note, String referenceId);
+
+    long importProductWeight(String userId, String shopId, String branchId,
+                             String branchProductId, double weight, String unit,
+                             String note);
+
+    /**
      * Lấy lịch sử giao dịch tồn kho cho một sản phẩm cụ thể.
      *
      * @param branchProductId ID của BranchProduct (sản phẩm chi nhánh).

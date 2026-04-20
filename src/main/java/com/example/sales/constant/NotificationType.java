@@ -25,5 +25,6 @@ public enum NotificationType {
     BILLING_PAYMENT_FAILED,
 
     // Generic
-    SYSTEM
+    SYSTEM,
+    BROADCAST
 }
