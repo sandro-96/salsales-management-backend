@@ -1,7 +1,6 @@
 // File: src/main/java/com/example/sales/security/SubscriptionGuardInterceptor.java
 package com.example.sales.security;
 
-import com.example.sales.cache.ShopCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.SubscriptionStatus;
 import com.example.sales.constant.UserRole;
@@ -9,6 +8,7 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.Subscription;
 import com.example.sales.repository.SubscriptionRepository;
+import com.example.sales.service.ShopContextResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +49,7 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
     );
 
     private final SubscriptionRepository subscriptionRepository;
-    private final ShopCache shopCache;
+    private final ShopContextResolver shopContextResolver;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -67,11 +67,10 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
         // Admin (kể cả đang impersonate) không bị guard — admin không vận hành POS.
         if (user.getRole() == UserRole.ROLE_ADMIN || user.isImpersonating()) return true;
 
-        Shop shop;
-        try {
-            shop = shopCache.getShopByOwner(user.getId());
-        } catch (BusinessException ex) {
-            // User không gắn với shop nào (admin cũ, hoặc user staff không có shop) → không chặn.
+        String hint = ShopContextResolver.shopIdHintFrom(request);
+        Shop shop = shopContextResolver.resolveShopForWriteGuard(user.getId(), hint);
+        if (shop == null) {
+            // Không phải chủ shop (VD nhân viên) hoặc không suy ra được shop → không áp guard theo subscription owner.
             return true;
         }
 

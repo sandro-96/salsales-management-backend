@@ -23,6 +23,8 @@ public enum NotificationType {
     BILLING_INVOICE_CREATED,
     BILLING_PAYMENT_SUCCESS,
     BILLING_PAYMENT_FAILED,
+    /** Shop đã bấm thanh toán CK — chờ admin xác nhận (mã MANUAL-…). */
+    BILLING_MANUAL_TRANSFER_PENDING,
 
     // Generic
     SYSTEM,

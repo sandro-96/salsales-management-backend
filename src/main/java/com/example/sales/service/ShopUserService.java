@@ -10,6 +10,7 @@ import com.example.sales.dto.shopUser.ShopMemberResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
+import com.example.sales.model.Subscription;
 import com.example.sales.model.StaffProfile;
 import com.example.sales.model.User;
 import com.example.sales.repository.ShopRepository;
@@ -33,6 +34,7 @@ public class ShopUserService extends BaseService {
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
     private final ShopUserCache shopUserCache;
+    private final SubscriptionService subscriptionService;
     private final UserRepository userRepository;
     private final StaffProfileRepository staffProfileRepository;
 
@@ -203,6 +205,7 @@ public class ShopUserService extends BaseService {
         List<Shop> shops = shopRepository.findByIdInAndDeletedFalse(shopIds);
         Map<String, Shop> shopMap = shops.stream()
                 .collect(Collectors.toMap(Shop::getId, Function.identity()));
+        Map<String, Subscription> subByShop = subscriptionService.mapSubscriptionsByShopId(shopIds);
 
         List<ShopSimpleResponse> shopResponses = shopUsers.getContent().stream()
                 .map(su -> shopMap.get(su.getShopId()))
@@ -214,7 +217,8 @@ public class ShopUserService extends BaseService {
                             .orElse(null);
 
                     Set<Permission> perms = resolvePermissions(su);
-                    return ShopSimpleResponse.builder()
+                    Subscription sub = subByShop.get(shop.getId());
+                    var b = ShopSimpleResponse.builder()
                             .id(shop.getId())
                             .name(shop.getName())
                             .type(shop.getType())
@@ -233,8 +237,12 @@ public class ShopUserService extends BaseService {
                             .permissions(perms)
                             .industry(shop.getType().getIndustry())
                             .businessModel(shop.getBusinessModel())
-                            .slug(shop.getSlug())
-                            .build();
+                            .slug(shop.getSlug());
+                    if (sub != null) {
+                        b.subscriptionStatus(sub.getStatus())
+                                .subscriptionDaysRemaining(subscriptionService.computeDaysRemainingForList(sub));
+                    }
+                    return b.build();
                 })
                 .toList();
 

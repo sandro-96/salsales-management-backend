@@ -40,4 +40,9 @@ public class SubscriptionDto {
 
     private LocalDateTime lastPaymentAt;
     private String lastPaymentTransactionId;
+
+    /** Mã giao dịch MANUAL đang PENDING (nếu có). */
+    private String pendingManualProviderTxnRef;
+    /** Thời điểm shop báo đã CK (cùng giao dịch {@link #pendingManualProviderTxnRef}). */
+    private LocalDateTime pendingManualShopReportedAt;
 }

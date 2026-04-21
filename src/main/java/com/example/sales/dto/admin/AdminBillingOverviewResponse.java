@@ -29,6 +29,9 @@ public class AdminBillingOverviewResponse {
     private long expiringIn7Days;
     private long expiredUnrenewed;
 
+    /** Số giao dịch MANUAL đang PENDING (chờ admin xác nhận sau CK). */
+    private long pendingManualTransferCount;
+
     private Map<SubscriptionStatus, Long> subscriptionStatusDistribution;
 
     private List<MonthlyPoint> mrrTrend;

@@ -7,6 +7,7 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.model.PaymentTransaction;
 import com.example.sales.repository.PaymentTransactionRepository;
 import com.example.sales.service.SubscriptionService;
+import com.example.sales.service.admin.AdminBillingService;
 import com.example.sales.service.payment.MoMoGateway;
 import com.example.sales.service.payment.VNPayGateway;
 import com.example.sales.util.SignatureUtil;
@@ -50,6 +51,7 @@ public class WebhookController {
     private final PaymentTransactionRepository txnRepository;
     private final VNPayGateway vnPayGateway;
     private final MoMoGateway momoGateway;
+    private final AdminBillingService adminBillingService;
 
     @Value("${webhook.secret}")
     private String webhookSecret;
@@ -108,6 +110,7 @@ public class WebhookController {
         txn.setCompletedAt(LocalDateTime.now());
         txn.setRawCallback(stringify(params));
         txnRepository.save(txn);
+        adminBillingService.invalidateOverviewCache();
 
         return vnpayResponse("00", "Confirm Success");
     }
@@ -163,6 +166,7 @@ public class WebhookController {
         txn.setCompletedAt(LocalDateTime.now());
         txn.setRawCallback(stringify(payload));
         txnRepository.save(txn);
+        adminBillingService.invalidateOverviewCache();
 
         return ResponseEntity.ok(Map.of("message", "confirm success", "resultCode", 0));
     }
@@ -200,6 +204,7 @@ public class WebhookController {
             }
 
             subscriptionService.recordPayment(shopId, transactionId, gateway, null);
+            adminBillingService.invalidateOverviewCache();
             log.info("✅ Subscription payment recorded for shop {} (tx={}, gw={})",
                     shopId, transactionId, gateway);
         } catch (Exception e) {
@@ -232,6 +237,7 @@ public class WebhookController {
         txn.setCompletedAt(LocalDateTime.now());
         txn.setRawCallback(stringify(rawPayload));
         txnRepository.save(txn);
+        adminBillingService.invalidateOverviewCache();
         log.warn("[Webhook] txn {} đánh dấu FAILED: {}", txn.getProviderTxnRef(), reason);
     }
 

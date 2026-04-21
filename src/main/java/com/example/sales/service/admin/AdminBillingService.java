@@ -85,6 +85,11 @@ public class AdminBillingService {
         return data;
     }
 
+    /** Xoá snapshot overview (sau khi có thay đổi billing / payment transaction). */
+    public void invalidateOverviewCache() {
+        cache.set(null);
+    }
+
     private AdminBillingOverviewResponse compute(int months) {
         LocalDateTime nowDt = LocalDateTime.now();
         LocalDateTime in7Days = nowDt.plusDays(7);
@@ -112,6 +117,12 @@ public class AdminBillingService {
                 Subscription.class);
 
         long mrr = activePaidShops * SubscriptionService.BASIC_AMOUNT_VND;
+
+        long pendingManual = mongoTemplate.count(
+                Query.query(Criteria.where("deleted").is(false)
+                        .and("gateway").is(PaymentGatewayType.MANUAL.name())
+                        .and("status").is(PaymentTransactionStatus.PENDING.name())),
+                PaymentTransaction.class);
 
         List<YearMonth> buckets = buildMonthBuckets(months);
         LocalDateTime fromDt = buckets.get(0).atDay(1).atStartOfDay();
@@ -149,6 +160,7 @@ public class AdminBillingService {
                 .trialShops(trialShops)
                 .expiringIn7Days(expiringSoon)
                 .expiredUnrenewed(expiredUnrenewed)
+                .pendingManualTransferCount(pendingManual)
                 .subscriptionStatusDistribution(distribution)
                 .mrrTrend(toMonthlyPoints(mrrDeltaMap))
                 .newSubscriptions(toMonthlyPoints(newSubsMap))
@@ -266,6 +278,7 @@ public class AdminBillingService {
                         .failureReason(t.getFailureReason())
                         .createdAt(t.getCreatedAt())
                         .completedAt(t.getCompletedAt())
+                        .shopReportedTransferAt(t.getShopReportedTransferAt())
                         .build()
         ).toList();
 
@@ -318,6 +331,7 @@ public class AdminBillingService {
         PaymentTransaction saved = mongoTemplate.save(txn);
         log.info("[AdminBilling] Admin resolved txn id={} ref={} → {} reason={}",
                 saved.getId(), saved.getProviderTxnRef(), newStatus, reason);
+        invalidateOverviewCache();
 
         String shopName = null;
         if (StringUtils.hasText(saved.getShopId())) {
@@ -340,6 +354,7 @@ public class AdminBillingService {
                 .failureReason(saved.getFailureReason())
                 .createdAt(saved.getCreatedAt())
                 .completedAt(saved.getCompletedAt())
+                .shopReportedTransferAt(saved.getShopReportedTransferAt())
                 .build();
     }
 
@@ -446,7 +461,7 @@ public class AdminBillingService {
             }
         }
 
-        return AdminPaymentTransactionResyncResponse.builder()
+        AdminPaymentTransactionResyncResponse out = AdminPaymentTransactionResyncResponse.builder()
                 .gatewayStatus(result.status().name())
                 .applied(applied)
                 .gatewayAmountVnd(result.amountVnd())
@@ -454,6 +469,8 @@ public class AdminBillingService {
                 .gatewayMessage(result.message())
                 .transaction(toItem(txn))
                 .build();
+        invalidateOverviewCache();
+        return out;
     }
 
     private AdminPaymentTransactionItem toItem(PaymentTransaction t) {
@@ -478,6 +495,7 @@ public class AdminBillingService {
                 .failureReason(t.getFailureReason())
                 .createdAt(t.getCreatedAt())
                 .completedAt(t.getCompletedAt())
+                .shopReportedTransferAt(t.getShopReportedTransferAt())
                 .build();
     }
 

@@ -72,4 +72,8 @@ public class PaymentTransaction extends BaseEntity {
 
     /** Thời điểm gateway xác nhận (SUCCESS/FAILED/CANCELLED). */
     private LocalDateTime completedAt;
+
+    /** Shop chủ động báo đã chuyển khoản (chờ admin đối soát) — không thay status. */
+    private LocalDateTime shopReportedTransferAt;
+    private String shopReportedTransferByUserId;
 }

@@ -3,6 +3,7 @@ package com.example.sales.service.admin;
 
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.PaymentGatewayType;
+import com.example.sales.constant.PaymentTransactionStatus;
 import com.example.sales.constant.SubscriptionStatus;
 import com.example.sales.dto.admin.AdminShopDetail;
 import com.example.sales.dto.admin.AdminShopMarkPaidRequest;
@@ -12,11 +13,13 @@ import com.example.sales.dto.admin.AdminShopStatusUpdateRequest;
 import com.example.sales.dto.admin.AdminShopSummary;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.Order;
+import com.example.sales.model.PaymentTransaction;
 import com.example.sales.model.Shop;
 import com.example.sales.model.Subscription;
 import com.example.sales.model.SubscriptionHistory;
 import com.example.sales.model.User;
 import com.example.sales.repository.BranchRepository;
+import com.example.sales.repository.PaymentTransactionRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.repository.SubscriptionHistoryRepository;
@@ -28,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -61,6 +65,8 @@ public class AdminShopService {
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final SubscriptionService subscriptionService;
+    private final PaymentTransactionRepository paymentTransactionRepository;
+    private final AdminBillingService adminBillingService;
 
     public Page<AdminShopSummary> list(Pageable pageable, String status, SubscriptionStatus subStatus, String keyword) {
         Criteria criteria = Criteria.where("deleted").is(false);
@@ -131,6 +137,16 @@ public class AdminShopService {
 
         shopUserRepository.getClass();
 
+        Query pendingManualQuery = Query.query(
+                Criteria.where("shopId").is(shopId)
+                        .and("deleted").is(false)
+                        .and("gateway").is(PaymentGatewayType.MANUAL)
+                        .and("status").is(PaymentTransactionStatus.PENDING)
+        ).with(Sort.by(Sort.Direction.DESC, "createdAt"));
+        PaymentTransaction pendingManual = mongoTemplate.findOne(pendingManualQuery, PaymentTransaction.class);
+        boolean hasPendingManualBilling = pendingManual != null;
+        String pendingManualProviderTxnRef = pendingManual != null ? pendingManual.getProviderTxnRef() : null;
+
         return AdminShopDetail.builder()
                 .summary(summary)
                 .branchCount(branchCount)
@@ -138,6 +154,8 @@ public class AdminShopService {
                 .totalOrderCount(totalOrders)
                 .orderCountLast30d(ordersLast30)
                 .subscriptionHistory(history)
+                .hasPendingManualBilling(hasPendingManualBilling)
+                .pendingManualProviderTxnRef(pendingManualProviderTxnRef)
                 .build();
     }
 
@@ -182,7 +200,17 @@ public class AdminShopService {
         PaymentGatewayType gw = req != null && req.getGateway() != null
                 ? req.getGateway() : PaymentGatewayType.MANUAL;
         subscriptionService.recordPayment(shopId, tx, gw, adminId);
+        paymentTransactionRepository.findByProviderTxnRef(tx).ifPresent(pt -> {
+            if (pt.getGateway() == PaymentGatewayType.MANUAL
+                    && pt.getStatus() == PaymentTransactionStatus.PENDING) {
+                pt.setStatus(PaymentTransactionStatus.SUCCESS);
+                pt.setCompletedAt(LocalDateTime.now());
+                pt.setFailureReason(null);
+                paymentTransactionRepository.save(pt);
+            }
+        });
         log.info("[AdminShop] {} markPaid shop={} tx={} gw={}", adminId, shopId, tx, gw);
+        adminBillingService.invalidateOverviewCache();
         return detail(shopId);
     }
 

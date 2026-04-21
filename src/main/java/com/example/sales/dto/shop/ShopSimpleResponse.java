@@ -30,4 +30,9 @@ public class ShopSimpleResponse {
     private ShopRole role;
     private ShopIndustry industry;
     private Set<Permission> permissions;
+
+    /** Gói subscription (nếu đã có bản ghi). */
+    private SubscriptionStatus subscriptionStatus;
+    /** Ngày còn lại trial hoặc chu kỳ ACTIVE; null nếu chưa có subscription. */
+    private Long subscriptionDaysRemaining;
 }

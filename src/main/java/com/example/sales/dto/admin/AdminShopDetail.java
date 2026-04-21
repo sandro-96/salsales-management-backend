@@ -26,4 +26,8 @@ public class AdminShopDetail {
     private long totalOrderCount;
     private long orderCountLast30d;
     private List<SubscriptionHistory> subscriptionHistory;
+    /** Có giao dịch MANUAL đang PENDING (chờ admin xác nhận chuyển khoản). */
+    private boolean hasPendingManualBilling;
+    /** Mã tham chiếu giao dịch MANUAL mới nhất đang chờ (để admin dán khớp). */
+    private String pendingManualProviderTxnRef;
 }

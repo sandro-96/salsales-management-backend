@@ -14,6 +14,8 @@ import java.util.Optional;
 
 public interface ShopRepository extends MongoRepository<Shop, String> {
     Optional<Shop> findByOwnerIdAndDeletedFalse(String ownerId);
+
+    List<Shop> findAllByOwnerIdAndDeletedFalse(String ownerId);
     Optional<Shop> findByIdAndDeletedFalse(String id);
     Optional<Shop> findBySlugAndDeletedFalse(String slug);
     List<Shop> findByPlanExpiryBeforeAndPlanNot(LocalDateTime date, SubscriptionPlan plan);

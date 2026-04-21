@@ -112,6 +112,10 @@ public class NotificationRouter {
                 .channel(NotificationChannel.IN_APP, ChannelPlan.inApp())
                 .build());
 
+        t.put(NotificationType.BILLING_MANUAL_TRANSFER_PENDING, RouteConfig.builder()
+                .channel(NotificationChannel.IN_APP, ChannelPlan.inApp())
+                .build());
+
         // Order — mặc định chỉ in-app (không spam email)
         for (NotificationType type : new NotificationType[]{
                 NotificationType.ORDER_CREATED,

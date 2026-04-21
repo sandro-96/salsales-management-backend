@@ -22,4 +22,6 @@ public class AdminPaymentTransactionItem {
     private String failureReason;
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
+    /** Shop báo đã chuyển khoản (MANUAL PENDING). */
+    private LocalDateTime shopReportedTransferAt;
 }

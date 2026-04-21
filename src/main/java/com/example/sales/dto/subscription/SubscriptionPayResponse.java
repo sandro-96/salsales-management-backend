@@ -18,4 +18,7 @@ public class SubscriptionPayResponse {
     private String paymentUrl;
     private String transactionId;
     private long amountVnd;
+
+    /** Chỉ có khi gateway = MANUAL và đã cấu hình {@code app.billing.transfer}. */
+    private SubscriptionTransferInstructionsDto transferInstructions;
 }

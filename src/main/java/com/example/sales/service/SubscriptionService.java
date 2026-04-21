@@ -4,24 +4,37 @@ package com.example.sales.service;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.NotificationType;
 import com.example.sales.constant.PaymentGatewayType;
+import com.example.sales.constant.PaymentTransactionStatus;
 import com.example.sales.constant.SubscriptionActionType;
 import com.example.sales.constant.SubscriptionStatus;
+import com.example.sales.constant.UserRole;
 import com.example.sales.dto.notification.NotificationEnvelope;
 import com.example.sales.dto.subscription.SubscriptionDto;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.model.PaymentTransaction;
 import com.example.sales.model.Shop;
 import com.example.sales.model.Subscription;
 import com.example.sales.model.SubscriptionHistory;
+import com.example.sales.model.User;
+import com.example.sales.repository.PaymentTransactionRepository;
 import com.example.sales.repository.ShopRepository;
+import com.example.sales.repository.UserRepository;
 import com.example.sales.repository.SubscriptionHistoryRepository;
 import com.example.sales.repository.SubscriptionRepository;
 import com.example.sales.service.notification.NotificationDispatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Nguồn sự thật cho trạng thái billing của shop (TRIAL → ACTIVE → EXPIRED).
@@ -46,7 +59,12 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionHistoryRepository historyRepository;
     private final ShopRepository shopRepository;
+    private final UserRepository userRepository;
     private final NotificationDispatcher notificationDispatcher;
+    private final PaymentTransactionRepository paymentTransactionRepository;
+
+    private static final DateTimeFormatter FMT_DT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter FMT_D = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /**
      * Lấy (hoặc tạo mới) subscription cho shop. Khi shop vừa tạo mà chưa có subscription
@@ -121,23 +139,95 @@ public class SubscriptionService {
                 .build();
         historyRepository.save(history);
 
+        String successMsg = "Shop \"" + shop.getName() + "\" đã được gia hạn tới ngày "
+                + nextEnd.toLocalDate().format(FMT_D) + ". "
+                + "Ghi nhận thanh toán lúc " + now.format(FMT_DT) + ". "
+                + "Chu kỳ hiện tại kết thúc: " + nextEnd.format(FMT_DT) + ".";
+
         notificationDispatcher.dispatch(NotificationEnvelope.builder()
                 .type(NotificationType.BILLING_PAYMENT_SUCCESS)
                 .shopId(shopId)
                 .recipient(shop.getOwnerId())
                 .title("Thanh toán thành công")
-                .message("Shop \"" + shop.getName() + "\" đã được gia hạn tới "
-                        + nextEnd.toLocalDate() + ".")
+                .message(successMsg)
                 .referenceId(history.getId())
                 .referenceType("SUBSCRIPTION")
                 .templateVar("shopName", shop.getName())
                 .templateVar("amount", String.valueOf(BASIC_AMOUNT_VND))
-                .templateVar("until", String.valueOf(nextEnd.toLocalDate()))
+                .templateVar("until", nextEnd.toLocalDate().format(FMT_D))
+                .templateVar("paidAt", now.format(FMT_DT))
+                .templateVar("periodEndAt", nextEnd.format(FMT_DT))
                 .dedupeKey("BILLING_PAYMENT_SUCCESS:" + history.getId())
                 .build());
         log.info("[Subscription] shop {} gia hạn ACTIVE tới {} (tx={}, gw={})",
                 shopId, nextEnd, transactionId, gateway);
         return sub;
+    }
+
+    /**
+     * Shop báo đã chuyển khoản — chỉ ghi timestamp, không đổi trạng thái giao dịch (vẫn PENDING tới khi admin xác nhận).
+     */
+    public void reportShopManualTransferSent(String shopId, String userId, String providerTxnRefOpt) {
+        PaymentTransaction txn = resolvePendingManualTxnForShop(shopId, providerTxnRefOpt);
+        if (txn == null) {
+            throw new BusinessException(ApiCode.NOT_FOUND);
+        }
+        if (txn.getShopReportedTransferAt() != null) {
+            return;
+        }
+        txn.setShopReportedTransferAt(LocalDateTime.now());
+        txn.setShopReportedTransferByUserId(userId);
+        paymentTransactionRepository.save(txn);
+        log.info("[Subscription] shop {} báo đã CK ref={} user={}", shopId, txn.getProviderTxnRef(), userId);
+    }
+
+    private PaymentTransaction resolvePendingManualTxnForShop(String shopId, String providerTxnRefOpt) {
+        if (StringUtils.hasText(providerTxnRefOpt)) {
+            return paymentTransactionRepository.findByProviderTxnRef(providerTxnRefOpt.trim())
+                    .filter(t -> shopId.equals(t.getShopId())
+                            && !t.isDeleted()
+                            && t.getGateway() == PaymentGatewayType.MANUAL
+                            && t.getStatus() == PaymentTransactionStatus.PENDING)
+                    .orElse(null);
+        }
+        return paymentTransactionRepository
+                .findByShopIdAndStatusOrderByCreatedAtDesc(shopId, PaymentTransactionStatus.PENDING)
+                .stream()
+                .filter(t -> !t.isDeleted() && t.getGateway() == PaymentGatewayType.MANUAL)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Gửi thông báo tới mọi user ROLE_ADMIN: có yêu cầu chuyển khoản subscription cần xác nhận.
+     */
+    public void notifyAdminsManualTransferPending(Shop shop, String transactionId, long amountVnd) {
+        List<User> admins = userRepository.findByRoleAndDeletedFalse(UserRole.ROLE_ADMIN);
+        if (admins.isEmpty()) {
+            log.warn("[Subscription] không có ROLE_ADMIN — bỏ qua thông báo CK chờ shop {}", shop.getId());
+            return;
+        }
+        String amountStr = String.format("%,d", amountVnd);
+        String msg = "Shop \"" + shop.getName() + "\" (" + shop.getId() + ") đã tạo yêu cầu chuyển khoản "
+                + amountStr + " ₫. Nội dung / mã tham chiếu: " + transactionId
+                + ". Vui lòng đối soát sao kê và xác nhận trên trang admin shop.";
+
+        NotificationEnvelope.NotificationEnvelopeBuilder b = NotificationEnvelope.builder()
+                .type(NotificationType.BILLING_MANUAL_TRANSFER_PENDING)
+                .shopId(shop.getId())
+                .title("Chờ xác nhận chuyển khoản subscription")
+                .message(msg)
+                .referenceId(transactionId)
+                .referenceType("PAYMENT_TRANSACTION")
+                .templateVar("shopName", shop.getName())
+                .templateVar("shopId", shop.getId())
+                .templateVar("transactionId", transactionId)
+                .templateVar("amount", amountStr)
+                .dedupeKey("BILLING_MANUAL_PENDING:" + transactionId);
+        for (User a : admins) {
+            b.recipient(a.getId());
+        }
+        notificationDispatcher.dispatch(b.build());
     }
 
     /** Admin gia hạn thủ công (không thanh toán) — thêm {@code months} tháng vào currentPeriodEnd. */
@@ -238,7 +328,7 @@ public class SubscriptionService {
                 periodDays = Math.max(periodDays, 1);
             }
         }
-        return SubscriptionDto.builder()
+        SubscriptionDto.SubscriptionDtoBuilder b = SubscriptionDto.builder()
                 .shopId(sub.getShopId())
                 .status(sub.getStatus())
                 .trialStartsAt(sub.getTrialStartsAt())
@@ -251,12 +341,58 @@ public class SubscriptionService {
                 .amountVnd(sub.getAmountVnd())
                 .gateway(sub.getGateway())
                 .lastPaymentAt(sub.getLastPaymentAt())
-                .lastPaymentTransactionId(sub.getLastPaymentTransactionId())
-                .build();
+                .lastPaymentTransactionId(sub.getLastPaymentTransactionId());
+        attachPendingManualForShop(b, sub.getShopId());
+        return b.build();
+    }
+
+    private void attachPendingManualForShop(SubscriptionDto.SubscriptionDtoBuilder b, String shopId) {
+        PaymentTransaction pending = paymentTransactionRepository
+                .findByShopIdAndStatusOrderByCreatedAtDesc(shopId, PaymentTransactionStatus.PENDING)
+                .stream()
+                .filter(t -> !t.isDeleted() && t.getGateway() == PaymentGatewayType.MANUAL)
+                .findFirst()
+                .orElse(null);
+        if (pending != null) {
+            b.pendingManualProviderTxnRef(pending.getProviderTxnRef())
+                    .pendingManualShopReportedAt(pending.getShopReportedTransferAt());
+        }
     }
 
     public Subscription getByShopId(String shopId) {
         return subscriptionRepository.findByShopId(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SUBSCRIPTION_NOT_FOUND));
+    }
+
+    /**
+     * Số ngày còn trial hoặc chu kỳ ACTIVE — dùng list shop (read-only, không ensure subscription).
+     */
+    public long computeDaysRemainingForList(Subscription sub) {
+        LocalDateTime now = LocalDateTime.now();
+        if (sub.getStatus() == SubscriptionStatus.TRIAL && sub.getTrialEndsAt() != null) {
+            long trialDays = Math.max(0L, ChronoUnit.DAYS.between(now, sub.getTrialEndsAt()));
+            if (sub.getTrialEndsAt().isAfter(now)
+                    && ChronoUnit.SECONDS.between(now, sub.getTrialEndsAt()) > 0) {
+                trialDays = Math.max(trialDays, 1L);
+            }
+            return trialDays;
+        }
+        if (sub.getStatus() == SubscriptionStatus.ACTIVE && sub.getCurrentPeriodEnd() != null) {
+            long periodDays = Math.max(0L, ChronoUnit.DAYS.between(now, sub.getCurrentPeriodEnd()));
+            if (sub.getCurrentPeriodEnd().isAfter(now)
+                    && ChronoUnit.SECONDS.between(now, sub.getCurrentPeriodEnd()) > 0) {
+                periodDays = Math.max(periodDays, 1L);
+            }
+            return periodDays;
+        }
+        return 0L;
+    }
+
+    public Map<String, Subscription> mapSubscriptionsByShopId(Collection<String> shopIds) {
+        if (shopIds == null || shopIds.isEmpty()) {
+            return Map.of();
+        }
+        return subscriptionRepository.findByShopIdIn(shopIds).stream()
+                .collect(Collectors.toMap(Subscription::getShopId, Function.identity(), (a, b) -> a));
     }
 }

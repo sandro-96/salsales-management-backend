@@ -9,6 +9,7 @@ import com.example.sales.exception.BusinessException;
 import com.example.sales.model.PaymentTransaction;
 import com.example.sales.repository.PaymentTransactionRepository;
 import com.example.sales.service.SubscriptionService;
+import com.example.sales.service.admin.AdminBillingService;
 import com.example.sales.service.payment.MoMoGateway;
 import com.example.sales.service.payment.VNPayGateway;
 import com.example.sales.util.PaymentSignatureUtil;
@@ -74,7 +75,8 @@ class WebhookControllerIdempotencyTest {
                 new ObjectMapper(),
                 txnRepository,
                 vnPayGateway,
-                moMoGateway
+                moMoGateway,
+                mock(AdminBillingService.class)
         );
     }
 

@@ -6,12 +6,15 @@ import com.example.sales.model.Subscription;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface SubscriptionRepository extends MongoRepository<Subscription, String> {
 
     Optional<Subscription> findByShopId(String shopId);
+
+    List<Subscription> findByShopIdIn(Collection<String> shopIds);
 
     List<Subscription> findByStatusAndTrialEndsAtBefore(SubscriptionStatus status, LocalDateTime cutoff);
 
