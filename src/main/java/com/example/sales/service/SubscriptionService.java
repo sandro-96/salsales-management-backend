@@ -178,7 +178,34 @@ public class SubscriptionService {
         txn.setShopReportedTransferAt(LocalDateTime.now());
         txn.setShopReportedTransferByUserId(userId);
         paymentTransactionRepository.save(txn);
+        shopRepository.findByIdAndDeletedFalse(shopId).ifPresent(shop ->
+                notifyAdminsManualTransferPending(shop, txn.getProviderTxnRef(), txn.getAmountVnd()));
         log.info("[Subscription] shop {} báo đã CK ref={} user={}", shopId, txn.getProviderTxnRef(), userId);
+    }
+
+    /**
+     * Shop huỷ yêu cầu chuyển khoản MANUAL đang PENDING (chưa được admin xác nhận SUCCESS).
+     */
+    public void cancelShopPendingManualTransfer(String shopId, String userId, String providerTxnRefOpt) {
+        PaymentTransaction txn = resolvePendingManualTxnForShop(shopId, providerTxnRefOpt);
+        if (txn == null) {
+            throw new BusinessException(ApiCode.NOT_FOUND);
+        }
+        txn.setStatus(PaymentTransactionStatus.CANCELLED);
+        txn.setFailureReason("SHOP_CANCELLED");
+        txn.setCompletedAt(LocalDateTime.now());
+        paymentTransactionRepository.save(txn);
+
+        historyRepository.save(SubscriptionHistory.builder()
+                .shopId(shopId)
+                .userId(userId)
+                .durationMonths(0)
+                .transactionId(txn.getProviderTxnRef())
+                .paymentMethod(PaymentGatewayType.MANUAL.name())
+                .actionType(SubscriptionActionType.PAYMENT_FAILED)
+                .build());
+        log.info("[Subscription] shop {} huỷ MANUAL PENDING ref={} user={}",
+                shopId, txn.getProviderTxnRef(), userId);
     }
 
     private PaymentTransaction resolvePendingManualTxnForShop(String shopId, String providerTxnRefOpt) {
@@ -208,9 +235,9 @@ public class SubscriptionService {
             return;
         }
         String amountStr = String.format("%,d", amountVnd);
-        String msg = "Shop \"" + shop.getName() + "\" (" + shop.getId() + ") đã tạo yêu cầu chuyển khoản "
+        String msg = "Shop \"" + shop.getName() + "\" (" + shop.getId() + ") đã báo đã chuyển khoản "
                 + amountStr + " ₫. Nội dung / mã tham chiếu: " + transactionId
-                + ". Vui lòng đối soát sao kê và xác nhận trên trang admin shop.";
+                + ". Vui lòng đối soát sao kê và xác nhận trên trang admin billing.";
 
         NotificationEnvelope.NotificationEnvelopeBuilder b = NotificationEnvelope.builder()
                 .type(NotificationType.BILLING_MANUAL_TRANSFER_PENDING)

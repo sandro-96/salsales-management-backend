@@ -60,7 +60,9 @@ public class UserController {
     }
 
     @PostMapping("/change-password")
-    @Operation(summary = "Đổi mật khẩu", description = "Cho phép người dùng đổi mật khẩu bằng cách cung cấp mật khẩu hiện tại và mật khẩu mới.")
+    @Operation(summary = "Đổi / đặt mật khẩu",
+            description = "Nếu tài khoản đã có mật khẩu đăng nhập email: gửi currentPassword + newPassword. "
+                    + "Nếu chỉ đăng nhập Google (chưa có mật khẩu): chỉ gửi newPassword để đặt mật khẩu đăng nhập cục bộ.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Đổi mật khẩu thành công"),
             @ApiResponse(responseCode = "400", description = "Mật khẩu hiện tại không đúng hoặc dữ liệu không hợp lệ"),

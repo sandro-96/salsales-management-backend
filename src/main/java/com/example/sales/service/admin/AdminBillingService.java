@@ -118,10 +118,12 @@ public class AdminBillingService {
 
         long mrr = activePaidShops * SubscriptionService.BASIC_AMOUNT_VND;
 
+        // Chỉ đếm CK chờ admin sau khi shop đã bấm "Đã chuyển khoản" (có shopReportedTransferAt).
         long pendingManual = mongoTemplate.count(
                 Query.query(Criteria.where("deleted").is(false)
                         .and("gateway").is(PaymentGatewayType.MANUAL.name())
-                        .and("status").is(PaymentTransactionStatus.PENDING.name())),
+                        .and("status").is(PaymentTransactionStatus.PENDING.name())
+                        .and("shopReportedTransferAt").ne(null)),
                 PaymentTransaction.class);
 
         List<YearMonth> buckets = buildMonthBuckets(months);
@@ -247,6 +249,9 @@ public class AdminBillingService {
             c = c.andOperator(createdAt);
         }
 
+        // Ẩn MANUAL+PENDING chưa được shop báo đã CK — chỉ hiện sau khi có shopReportedTransferAt.
+        c = new Criteria().andOperator(c, excludeUnreportedManualPending());
+
         long total = mongoTemplate.count(Query.query(c), PaymentTransaction.class);
         List<PaymentTransaction> rows = mongoTemplate.find(
                 Query.query(c).with(pageable).with(Sort.by(Sort.Direction.DESC, "createdAt")),
@@ -283,6 +288,17 @@ public class AdminBillingService {
         ).toList();
 
         return new PageImpl<>(items, pageable, total);
+    }
+
+    /**
+     * Txn MANUAL đang PENDING nhưng shop chưa bấm "Đã chuyển khoản" → không hiển thị trong admin.
+     */
+    private static Criteria excludeUnreportedManualPending() {
+        return new Criteria().orOperator(
+                Criteria.where("gateway").ne(PaymentGatewayType.MANUAL.name()),
+                Criteria.where("status").ne(PaymentTransactionStatus.PENDING.name()),
+                Criteria.where("shopReportedTransferAt").ne(null)
+        );
     }
 
     /**

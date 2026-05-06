@@ -34,4 +34,7 @@ public class UserResponse {
     private Instant lastLoginAt;
     private LocalDate birthDate;
     private Gender gender;
+
+    /** {@code true} nếu có thể đăng nhập bằng email+mật khẩu (đã lưu hash trong DB). */
+    private boolean passwordSet;
 }

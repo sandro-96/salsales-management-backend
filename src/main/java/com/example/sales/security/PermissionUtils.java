@@ -68,7 +68,8 @@ public class PermissionUtils {
                     PROMOTION_FULL, TABLE_FULL
             );
             case STAFF -> merge(
-                    Set.of(ORDER_CREATE, ORDER_UPDATE, CUSTOMER_VIEW), COMMON_VIEW
+                    Set.of(ORDER_CREATE, ORDER_UPDATE, CUSTOMER_VIEW, CUSTOMER_UPDATE),
+                    COMMON_VIEW
             );
             case CASHIER -> CASHIER_DEFAULT;
         };

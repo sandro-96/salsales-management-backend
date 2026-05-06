@@ -115,8 +115,7 @@ public class SubscriptionController {
         if (init.getGateway() == PaymentGatewayType.MANUAL) {
             transfer = billingTransferInfoService.buildForPayment(
                     init.getTransactionId(), shop.getId(), shop.getName(), init.getAmountVnd());
-            subscriptionService.notifyAdminsManualTransferPending(
-                    shop, init.getTransactionId(), init.getAmountVnd());
+            // Thông báo admin + hiển thị trong danh sách txn chỉ sau khi shop bấm "Đã chuyển khoản".
         }
 
         return ApiResponseDto.success(ApiCode.SUCCESS, SubscriptionPayResponse.builder()
@@ -153,6 +152,23 @@ public class SubscriptionController {
         Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
         String ref = body != null ? body.getProviderTxnRef() : null;
         subscriptionService.reportShopManualTransferSent(shop.getId(), user.getId(), ref);
+        Subscription sub = subscriptionService.ensureSubscription(shop);
+        return ApiResponseDto.success(ApiCode.SUCCESS, subscriptionService.toDto(sub));
+    }
+
+    @PostMapping("/manual-transfer/cancel")
+    @Operation(summary = "Shop huỷ giao dịch chuyển khoản đang chờ",
+            description = "Đánh dấu PaymentTransaction MANUAL+PENDING là CANCELLED. "
+                    + "Dùng khi shop muốn huỷ mã / huỷ trạng thái chờ xác nhận trước khi admin đối soát.")
+    @Audited(resource = "SUBSCRIPTION", action = "MANUAL_TRANSFER_CANCELLED")
+    public ApiResponseDto<SubscriptionDto> cancelManualTransferPending(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestBody(required = false) SubscriptionManualTransferReportRequest body,
+            HttpServletRequest request) {
+        String hint = ShopContextResolver.shopIdHintFrom(request);
+        Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
+        String ref = body != null ? body.getProviderTxnRef() : null;
+        subscriptionService.cancelShopPendingManualTransfer(shop.getId(), user.getId(), ref);
         Subscription sub = subscriptionService.ensureSubscription(shop);
         return ApiResponseDto.success(ApiCode.SUCCESS, subscriptionService.toDto(sub));
     }

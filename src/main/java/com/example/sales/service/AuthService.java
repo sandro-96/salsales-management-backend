@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
@@ -91,7 +92,8 @@ public class AuthService {
         User user = userRepository.findByEmailAndDeletedFalse(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!StringUtils.hasText(user.getPassword())
+                || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException(ApiCode.INVALID_CREDENTIALS);
         }
         if (!user.isVerified()) {
@@ -128,10 +130,11 @@ public class AuthService {
             if (existingUserOpt.isPresent()) {
                 user = existingUserOpt.get();
             } else {
-                existingUserOpt = userRepository.findByEmailAndDeletedFalse(email);
-                if (existingUserOpt.isPresent()) {
-                    user = existingUserOpt.get();
+                Optional<User> byEmail = userRepository.findByEmailAndDeletedFalse(email);
+                if (byEmail.isPresent()) {
+                    user = byEmail.get();
                     user.setGoogleId(googleId);
+                    userRepository.save(user);
                 } else {
                     user = new User();
                     user.setEmail(email);
@@ -140,6 +143,7 @@ public class AuthService {
                     user.setLastName(lastName);
                     user.setVerified(true);
                     user.setRole(UserRole.ROLE_USER);
+                    user.setPassword(null);
                     try {
                         MultipartFile avatarFile = FileUtil.downloadImageAsMultipartFile(avatarUrl, googleId);
                         String savedAvatar = fileUploadService.upload(avatarFile, "avatar");
@@ -147,9 +151,8 @@ public class AuthService {
                     } catch (Exception e) {
                         log.error("Lỗi khi tải ảnh đại diện từ Google", e);
                     }
+                    userRepository.save(user);
                 }
-                user.setPassword(null);
-                userRepository.save(user);
             }
 
             String accessToken = jwtUtil.generateToken(user);

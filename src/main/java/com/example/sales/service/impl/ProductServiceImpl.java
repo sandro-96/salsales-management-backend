@@ -420,6 +420,15 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         // Find Product
         Product product = productRepository.findByIdAndShopIdAndDeletedFalse(productId, shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.PRODUCT_NOT_FOUND));
+        if (product.isSellByWeight()) {
+            // SP bán theo cân: luôn không theo dõi tồn kho
+            if (product.isTrackInventory()) {
+                product.setTrackInventory(false);
+                product = productRepository.save(product);
+            }
+            productCache.evictByShop(shopId);
+            return toProductResponse(null, product);
+        }
         boolean newTrackInventoryState = !product.isTrackInventory();
         product.setTrackInventory(newTrackInventoryState);
         product = productRepository.save(product);
@@ -527,6 +536,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
     }
 
     private Product createNewProduct(Shop shop, String sku, ProductRequest request) {
+        boolean trackInventory = request.isTrackInventory() && !request.isSellByWeight();
         return Product.builder()
                 .shopId(shop.getId())
                 .name(request.getName())
@@ -544,7 +554,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 .assignedToppingIds(resolveAssignedToppingIdsForSave(shop, request.getAssignedToppingIds()))
                 .priceHistory(new ArrayList<>()) // Bắt đầu rỗng — history sẽ được ghi khi giá thay đổi
                 .active(request.isActive())
-                .trackInventory(request.isTrackInventory()) // Có theo dõi tồn kho không
+                .trackInventory(trackInventory) // SP cân mặc định không theo dõi tồn kho
                 .sellByWeight(request.isSellByWeight())
                 .build();
     }
@@ -568,8 +578,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
             existing.setAssignedToppingIds(resolveAssignedToppingIdsForSave(shop, request.getAssignedToppingIds()));
         }
         existing.setActive(request.isActive());
-        existing.setTrackInventory(request.isTrackInventory()); // Có theo dõi tồn kho không
         existing.setSellByWeight(request.isSellByWeight());
+        existing.setTrackInventory(request.isTrackInventory() && !existing.isSellByWeight()); // SP cân mặc định không theo dõi tồn kho
         // priceHistory KHÔNG lấy từ request — được quản lý bởi appendProductPriceHistory()
     }
 

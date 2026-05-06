@@ -37,7 +37,9 @@ public class User extends BaseEntity {
     @NotBlank
     private String email;
 
-    @NotBlank
+    /**
+     * BCrypt hash; {@code null} nếu chỉ đăng nhập Google (chưa đặt mật khẩu cục bộ).
+     */
     @JsonIgnore
     private String password;
 
