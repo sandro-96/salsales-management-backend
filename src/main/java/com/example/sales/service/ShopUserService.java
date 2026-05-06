@@ -3,8 +3,10 @@ package com.example.sales.service;
 
 import com.example.sales.cache.ShopUserCache;
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.NotificationType;
 import com.example.sales.constant.Permission;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.notification.NotificationEnvelope;
 import com.example.sales.dto.shop.ShopSimpleResponse;
 import com.example.sales.dto.shopUser.ShopMemberResponse;
 import com.example.sales.exception.BusinessException;
@@ -18,6 +20,7 @@ import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.repository.StaffProfileRepository;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.security.PermissionUtils;
+import com.example.sales.service.notification.NotificationDispatcher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -37,6 +40,7 @@ public class ShopUserService extends BaseService {
     private final SubscriptionService subscriptionService;
     private final UserRepository userRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final NotificationDispatcher notificationDispatcher;
 
     public void requireAnyRole(String shopId, String userId, ShopRole... roles) {
         ShopRole actual = shopUserCache.getUserRoleInShop(shopId, userId);
@@ -93,6 +97,7 @@ public class ShopUserService extends BaseService {
 
         User user = userRepository.findByEmailAndDeletedFalse(email)
                 .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
+        User actor = userRepository.findById(performedByUserId).orElse(null);
 
         Optional<ShopUser> existingShopUser = shopUserRepository.findByShopIdAndUserId(shopId, user.getId());
 
@@ -119,6 +124,19 @@ public class ShopUserService extends BaseService {
             auditLogService.log(performedByUserId, shopId, newShopUser.getId(), "SHOP_USER", "ADDED",
                     String.format("Thêm người dùng %s vào cửa hàng %s với vai trò %s", email, shopId, role));
         }
+
+        // Realtime notify added staff so FE can refresh shop list/role immediately
+        notificationDispatcher.dispatch(NotificationEnvelope.builder()
+                .type(NotificationType.STAFF_ADDED)
+                .shopId(shopId)
+                .recipient(user.getId())
+                .title("Bạn đã được thêm vào cửa hàng")
+                .message(String.format("Bạn đã được thêm vào cửa hàng \"%s\" với vai trò %s.", shop.getName(), role))
+                .referenceId(shopId)
+                .referenceType("SHOP")
+                .actorId(performedByUserId)
+                .actorName(actor != null ? (actor.getFullName() != null ? actor.getFullName() : actor.getEmail()) : null)
+                .build());
 
         return toMemberResponse(savedShopUser, user, null);
     }
@@ -179,6 +197,8 @@ public class ShopUserService extends BaseService {
                     "Người dùng không thể xóa chính mình khỏi cửa hàng");
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
+                .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         ShopUser shopUser = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
 
@@ -191,6 +211,20 @@ public class ShopUserService extends BaseService {
 
         auditLogService.log(performedByUserId, shopId, shopUser.getId(), "SHOP_USER", "REMOVED",
                 String.format("Xoá mềm người dùng %s khỏi cửa hàng %s", userId, shopId));
+
+        // Realtime notify removed staff so FE can exit shop context immediately
+        User actor = userRepository.findById(performedByUserId).orElse(null);
+        notificationDispatcher.dispatch(NotificationEnvelope.builder()
+                .type(NotificationType.STAFF_REMOVED)
+                .shopId(shopId)
+                .recipient(userId)
+                .title("Bạn đã bị gỡ khỏi cửa hàng")
+                .message(String.format("Bạn không còn là thành viên của cửa hàng \"%s\".", shop.getName()))
+                .referenceId(shopId)
+                .referenceType("SHOP")
+                .actorId(performedByUserId)
+                .actorName(actor != null ? (actor.getFullName() != null ? actor.getFullName() : actor.getEmail()) : null)
+                .build());
     }
 
     public Page<ShopSimpleResponse> getShopsForUser(String userId, Pageable pageable) {

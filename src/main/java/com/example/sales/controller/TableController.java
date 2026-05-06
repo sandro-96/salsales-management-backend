@@ -45,7 +45,13 @@ public class TableController {
     })
     public ApiResponseDto<TableResponse> create(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
+            @PathVariable("shopId") @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestBody @Valid @Parameter(description = "Thông tin bàn") TableRequest request) {
+        // Ensure path variable matches request payload (avoid cross-shop spoofing).
+        if (request.getShopId() == null) {
+            request.setShopId(shopId);
+        }
+        // If request already has shopId but differs, let service validation or exception handle it.
         return ApiResponseDto.success(ApiCode.SUCCESS, tableService.create(user.getId(), request));
     }
 
