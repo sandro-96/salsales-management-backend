@@ -153,10 +153,14 @@ public class SubscriptionService {
                 .referenceId(history.getId())
                 .referenceType("SUBSCRIPTION")
                 .templateVar("shopName", shop.getName())
-                .templateVar("amount", String.valueOf(BASIC_AMOUNT_VND))
+                .templateVar("shopId", shop.getId())
+                .templateVar("amount", String.format("%,d", BASIC_AMOUNT_VND))
                 .templateVar("until", nextEnd.toLocalDate().format(FMT_D))
                 .templateVar("paidAt", now.format(FMT_DT))
                 .templateVar("periodEndAt", nextEnd.format(FMT_DT))
+                .templateVar("gateway", gateway != null ? gateway.name() : "MANUAL")
+                .templateVar("transactionId", transactionId != null ? transactionId : "")
+                .templateVar("subscriptionStatus", SubscriptionStatus.ACTIVE.name())
                 .dedupeKey("BILLING_PAYMENT_SUCCESS:" + history.getId())
                 .build());
         log.info("[Subscription] shop {} gia hạn ACTIVE tới {} (tx={}, gw={})",
@@ -206,6 +210,75 @@ public class SubscriptionService {
                 .build());
         log.info("[Subscription] shop {} huỷ MANUAL PENDING ref={} user={}",
                 shopId, txn.getProviderTxnRef(), userId);
+
+        notifyPaymentFailed(txn, "Bạn đã huỷ yêu cầu chuyển khoản. Giao dịch không được ghi nhận.");
+    }
+
+    /**
+     * Gửi thông báo + email "thanh toán không thành công" cho chủ shop.
+     *
+     * <p>Idempotent theo {@code PaymentTransaction.id}, an toàn khi gọi lại nhiều lần
+     * (ví dụ admin resync rồi lại resolve).
+     */
+    public void notifyPaymentFailed(PaymentTransaction txn, String reason) {
+        if (txn == null) return;
+        Shop shop = shopRepository.findByIdAndDeletedFalse(txn.getShopId()).orElse(null);
+        if (shop == null) {
+            log.warn("[Subscription] notifyPaymentFailed: shop {} không còn hoặc đã xoá — bỏ qua.",
+                    txn.getShopId());
+            return;
+        }
+        String ownerId = shop.getOwnerId();
+        if (ownerId == null) {
+            log.warn("[Subscription] notifyPaymentFailed: shop {} không có owner — bỏ qua.", shop.getId());
+            return;
+        }
+
+        Subscription sub = subscriptionRepository.findByShopId(shop.getId()).orElse(null);
+        SubscriptionStatus status = sub != null ? sub.getStatus() : null;
+        String periodEndAt = sub != null && sub.getCurrentPeriodEnd() != null
+                ? sub.getCurrentPeriodEnd().format(FMT_DT) : "";
+        String until = sub != null && sub.getCurrentPeriodEnd() != null
+                ? sub.getCurrentPeriodEnd().toLocalDate().format(FMT_D) : "";
+
+        LocalDateTime failedAt = txn.getCompletedAt() != null
+                ? txn.getCompletedAt() : LocalDateTime.now();
+        String resultLabel = txn.getStatus() == PaymentTransactionStatus.CANCELLED
+                ? "đã bị huỷ" : "không thành công";
+        String safeReason = StringUtils.hasText(reason)
+                ? reason
+                : (StringUtils.hasText(txn.getFailureReason())
+                        ? txn.getFailureReason()
+                        : "Giao dịch không thành công.");
+        String txnIdForMsg = StringUtils.hasText(txn.getProviderTxnRef())
+                ? txn.getProviderTxnRef() : (txn.getId() != null ? txn.getId() : "");
+        String message = "Giao dịch thanh toán cho cửa hàng \"" + shop.getName() + "\" "
+                + resultLabel + ". Mã giao dịch: " + txnIdForMsg
+                + (StringUtils.hasText(safeReason) ? ". Lý do: " + safeReason : ".");
+
+        notificationDispatcher.dispatch(NotificationEnvelope.builder()
+                .type(NotificationType.BILLING_PAYMENT_FAILED)
+                .shopId(shop.getId())
+                .recipient(ownerId)
+                .title("Thanh toán không thành công")
+                .message(message)
+                .referenceId(txn.getId())
+                .referenceType("PAYMENT_TRANSACTION")
+                .templateVar("shopName", shop.getName())
+                .templateVar("shopId", shop.getId())
+                .templateVar("amount", String.format("%,d", txn.getAmountVnd()))
+                .templateVar("gateway", txn.getGateway() != null ? txn.getGateway().name() : "MANUAL")
+                .templateVar("transactionId", txnIdForMsg)
+                .templateVar("failedAt", failedAt.format(FMT_DT))
+                .templateVar("reason", safeReason)
+                .templateVar("resultLabel", resultLabel)
+                .templateVar("subscriptionStatus", status != null ? status.name() : "")
+                .templateVar("periodEndAt", periodEndAt)
+                .templateVar("until", until)
+                .dedupeKey("BILLING_PAYMENT_FAILED:" + (txn.getId() != null ? txn.getId() : txnIdForMsg))
+                .build());
+        log.info("[Subscription] notify payment FAILED shop={} txn={} status={} reason={}",
+                shop.getId(), txnIdForMsg, txn.getStatus(), safeReason);
     }
 
     private PaymentTransaction resolvePendingManualTxnForShop(String shopId, String providerTxnRefOpt) {

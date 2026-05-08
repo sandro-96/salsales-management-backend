@@ -349,6 +349,14 @@ public class AdminBillingService {
                 saved.getId(), saved.getProviderTxnRef(), newStatus, reason);
         invalidateOverviewCache();
 
+        // Báo cho chủ shop biết giao dịch đã được admin xử lý là FAILED/CANCELLED.
+        try {
+            subscriptionService.notifyPaymentFailed(saved, reason);
+        } catch (Exception ex) {
+            log.warn("[AdminBilling] notifyPaymentFailed (resolve) txn={} lỗi: {}",
+                    saved.getId(), ex.getMessage());
+        }
+
         String shopName = null;
         if (StringUtils.hasText(saved.getShopId())) {
             Shop shop = mongoTemplate.findOne(
@@ -441,6 +449,7 @@ public class AdminBillingService {
                     txn.setCompletedAt(LocalDateTime.now());
                     mongoTemplate.save(txn);
                     applied = true;
+                    safeNotifyPaymentFailed(txn, "Số tiền cổng thanh toán trả về không khớp với giao dịch.");
                     break;
                 }
                 try {
@@ -463,6 +472,8 @@ public class AdminBillingService {
                     txn.setCompletedAt(LocalDateTime.now());
                     mongoTemplate.save(txn);
                     applied = true;
+                    safeNotifyPaymentFailed(txn,
+                            "Không ghi nhận được thanh toán sau khi xác minh với cổng thanh toán.");
                 }
             }
             case FAILED -> {
@@ -471,6 +482,10 @@ public class AdminBillingService {
                 txn.setCompletedAt(LocalDateTime.now());
                 mongoTemplate.save(txn);
                 applied = true;
+                safeNotifyPaymentFailed(txn,
+                        "Cổng thanh toán xác nhận giao dịch không thành công"
+                                + (result.message() != null && !result.message().isBlank()
+                                        ? ": " + result.message() : "."));
             }
             case PENDING, UNKNOWN -> {
                 // Không update DB — admin có thể resync lại sau hoặc dùng resolve thủ công.
@@ -487,6 +502,19 @@ public class AdminBillingService {
                 .build();
         invalidateOverviewCache();
         return out;
+    }
+
+    /**
+     * Gửi thông báo "thanh toán không thành công" nhưng không làm fail flow chính
+     * — log warning nếu lỗi.
+     */
+    private void safeNotifyPaymentFailed(PaymentTransaction txn, String reason) {
+        try {
+            subscriptionService.notifyPaymentFailed(txn, reason);
+        } catch (Exception ex) {
+            log.warn("[AdminBilling] notifyPaymentFailed (resync) txn={} lỗi: {}",
+                    txn != null ? txn.getId() : null, ex.getMessage());
+        }
     }
 
     private AdminPaymentTransactionItem toItem(PaymentTransaction t) {

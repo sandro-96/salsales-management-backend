@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -45,12 +47,16 @@ public class CustomerService {
     }
 
     public CustomerResponse createCustomer(String shopId, String userId, CustomerRequest request) {
+        String phone = normalizePhone(request.getPhone());
+        String email = normalizeEmail(request.getEmail());
+        assertUniquePhoneEmail(shopId, null, phone, email);
+
         Customer customer = new Customer();
         customer.setShopId(shopId);
         customer.setUserId(userId);
         customer.setName(request.getName());
-        customer.setPhone(request.getPhone());
-        customer.setEmail(request.getEmail());
+        customer.setPhone(phone);
+        customer.setEmail(email);
         customer.setAddress(request.getAddress());
         customer.setNote(request.getNote());
         customer.setBranchId(request.getBranchId());
@@ -70,9 +76,13 @@ public class CustomerService {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
+        String phone = normalizePhone(request.getPhone());
+        String email = normalizeEmail(request.getEmail());
+        assertUniquePhoneEmail(shopId, id, phone, email);
+
         existing.setName(request.getName());
-        existing.setPhone(request.getPhone());
-        existing.setEmail(request.getEmail());
+        existing.setPhone(phone);
+        existing.setEmail(email);
         existing.setAddress(request.getAddress());
         existing.setNote(request.getNote());
 
@@ -135,5 +145,39 @@ public class CustomerService {
 
     private static String safe(String value) {
         return value != null ? value : "";
+    }
+
+    /**
+     * Chuẩn hoá SĐT để so sánh trùng (bỏ khoảng trắng). Null nếu rỗng.
+     */
+    private static String normalizePhone(String phone) {
+        if (phone == null) {
+            return null;
+        }
+        String compact = phone.trim().replaceAll("\\s+", "");
+        return compact.isEmpty() ? null : compact;
+    }
+
+    private static String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        String t = email.trim();
+        return t.isEmpty() ? null : t.toLowerCase(Locale.ROOT);
+    }
+
+    private void assertUniquePhoneEmail(String shopId, String excludeCustomerId, String phone, String email) {
+        if (phone != null) {
+            Optional<Customer> byPhone = customerRepository.findByShopIdAndPhoneAndDeletedFalse(shopId, phone);
+            if (byPhone.isPresent() && !byPhone.get().getId().equals(excludeCustomerId)) {
+                throw new BusinessException(ApiCode.CUSTOMER_PHONE_DUPLICATE);
+            }
+        }
+        if (email != null) {
+            Optional<Customer> byEmail = customerRepository.findByShopIdAndEmailIgnoreCaseAndDeletedFalse(shopId, email);
+            if (byEmail.isPresent() && !byEmail.get().getId().equals(excludeCustomerId)) {
+                throw new BusinessException(ApiCode.CUSTOMER_EMAIL_DUPLICATE);
+            }
+        }
     }
 }

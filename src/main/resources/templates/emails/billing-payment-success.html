@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Thanh toán thành công</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f2f2f2; padding: 20px;">
+<div style="max-width: 620px; margin: auto; background: white; padding: 24px; border-radius: 10px;">
+    <h2 style="color: #16a34a; margin-top: 0;">Thanh toán thành công</h2>
+    <p>Xin chào <b th:text="${fullName}">Người dùng</b>,</p>
+
+    <p>
+        Chúng tôi đã ghi nhận thanh toán của bạn cho cửa hàng
+        <b th:text="${shopName}">Tên cửa hàng</b>. Gói dịch vụ của bạn đã được kích hoạt /
+        gia hạn thành công.
+    </p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tbody>
+        <tr>
+            <td style="padding: 8px 4px; color: #555; width: 40%;">Cửa hàng</td>
+            <td style="padding: 8px 4px; font-weight: 600;" th:text="${shopName}">Tên cửa hàng</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 4px; color: #555;">Mã giao dịch</td>
+            <td style="padding: 8px 4px; font-family: monospace;" th:text="${transactionId} ?: '—'">TXN_ID</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 4px; color: #555;">Cổng thanh toán</td>
+            <td style="padding: 8px 4px;" th:text="${gateway} ?: '—'">VNPAY</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 4px; color: #555;">Số tiền</td>
+            <td style="padding: 8px 4px; font-weight: 600;">
+                <span th:text="${amount}">99,000</span> ₫
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 4px; color: #555;">Thời gian thanh toán</td>
+            <td style="padding: 8px 4px;" th:text="${paidAt} ?: '—'">01/05/2026 09:00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 4px; color: #555;">Trạng thái cửa hàng</td>
+            <td style="padding: 8px 4px;">
+                <span th:text="${subscriptionStatus} ?: 'ACTIVE'">ACTIVE</span>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 4px; color: #555;">Hiệu lực đến</td>
+            <td style="padding: 8px 4px; font-weight: 600;" th:text="${until} ?: '—'">31/05/2026</td>
+        </tr>
+        <tr th:if="${periodEndAt}">
+            <td style="padding: 8px 4px; color: #555;">Kết thúc chu kỳ</td>
+            <td style="padding: 8px 4px;" th:text="${periodEndAt}">31/05/2026 23:59</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <p style="margin-top: 16px;">
+        Bạn có thể tiếp tục sử dụng đầy đủ các tính năng của <strong>SalesApp</strong>.
+        Cảm ơn bạn đã đồng hành.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+    <p style="font-size: 12px; color: #999;">
+        Đây là email tự động từ hệ thống SalesApp — vui lòng không trả lời email này.
+    </p>
+</div>
+</body>
+</html>

@@ -143,6 +143,38 @@ public class StaffProfileController {
         return ApiResponseDto.success(ApiCode.SUCCESS, null);
     }
 
+    // ─── Overview / Dashboard (Phase 1) ───────────────────────────────
+
+    @GetMapping("/overview")
+    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER})
+    @Operation(summary = "Tổng quan nhân sự cấp shop",
+            description = "Trả về metric phục vụ Staff Dashboard: tổng số nhân sự, theo vai trò, "
+                    + "theo chi nhánh, tổng lương, …. Param month có dạng yyyy-MM (mặc định = tháng hiện tại). "
+                    + "Block attendance/leave/payroll trả enabled=false ở phase 1, sẽ bật khi phase 2–4 release.")
+    public ApiResponseDto<?> getShopOverview(
+            @PathVariable String shopId,
+            @RequestParam(required = false) String month,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails
+    ) {
+        return ApiResponseDto.success(ApiCode.SUCCESS,
+                staffProfileService.getShopOverview(shopId, month));
+    }
+
+    @GetMapping("/{userOrProfileId}/overview")
+    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER})
+    @Operation(summary = "Tổng quan của 1 nhân sự",
+            description = "Lấy thông tin tổng quan nhân sự (profile + skeleton attendance/leave/payroll). "
+                    + "Tham số {userOrProfileId} hỗ trợ cả userId hệ thống lẫn profileId nhân sự ngoài hệ thống.")
+    public ApiResponseDto<?> getStaffMemberOverview(
+            @PathVariable String shopId,
+            @PathVariable String userOrProfileId,
+            @RequestParam(required = false) String month,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails
+    ) {
+        return ApiResponseDto.success(ApiCode.SUCCESS,
+                staffProfileService.getStaffMemberOverview(shopId, userOrProfileId, month));
+    }
+
     // ─── Export ───────────────────────────────────────────────────────
 
     @GetMapping("/export")

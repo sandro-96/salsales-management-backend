@@ -109,7 +109,19 @@ public enum ApiCode {
     BARCODE_INVALID_GSIN("4160", "Mã vạch không hợp lệ chuẩn GS1 (sai chữ số kiểm tra). Hãy nhập đúng số in trên bao bì hoặc quét lại."),
     SUBSCRIPTION_EXPIRED("4161", "Gói dịch vụ đã hết hạn. Vui lòng thanh toán để tiếp tục sử dụng."),
     SUBSCRIPTION_NOT_FOUND("4162", "Không tìm thấy gói dịch vụ của cửa hàng."),
-    PAYMENT_GATEWAY_ERROR("4163", "Không khởi tạo được cổng thanh toán, vui lòng thử lại sau.");
+    PAYMENT_GATEWAY_ERROR("4163", "Không khởi tạo được cổng thanh toán, vui lòng thử lại sau."),
+    CUSTOMER_PHONE_DUPLICATE("4164", "Số điện thoại đã được dùng cho khách hàng khác."),
+    CUSTOMER_EMAIL_DUPLICATE("4165", "Email đã được dùng cho khách hàng khác."),
+
+    // Leave / Attendance
+    LEAVE_REQUEST_NOT_FOUND("4166", "Không tìm thấy đơn nghỉ phép."),
+    LEAVE_REQUEST_INVALID_STATUS("4167", "Trạng thái đơn nghỉ phép không hợp lệ."),
+    LEAVE_REQUEST_OVERLAP("4168", "Đơn nghỉ phép bị trùng ngày với đơn khác."),
+
+    // Payroll
+    PAYROLL_RUN_NOT_FOUND("4169", "Không tìm thấy bảng lương."),
+    PAYROLL_ALREADY_FINALIZED("4170", "Bảng lương đã được chốt, không thể chỉnh sửa."),
+    PAYROLL_ITEM_NOT_FOUND("4171", "Không tìm thấy bản ghi lương của nhân sự.");
 
     private final String code;
     private final String message;

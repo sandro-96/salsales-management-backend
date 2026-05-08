@@ -1,14 +1,22 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.ContractType;
 import com.example.sales.constant.ShopRole;
+import com.example.sales.dto.staffProfile.StaffMemberOverviewResponse;
 import com.example.sales.dto.staffProfile.StaffProfileRequest;
 import com.example.sales.dto.staffProfile.StaffProfileResponse;
+import com.example.sales.dto.staffProfile.StaffShopOverviewResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.exception.ResourceNotFoundException;
+import com.example.sales.model.Branch;
 import com.example.sales.model.ShopUser;
 import com.example.sales.model.StaffProfile;
 import com.example.sales.model.User;
+import com.example.sales.model.AttendanceLog;
+import com.example.sales.repository.AttendanceLogRepository;
+import com.example.sales.repository.PayrollRunRepository;
+import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.repository.StaffProfileRepository;
 import com.example.sales.repository.UserRepository;
@@ -17,6 +25,9 @@ import org.springframework.data.domain.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Function;
@@ -29,6 +40,9 @@ public class StaffProfileService {
     private final StaffProfileRepository staffProfileRepository;
     private final ShopUserRepository shopUserRepository;
     private final UserRepository userRepository;
+    private final BranchRepository branchRepository;
+    private final AttendanceLogRepository attendanceLogRepository;
+    private final PayrollRunRepository payrollRunRepository;
     private final AuditLogService auditLogService;
     private final ExcelExportService excelExportService;
 
@@ -416,5 +430,281 @@ public class StaffProfileService {
 
     private static String safe(String value) {
         return value != null ? value : "";
+    }
+
+    // ─── Overview / Dashboard (Phase 1) ───────────────────────────────
+
+    /**
+     * Tổng quan nhân sự cấp shop dùng cho trang Staff Dashboard.
+     *
+     * <p>Phase 1 chỉ trả các metric tổng quan (số lượng + chi phí lương ước tính).
+     * Các block <i>attendance</i>, <i>leave</i>, <i>payroll</i> trả về placeholder
+     * (enabled=false) để phase 2–4 bật mà không phải đổi schema FE.
+     */
+    public StaffShopOverviewResponse getShopOverview(String shopId, String monthOpt) {
+        YearMonth ym = parseMonthOrNow(monthOpt);
+        LocalDateTime monthStart = ym.atDay(1).atStartOfDay();
+        LocalDateTime nextMonthStart = ym.plusMonths(1).atDay(1).atStartOfDay();
+
+        List<ShopUser> shopUsers = shopUserRepository
+                .findByShopIdAndDeletedFalse(shopId, Pageable.unpaged())
+                .getContent();
+        List<StaffProfile> profiles = staffProfileRepository.findByShopIdAndDeletedFalse(shopId);
+
+        Map<String, StaffProfile> profileByUserId = profiles.stream()
+                .filter(p -> p.getUserId() != null)
+                .collect(Collectors.toMap(StaffProfile::getUserId, Function.identity(), (a, b) -> a));
+        List<StaffProfile> externalProfiles = profiles.stream()
+                .filter(p -> p.getUserId() == null)
+                .toList();
+
+        long systemStaff = shopUsers.size();
+        long externalStaff = externalProfiles.size();
+        long totalStaff = systemStaff + externalStaff;
+
+        Map<ShopRole, Long> staffByRole = new EnumMap<>(ShopRole.class);
+        for (ShopRole r : ShopRole.values()) staffByRole.put(r, 0L);
+        for (ShopUser su : shopUsers) {
+            if (su.getRole() == null) continue;
+            staffByRole.merge(su.getRole(), 1L, Long::sum);
+        }
+
+        // Lấy tên branch để hiển thị; dùng cache 1 query
+        Map<String, String> branchNameById = new HashMap<>();
+        for (Branch b : branchRepository.findAllByShopIdAndDeletedFalse(shopId)) {
+            branchNameById.put(b.getId(), b.getName());
+        }
+
+        Map<String, Long> branchCount = new LinkedHashMap<>();
+        for (StaffProfile p : profiles) {
+            String key = p.getBranchId() != null ? p.getBranchId() : "__unassigned__";
+            branchCount.merge(key, 1L, Long::sum);
+        }
+        // Người trong shopUsers nhưng không có profile vẫn cần được đếm vào "chưa gán chi nhánh"
+        long usersWithoutProfile = shopUsers.stream()
+                .filter(su -> !profileByUserId.containsKey(su.getUserId()))
+                .count();
+        if (usersWithoutProfile > 0) {
+            branchCount.merge("__unassigned__", usersWithoutProfile, Long::sum);
+        }
+        List<StaffShopOverviewResponse.BranchStaffCount> branchList = branchCount.entrySet().stream()
+                .map(e -> StaffShopOverviewResponse.BranchStaffCount.builder()
+                        .branchId("__unassigned__".equals(e.getKey()) ? null : e.getKey())
+                        .branchName("__unassigned__".equals(e.getKey())
+                                ? "Chưa gán chi nhánh"
+                                : branchNameById.getOrDefault(e.getKey(), e.getKey()))
+                        .count(e.getValue())
+                        .build())
+                .sorted(Comparator
+                        .comparing((StaffShopOverviewResponse.BranchStaffCount b) -> b.getBranchId() == null)
+                        .thenComparing(StaffShopOverviewResponse.BranchStaffCount::getBranchName,
+                                Comparator.nullsLast(String::compareToIgnoreCase)))
+                .toList();
+
+        double totalSalary = 0.0;
+        long staffWithSalary = 0L;
+        Map<ContractType, StaffShopOverviewResponse.ContractTypeBreakdown> byContractAcc = new EnumMap<>(ContractType.class);
+        Map<ContractType, Long> contractStaffCount = new EnumMap<>(ContractType.class);
+        Map<ContractType, Double> contractSalarySum = new EnumMap<>(ContractType.class);
+
+        for (StaffProfile p : profiles) {
+            Double salary = p.getSalary();
+            if (salary != null && salary > 0) {
+                totalSalary += salary;
+                staffWithSalary += 1;
+            }
+            ContractType ct = p.getContractType();
+            if (ct != null) {
+                contractStaffCount.merge(ct, 1L, Long::sum);
+                if (salary != null && salary > 0) {
+                    contractSalarySum.merge(ct, salary, Double::sum);
+                }
+            }
+        }
+        for (Map.Entry<ContractType, Long> e : contractStaffCount.entrySet()) {
+            byContractAcc.put(e.getKey(), StaffShopOverviewResponse.ContractTypeBreakdown.builder()
+                    .staffCount(e.getValue())
+                    .totalSalary(contractSalarySum.getOrDefault(e.getKey(), 0.0))
+                    .build());
+        }
+        double averageSalary = staffWithSalary > 0 ? totalSalary / staffWithSalary : 0.0;
+
+        long newStaffThisMonth = 0L;
+        for (ShopUser su : shopUsers) {
+            if (su.getCreatedAt() != null
+                    && !su.getCreatedAt().isBefore(monthStart)
+                    && su.getCreatedAt().isBefore(nextMonthStart)) {
+                newStaffThisMonth += 1;
+            }
+        }
+        for (StaffProfile p : externalProfiles) {
+            if (p.getCreatedAt() != null
+                    && !p.getCreatedAt().isBefore(monthStart)
+                    && p.getCreatedAt().isBefore(nextMonthStart)) {
+                newStaffThisMonth += 1;
+            }
+        }
+
+        // Phase 2: chấm công (tối thiểu) — tổng hợp theo tháng
+        LocalDate fromDate = ym.atDay(1);
+        LocalDate toDate = ym.atEndOfMonth();
+        List<AttendanceLog> attendanceRows = new ArrayList<>();
+        // SYSTEM users
+        for (ShopUser su : shopUsers) {
+            if (su.getUserId() == null) continue;
+            attendanceRows.addAll(attendanceLogRepository
+                    .findByShopIdAndStaffRefAndWorkDateBetweenAndDeletedFalse(shopId, su.getUserId(), fromDate, toDate));
+        }
+        // EXTERNAL staff
+        for (StaffProfile ep : externalProfiles) {
+            if (ep.getId() == null) continue;
+            attendanceRows.addAll(attendanceLogRepository
+                    .findByShopIdAndStaffRefAndWorkDateBetweenAndDeletedFalse(shopId, ep.getId(), fromDate, toDate));
+        }
+        long totalSessions = 0L;
+        long completedSessions = 0L;
+        long totalWorkMinutes = 0L;
+        for (AttendanceLog log : attendanceRows) {
+            if (log.getSessions() != null && !log.getSessions().isEmpty()) {
+                for (AttendanceLog.AttendanceSession s : log.getSessions()) {
+                    if (s.getCheckInAt() == null) continue;
+                    totalSessions += 1;
+                    if (s.getCheckOutAt() != null) {
+                        completedSessions += 1;
+                        long m = java.time.temporal.ChronoUnit.MINUTES.between(s.getCheckInAt(), s.getCheckOutAt());
+                        if (m > 0) totalWorkMinutes += m;
+                    }
+                }
+            } else if (log.getCheckInAt() != null) {
+                // Legacy record (Phase 2): treat as 1 session
+                totalSessions += 1;
+                if (log.getCheckOutAt() != null) {
+                    completedSessions += 1;
+                    long m = java.time.temporal.ChronoUnit.MINUTES.between(log.getCheckInAt(), log.getCheckOutAt());
+                    if (m > 0) totalWorkMinutes += m;
+                }
+            }
+        }
+
+        return StaffShopOverviewResponse.builder()
+                .month(ym.toString())
+                .totalStaff(totalStaff)
+                .systemStaff(systemStaff)
+                .externalStaff(externalStaff)
+                .staffByRole(staffByRole)
+                .staffByBranch(branchList)
+                .totalMonthlySalary(round2(totalSalary))
+                .averageSalary(round2(averageSalary))
+                .staffWithSalary(staffWithSalary)
+                .payrollByContract(byContractAcc)
+                .newStaffThisMonth(newStaffThisMonth)
+                .attendance(StaffShopOverviewResponse.AttendanceSummary.builder()
+                        .enabled(true)
+                        .totalShiftsScheduled(totalSessions)
+                        .totalShiftsCompleted(completedSessions)
+                        .totalLateArrivals(0L)
+                        .totalEarlyLeaves(0L)
+                        .totalWorkMinutes(totalWorkMinutes)
+                        .build())
+                .leave(StaffShopOverviewResponse.LeaveSummary.builder().enabled(true).build())
+                .payroll(buildPayrollSummary(shopId, ym.toString()))
+                .build();
+    }
+
+    private StaffShopOverviewResponse.PayrollSummary buildPayrollSummary(String shopId, String month) {
+        return payrollRunRepository.findByShopIdAndMonthAndDeletedFalse(shopId, month)
+                .map(run -> StaffShopOverviewResponse.PayrollSummary.builder()
+                        .enabled(true)
+                        .grossPayroll(run.getGrossTotal())
+                        .netPayroll(run.getNetTotal())
+                        .bonusTotal(run.getBonusTotal())
+                        .deductionTotal(run.getDeductionTotal())
+                        .status(run.getStatus() != null ? run.getStatus().name() : null)
+                        .build())
+                .orElseGet(() -> StaffShopOverviewResponse.PayrollSummary.builder()
+                        .enabled(false)
+                        .grossPayroll(0.0)
+                        .netPayroll(0.0)
+                        .bonusTotal(0.0)
+                        .deductionTotal(0.0)
+                        .status("NOT_GENERATED")
+                        .build());
+    }
+
+    /**
+     * Tổng quan của 1 nhân sự cụ thể.
+     *
+     * <p>Hỗ trợ 2 dạng id:
+     * <ul>
+     *   <li>userId hệ thống (ShopUser tồn tại)</li>
+     *   <li>profileId của nhân sự ngoài hệ thống</li>
+     * </ul>
+     */
+    public StaffMemberOverviewResponse getStaffMemberOverview(
+            String shopId, String userOrProfileId, String monthOpt) {
+        if (userOrProfileId == null || userOrProfileId.isBlank()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        YearMonth ym = parseMonthOrNow(monthOpt);
+
+        StaffProfileResponse profileResponse = null;
+
+        // Ưu tiên thử userId hệ thống.
+        Optional<ShopUser> shopUserOpt = shopUserRepository
+                .findByShopIdAndUserIdAndDeletedFalse(shopId, userOrProfileId);
+        if (shopUserOpt.isPresent()) {
+            profileResponse = getProfile(shopId, userOrProfileId);
+        } else {
+            // Fallback: profileId (external hoặc system).
+            StaffProfile profile = staffProfileRepository
+                    .findByIdAndShopIdAndDeletedFalse(userOrProfileId, shopId)
+                    .orElse(null);
+            if (profile != null) {
+                if (profile.getUserId() != null) {
+                    profileResponse = getProfile(shopId, profile.getUserId());
+                } else {
+                    profileResponse = buildExternalResponse(profile);
+                }
+            }
+        }
+
+        if (profileResponse == null) {
+            throw new ResourceNotFoundException(ApiCode.STAFF_PROFILE_NOT_FOUND);
+        }
+
+        Double baseSalary = profileResponse.getSalary();
+
+        return StaffMemberOverviewResponse.builder()
+                .profile(profileResponse)
+                .month(ym.toString())
+                .attendance(StaffMemberOverviewResponse.AttendanceBlock.builder()
+                        .enabled(false)
+                        .recentEntries(List.of())
+                        .build())
+                .leave(StaffMemberOverviewResponse.LeaveBlock.builder()
+                        .enabled(false)
+                        .recentRequests(List.of())
+                        .build())
+                .payroll(StaffMemberOverviewResponse.PayrollBlock.builder()
+                        .enabled(false)
+                        .baseSalary(baseSalary)
+                        .recentRuns(List.of())
+                        .build())
+                .build();
+    }
+
+    private static YearMonth parseMonthOrNow(String monthOpt) {
+        if (monthOpt == null || monthOpt.isBlank()) {
+            return YearMonth.now();
+        }
+        try {
+            return YearMonth.parse(monthOpt.trim());
+        } catch (Exception ex) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+    }
+
+    private static double round2(double v) {
+        return Math.round(v * 100.0) / 100.0;
     }
 }

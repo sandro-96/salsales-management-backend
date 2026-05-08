@@ -105,11 +105,21 @@ public class NotificationRouter {
         t.put(NotificationType.BILLING_INVOICE_CREATED, RouteConfig.builder()
                 .channel(NotificationChannel.IN_APP, ChannelPlan.inApp())
                 .build());
+        // Payment success/failed: in-app + email song song để chủ shop nắm trạng thái
+        // ngay cả khi không online.
         t.put(NotificationType.BILLING_PAYMENT_SUCCESS, RouteConfig.builder()
                 .channel(NotificationChannel.IN_APP, ChannelPlan.inApp())
+                .channel(NotificationChannel.EMAIL,
+                        ChannelPlan.email("emails/billing-payment-success",
+                                env -> "[SalesApp] Thanh toán thành công — "
+                                        + safe(templateString(env, "shopName"))))
                 .build());
         t.put(NotificationType.BILLING_PAYMENT_FAILED, RouteConfig.builder()
                 .channel(NotificationChannel.IN_APP, ChannelPlan.inApp())
+                .channel(NotificationChannel.EMAIL,
+                        ChannelPlan.email("emails/billing-payment-failed",
+                                env -> "[SalesApp] Thanh toán không thành công — "
+                                        + safe(templateString(env, "shopName"))))
                 .build());
 
         t.put(NotificationType.BILLING_MANUAL_TRANSFER_PENDING, RouteConfig.builder()

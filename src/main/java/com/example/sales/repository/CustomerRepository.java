@@ -12,4 +12,8 @@ public interface CustomerRepository extends MongoRepository<Customer, String> {
     List<Customer> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId);
 
     Optional<Customer> findByIdAndDeletedFalse(String id);
+
+    Optional<Customer> findByShopIdAndPhoneAndDeletedFalse(String shopId, String phone);
+
+    Optional<Customer> findByShopIdAndEmailIgnoreCaseAndDeletedFalse(String shopId, String email);
 }
