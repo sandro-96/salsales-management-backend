@@ -24,6 +24,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -50,12 +51,13 @@ public class SupportTicketService {
     @Value("${app.fe.url:}")
     private String frontendUrl;
 
-    public TicketResponse createTicket(String shopId, CreateTicketRequest request, String userId) {
+    /** Hỗ trợ user ↔ admin; không gắn shop ({@code shopId} lưu null). */
+    public TicketResponse createUserTicket(CreateTicketRequest request, String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
         SupportTicket ticket = SupportTicket.builder()
-                .shopId(shopId)
+                .shopId(null)
                 .userId(userId)
                 .userEmail(user.getEmail())
                 .userName(buildFullName(user))
@@ -69,7 +71,7 @@ public class SupportTicketService {
 
         ticket = ticketRepository.save(ticket);
 
-        auditLogService.log(userId, shopId, ticket.getId(), "SUPPORT_TICKET", "CREATE",
+        auditLogService.log(userId, null, ticket.getId(), "SUPPORT_TICKET", "CREATE",
                 "Created support ticket: " + request.getSubject());
 
         fanOutTicketCreated(ticket, user);
@@ -77,10 +79,10 @@ public class SupportTicketService {
         return toResponse(ticket);
     }
 
-    public Page<TicketResponse> getTickets(String shopId, String status, String category,
-                                           String keyword, Pageable pageable) {
+    public Page<TicketResponse> listUserTickets(String userId, String status, String category,
+                                                 String keyword, Pageable pageable) {
         List<Criteria> criteriaList = new ArrayList<>();
-        criteriaList.add(Criteria.where("shopId").is(shopId));
+        criteriaList.add(Criteria.where("userId").is(userId));
         criteriaList.add(Criteria.where("deleted").is(false));
 
         if (status != null && !status.isBlank()) {
@@ -108,19 +110,23 @@ public class SupportTicketService {
                 pageable, () -> total);
     }
 
-    public Page<TicketResponse> getMyTickets(String shopId, String userId, Pageable pageable) {
-        return ticketRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, userId, pageable)
-                .map(this::toResponse);
+    public TicketResponse getUserTicket(String userId, String ticketId) {
+        SupportTicket ticket = findTicketOwnedByUser(ticketId, userId);
+        return toResponse(ticket);
     }
 
-    public TicketResponse getTicket(String shopId, String ticketId) {
-        SupportTicket ticket = findTicket(shopId, ticketId);
-        return toResponse(ticket);
+    public TicketResponse replyUserTicket(String ticketId, ReplyTicketRequest request, String userId) {
+        SupportTicket ticket = findTicketOwnedByUser(ticketId, userId);
+        return applyReply(ticket, request, userId);
     }
 
     public TicketResponse replyToTicket(String shopId, String ticketId,
                                         ReplyTicketRequest request, String userId) {
         SupportTicket ticket = findTicket(shopId, ticketId);
+        return applyReply(ticket, request, userId);
+    }
+
+    private TicketResponse applyReply(SupportTicket ticket, ReplyTicketRequest request, String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
 
@@ -140,10 +146,27 @@ public class SupportTicketService {
 
         ticket = ticketRepository.save(ticket);
 
-        auditLogService.log(userId, shopId, ticket.getId(), "SUPPORT_TICKET", "REPLY",
+        auditLogService.log(userId, ticket.getShopId(), ticket.getId(), "SUPPORT_TICKET", "REPLY",
                 "Replied to ticket: " + ticket.getSubject());
 
         fanOutReply(ticket, user, reply);
+
+        return toResponse(ticket);
+    }
+
+    public TicketResponse updateUserTicketStatus(String ticketId, UpdateTicketStatusRequest request,
+                                                 String userId) {
+        SupportTicket ticket = findTicketOwnedByUser(ticketId, userId);
+        TicketStatus previousStatus = ticket.getStatus();
+
+        ticket.setStatus(request.getStatus());
+
+        ticket = ticketRepository.save(ticket);
+
+        auditLogService.log(userId, null, ticket.getId(), "SUPPORT_TICKET", "UPDATE_STATUS",
+                "Updated ticket status to " + request.getStatus());
+
+        fanOutStatusChange(ticket, userId, previousStatus, request.getStatus());
 
         return toResponse(ticket);
     }
@@ -163,7 +186,7 @@ public class SupportTicketService {
 
         ticket = ticketRepository.save(ticket);
 
-        auditLogService.log(userId, shopId, ticket.getId(), "SUPPORT_TICKET", "UPDATE_STATUS",
+        auditLogService.log(userId, ticket.getShopId(), ticket.getId(), "SUPPORT_TICKET", "UPDATE_STATUS",
                 "Updated ticket status to " + request.getStatus());
 
         fanOutStatusChange(ticket, userId, previousStatus, request.getStatus());
@@ -171,13 +194,13 @@ public class SupportTicketService {
         return toResponse(ticket);
     }
 
-    public void deleteTicket(String shopId, String ticketId, String userId) {
-        SupportTicket ticket = findTicket(shopId, ticketId);
+    public void deleteUserTicket(String ticketId, String userId) {
+        SupportTicket ticket = findTicketOwnedByUser(ticketId, userId);
         ticket.setDeleted(true);
         ticket.setDeletedAt(LocalDateTime.now());
         ticketRepository.save(ticket);
 
-        auditLogService.log(userId, shopId, ticketId, "SUPPORT_TICKET", "DELETE",
+        auditLogService.log(userId, null, ticketId, "SUPPORT_TICKET", "DELETE",
                 "Deleted ticket: " + ticket.getSubject());
     }
 
@@ -291,7 +314,7 @@ public class SupportTicketService {
         boolean replierIsCreator = ticket.getUserId().equals(replier.getId());
 
         if (replierIsCreator) {
-            // Creator (shop) phản hồi — ưu tiên báo cho assignee; nếu chưa assign thì fan-out tất cả admin.
+            // Người tạo ticket phản hồi — ưu tiên báo assignee; nếu chưa assign thì fan-out tất cả admin.
             String assigneeId = ticket.getAssigneeId();
             if (assigneeId != null && !assigneeId.isBlank()) {
                 notificationService.send(ticket.getShopId(), assigneeId,
@@ -439,7 +462,17 @@ public class SupportTicketService {
     // ────────────────────────────────────────────────────────────────────────────
 
     private SupportTicket findTicket(String shopId, String ticketId) {
-        return ticketRepository.findByIdAndShopIdAndDeletedFalse(ticketId, shopId)
+        if (StringUtils.hasText(shopId)) {
+            return ticketRepository.findByIdAndShopIdAndDeletedFalse(ticketId, shopId.trim())
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TICKET_NOT_FOUND));
+        }
+        return ticketRepository.findById(ticketId)
+                .filter(t -> !t.isDeleted())
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TICKET_NOT_FOUND));
+    }
+
+    private SupportTicket findTicketOwnedByUser(String ticketId, String userId) {
+        return ticketRepository.findByIdAndUserIdAndDeletedFalse(ticketId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TICKET_NOT_FOUND));
     }
 

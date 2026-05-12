@@ -16,23 +16,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.List;
 
 /**
- * Khóa mọi thao tác ghi (POST/PUT/PATCH/DELETE) khi subscription của shop hiện tại
- * đang ở trạng thái {@link SubscriptionStatus#EXPIRED} hoặc {@link SubscriptionStatus#CANCELLED}.
+ * 1) Shop bị admin khoá ({@code Shop.active == false}): chỉ chặn thao tác <strong>ghi</strong>
+ *    (POST/PUT/PATCH/DELETE), gồm đơn hàng và thanh toán. GET/HEAD vẫn xem dữ liệu shop nếu user có quyền.
+ *    Ngữ cảnh shop: query {@code shopId}, header {@code X-Shop-Id}, path {@code /api/shops/{id}/...}.
+ *    GET không gắn shop (không hint) không suy shop để tránh khoá nhầm toàn session.
+ * 2) Chặn ghi khi subscription EXPIRED/CANCELLED (trừ {@code /api/subscription} để gia hạn;
+ *    {@code POST /api/shop} tạo shop mới; {@code DELETE /api/shop/{shopId}} xóa shop — không phụ thuộc shop đang chọn / trạng thái khóa).
  * <p>
- * Whitelist các endpoint cần còn hoạt động:
- * <ul>
- *   <li>{@code /api/auth/**}: đăng nhập/đăng xuất.</li>
- *   <li>{@code /api/subscription/**}: xem trạng thái + tạo thanh toán.</li>
- *   <li>{@code /api/webhook/**}: callback của cổng thanh toán.</li>
- *   <li>{@code /api/admin/**}: admin luôn có thể thao tác (admin không có shop riêng).</li>
- *   <li>Impersonation session: admin đang mượn danh user cũng được qua.</li>
- * </ul>
- * GET luôn được phép — người dùng xem lịch sử để tra cứu.
+ * Whitelist toàn cục: {@code /api/auth/**}, {@code /api/user/**} (hồ sơ / mật khẩu — không nên phụ thuộc shop),
+ * {@code /api/enums**}, {@code /api/webhook/**}, {@code /api/admin/**},
+ * {@code /api/2fa/**}, {@code /api/uploads/**}.
  */
 @Slf4j
 @Component
@@ -41,7 +40,8 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
 
     private static final List<String> WHITELIST_PREFIXES = List.of(
             "/api/auth/",
-            "/api/subscription/",
+            "/api/user/",
+            "/api/enums",
             "/api/webhook/",
             "/api/admin/",
             "/api/2fa/",
@@ -54,28 +54,67 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String method = request.getMethod();
-        if (!isWriteMethod(method)) return true;
-
         String path = request.getRequestURI();
-        if (isWhitelisted(path)) return true;
+        if (isWhitelisted(path)) {
+            return true;
+        }
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated()) return true; // để AuthFilter xử lý
+        if (auth == null || !auth.isAuthenticated()) {
+            return true;
+        }
         Object principal = auth.getPrincipal();
-        if (!(principal instanceof CustomUserDetails user)) return true;
+        if (!(principal instanceof CustomUserDetails user)) {
+            return true;
+        }
 
-        // Admin (kể cả đang impersonate) không bị guard — admin không vận hành POS.
-        if (user.getRole() == UserRole.ROLE_ADMIN || user.isImpersonating()) return true;
+        if (user.getRole() == UserRole.ROLE_ADMIN || user.isImpersonating()) {
+            return true;
+        }
+
+        // Tạo cửa hàng mới không phụ thuộc shop đang chọn (tránh X-Shop-Id → shop bị khóa chặn POST).
+        if (isWriteMethod(method) && "/api/shop".equals(path)) {
+            return true;
+        }
+
+        // Xóa shop theo path: không dùng X-Shop-Id (có thể là shop khác / đang khóa) để chặn nhầm.
+        if (isDeleteShopByIdPath(path, method)) {
+            return true;
+        }
 
         String hint = ShopContextResolver.shopIdHintFrom(request);
-        Shop shop = shopContextResolver.resolveShopForWriteGuard(user.getId(), hint);
+        boolean explicitShopContext = StringUtils.hasText(hint);
+
+        Shop shop = null;
+        if (explicitShopContext || isWriteMethod(method)) {
+            shop = shopContextResolver.resolveShopForWriteGuard(user.getId(), hint);
+        }
+
+        if (shop != null && !shop.isActive() && isWriteMethod(method)) {
+            log.info("[ShopGuard] chặn {} {} shop={} (inactive)", method, path, shop.getId());
+            throw new BusinessException(ApiCode.SHOP_INACTIVE);
+        }
+
+        if (!isWriteMethod(method)) {
+            return true;
+        }
+
         if (shop == null) {
-            // Không phải chủ shop (VD nhân viên) hoặc không suy ra được shop → không áp guard theo subscription owner.
+            shop = shopContextResolver.resolveShopForWriteGuard(user.getId(), hint);
+        }
+
+        if (shop == null) {
+            return true;
+        }
+
+        if (path != null && path.startsWith("/api/subscription")) {
             return true;
         }
 
         Subscription sub = subscriptionRepository.findByShopId(shop.getId()).orElse(null);
-        if (sub == null) return true; // chưa có subscription → coi như TRIAL, cho qua.
+        if (sub == null) {
+            return true;
+        }
 
         if (sub.getStatus() == SubscriptionStatus.EXPIRED
                 || sub.getStatus() == SubscriptionStatus.CANCELLED) {
@@ -94,10 +133,36 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
     }
 
     private boolean isWhitelisted(String path) {
-        if (path == null) return false;
+        if (path == null) {
+            return false;
+        }
         for (String prefix : WHITELIST_PREFIXES) {
-            if (path.startsWith(prefix)) return true;
+            if (path.startsWith(prefix)) {
+                return true;
+            }
         }
         return false;
+    }
+
+    /** {@code DELETE /api/shop/{shopId}} — không có thêm segment sau shopId. */
+    private boolean isDeleteShopByIdPath(String path, String method) {
+        if (!"DELETE".equalsIgnoreCase(method) || path == null) {
+            return false;
+        }
+        if (!path.startsWith("/api/shop/")) {
+            return false;
+        }
+        String rest = path.substring("/api/shop/".length());
+        int q = rest.indexOf('?');
+        if (q >= 0) {
+            rest = rest.substring(0, q);
+        }
+        if (rest.indexOf('/') >= 0) {
+            return false;
+        }
+        if (!StringUtils.hasText(rest) || "my".equals(rest) || rest.startsWith("by-slug")) {
+            return false;
+        }
+        return true;
     }
 }

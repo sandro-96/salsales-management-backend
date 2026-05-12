@@ -5,6 +5,7 @@ import com.example.sales.constant.ShopRole;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.attendance.AttendanceCheckInRequest;
 import com.example.sales.dto.attendance.AttendanceCheckOutRequest;
+import com.example.sales.dto.attendance.AttendanceManualSessionRequest;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequireRole;
 import com.example.sales.service.AttendanceService;
@@ -48,6 +49,18 @@ public class AttendanceController {
     ) {
         return ApiResponseDto.success(ApiCode.SUCCESS,
                 attendanceService.checkOut(shopId, customUserDetails.getId(), request));
+    }
+
+    @PostMapping("/manual-session")
+    @RequireRole({ShopRole.OWNER, ShopRole.MANAGER})
+    @Operation(summary = "Nhập giờ chấm công (Owner/Manager)", description = "Nhập giờ vào / giờ ra theo ngày cho nhân viên. replaceDay=true ghi đè cả ngày.")
+    public ApiResponseDto<?> manualSession(
+            @PathVariable String shopId,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails,
+            @Valid @RequestBody AttendanceManualSessionRequest request
+    ) {
+        return ApiResponseDto.success(ApiCode.SUCCESS,
+                attendanceService.upsertManualSession(shopId, customUserDetails.getId(), request));
     }
 
     @GetMapping("/day")

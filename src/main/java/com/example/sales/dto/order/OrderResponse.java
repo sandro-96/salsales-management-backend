@@ -31,6 +31,8 @@ public class OrderResponse {
     private String paymentMethod;   // Phương thức thanh toán
     private String paymentId;       // ID giao dịch thanh toán (nếu có)
     private LocalDateTime paymentTime; // Thời gian thanh toán
+    /** Ảnh chứng từ CK (tuỳ chọn). */
+    private String paymentProofImageUrl;
     private double totalAmount;     // Tổng số lượng sản phẩm (ví dụ: tổng số lượng items)
     private double totalPrice;      // Tổng giá trị đơn hàng sau chiết khấu
     private List<OrderItemResponse> items; // Danh sách các mục trong đơn hàng

@@ -55,6 +55,8 @@ public class Order extends BaseEntity {
     private String paymentId;
     private String paymentMethod;
     private LocalDateTime paymentTime;
+    /** URL ảnh chứng từ chuyển khoản (tuỳ chọn, gắn sau khi thanh toán). */
+    private String paymentProofImageUrl;
     private boolean isPaid;
 
     /** Trạng thái thanh toán (COD chờ thu, đã thu, …). */

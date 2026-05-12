@@ -32,7 +32,8 @@ public class ShopContextResolver {
     private final ShopUserRepository shopUserRepository;
 
     /**
-     * Gợi ý shopId: query {@code shopId} trước, sau đó header {@code X-Shop-Id}.
+     * Gợi ý shopId: query {@code shopId} trước, header {@code X-Shop-Id},
+     * sau đó suy ra từ đường dẫn {@code /api/shops/{shopId}/...} hoặc {@code /api/shop/{shopId}/...} (trừ {@code my}, {@code by-slug}).
      */
     public static String shopIdHintFrom(HttpServletRequest request) {
         String q = request.getParameter("shopId");
@@ -40,7 +41,55 @@ public class ShopContextResolver {
             return q.trim();
         }
         String h = request.getHeader("X-Shop-Id");
-        return StringUtils.hasText(h) ? h.trim() : null;
+        if (StringUtils.hasText(h)) {
+            return h.trim();
+        }
+        String uri = request.getRequestURI();
+        String fromShops = extractShopIdAfterPrefix(uri, "/api/shops/");
+        if (StringUtils.hasText(fromShops)) {
+            return fromShops;
+        }
+        return extractShopIdFromSingularShopPath(uri);
+    }
+
+    private static String extractShopIdAfterPrefix(String uri, String prefix) {
+        if (uri == null || !uri.startsWith(prefix)) {
+            return null;
+        }
+        int start = prefix.length();
+        if (start >= uri.length()) {
+            return null;
+        }
+        int slash = uri.indexOf('/', start);
+        String id = slash < 0 ? uri.substring(start) : uri.substring(start, slash);
+        return StringUtils.hasText(id) ? id.trim() : null;
+    }
+
+    /**
+     * {@code /api/shop/{id}} hoặc {@code /api/shop/{id}/toppings} — không áp cho {@code my}, {@code by-slug}.
+     */
+    private static String extractShopIdFromSingularShopPath(String uri) {
+        if (uri == null) {
+            return null;
+        }
+        final String prefix = "/api/shop/";
+        if (!uri.startsWith(prefix)) {
+            return null;
+        }
+        String rest = uri.substring(prefix.length());
+        int q = rest.indexOf('?');
+        if (q >= 0) {
+            rest = rest.substring(0, q);
+        }
+        int slash = rest.indexOf('/');
+        String first = slash < 0 ? rest : rest.substring(0, slash);
+        if (!StringUtils.hasText(first)) {
+            return null;
+        }
+        if ("my".equals(first) || "by-slug".equals(first)) {
+            return null;
+        }
+        return first.trim();
     }
 
     /**

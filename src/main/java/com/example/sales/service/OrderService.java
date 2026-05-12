@@ -32,6 +32,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -65,8 +66,12 @@ public class OrderService extends BaseService {
     private final CustomerRepository customerRepository;
     private final SequenceService sequenceService;
     private final RealtimeEventPublisher realtimeEventPublisher;
+    private final FileUploadService fileUploadService;
 
     private static final DateTimeFormatter ORDER_CODE_DATE = DateTimeFormatter.BASIC_ISO_DATE;
+
+    private static final List<String> PAYMENT_PROOF_IMAGE_TYPES = List.of(
+            "image/jpeg", "image/png", "image/jpg", "image/webp");
 
     @Transactional
     public OrderResponse createOrder(String userId, String branchId, String shopId, OrderRequest request) {
@@ -262,6 +267,43 @@ public class OrderService extends BaseService {
         realtimeEventPublisher.publishPaymentEvent(updated.getShopId(), updated.getBranchId(),
                 WebSocketMessageType.PAYMENT_SUCCEEDED, resp);
         return publishOrderEvent(updated, resp, WebSocketMessageType.ORDER_STATUS_CHANGED);
+    }
+
+    /**
+     * Đính kèm / thay ảnh chứng từ thanh toán (thường dùng cho chuyển khoản). Chỉ cho đơn đã thanh toán.
+     */
+    @Transactional
+    public OrderResponse uploadPaymentProof(String userId, String shopId, String orderId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ApiCode.FILE_EMPTY);
+        }
+        String ct = file.getContentType();
+        if (ct == null || !PAYMENT_PROOF_IMAGE_TYPES.contains(ct)) {
+            throw new BusinessException(ApiCode.INVALID_FILE_TYPE);
+        }
+
+        Order order = orderCache.getOrderByShop(orderId, shopId);
+        if (!order.isPaid()) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        String oldUrl = order.getPaymentProofImageUrl();
+        String folder = "orders/" + shopId + "/" + orderId + "/payment-proof";
+        String url = fileUploadService.upload(file, folder);
+        order.setPaymentProofImageUrl(url);
+        Order saved = orderRepository.save(order);
+
+        if (StringUtils.hasText(oldUrl) && !oldUrl.equals(url)) {
+            try {
+                fileUploadService.delete(oldUrl);
+            } catch (Exception ignored) {
+            }
+        }
+
+        orderCache.evict(orderId, shopId);
+        auditLogService.log(userId, shopId, orderId, "ORDER", "PAYMENT_PROOF_UPLOADED",
+                "Cập nhật ảnh chứng từ thanh toán");
+        return publishOrderEvent(saved, toResponse(saved), WebSocketMessageType.ORDER_UPDATED);
     }
 
     public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
@@ -1124,6 +1166,7 @@ public class OrderService extends BaseService {
                 .paymentMethod(order.getPaymentMethod())
                 .paymentId(order.getPaymentId())
                 .paymentTime(order.getPaymentTime())
+                .paymentProofImageUrl(order.getPaymentProofImageUrl())
                 .totalAmount(order.getTotalAmount())
                 .totalPrice(order.getTotalPrice())
                 .items(order.getItems().stream()

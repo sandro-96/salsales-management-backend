@@ -25,6 +25,7 @@ import com.example.sales.repository.ShopUserRepository;
 import com.example.sales.repository.SubscriptionHistoryRepository;
 import com.example.sales.repository.SubscriptionRepository;
 import com.example.sales.repository.UserRepository;
+import com.example.sales.cache.ShopCache;
 import com.example.sales.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +68,7 @@ public class AdminShopService {
     private final SubscriptionService subscriptionService;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final AdminBillingService adminBillingService;
+    private final ShopCache shopCache;
 
     public Page<AdminShopSummary> list(Pageable pageable, String status, SubscriptionStatus subStatus, String keyword) {
         Criteria criteria = Criteria.where("deleted").is(false);
@@ -166,6 +168,7 @@ public class AdminShopService {
                 adminId, newActive, shopId, req.getReason());
         shop.setActive(newActive);
         shopRepository.save(shop);
+        shopCache.evictAllShopKeys(shop.getId(), shop.getOwnerId(), shop.getSlug());
         Subscription sub = subscriptionRepository.findByShopId(shopId).orElse(null);
         return toSummary(shop, ownerOf(shop), sub);
     }

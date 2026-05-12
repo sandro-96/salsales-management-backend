@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -159,6 +160,116 @@ public class AttendanceService {
                 .checkedOutDays(checkedOutDays)
                 .entries(rows.stream().map(this::toEntry).toList())
                 .build();
+    }
+
+    /**
+     * Owner/Manager: nhập giờ vào / giờ ra cho nhân viên theo ngày (linh động hơn check-in app).
+     */
+    public AttendanceEntryResponse upsertManualSession(String shopId, String actorUserId, AttendanceManualSessionRequest req) {
+        if (!StringUtils.hasText(shopId) || req == null) throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        assertOwnerOrManager(shopId, actorUserId);
+
+        if (req.getWorkDate() == null || !StringUtils.hasText(req.getStaffRef()) || req.getCheckInAt() == null) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        if (req.getCheckOutAt() != null && req.getCheckOutAt().isBefore(req.getCheckInAt())) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+
+        String staffType = normalizeType(req.getStaffType(), TYPE_SYSTEM);
+        String staffRef = req.getStaffRef().trim();
+        if (TYPE_SYSTEM.equals(staffType)) {
+            shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, staffRef)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.NOT_FOUND));
+        } else {
+            staffProfileRepository.findByIdAndShopIdAndDeletedFalse(staffRef, shopId)
+                    .orElseThrow(() -> new ResourceNotFoundException(ApiCode.STAFF_PROFILE_NOT_FOUND));
+        }
+
+        LocalDate workDate = req.getWorkDate();
+        boolean replaceDay = req.getReplaceDay() == null || Boolean.TRUE.equals(req.getReplaceDay());
+
+        AttendanceLog log = attendanceLogRepository
+                .findByShopIdAndStaffRefAndWorkDateAndDeletedFalse(shopId, staffRef, workDate)
+                .orElseGet(() -> AttendanceLog.builder()
+                        .shopId(shopId)
+                        .staffRef(staffRef)
+                        .staffType(staffType)
+                        .workDate(workDate)
+                        .build());
+
+        log.setStaffType(staffType);
+
+        AttendanceLog.AttendanceSession session = AttendanceLog.AttendanceSession.builder()
+                .checkInAt(req.getCheckInAt())
+                .checkOutAt(req.getCheckOutAt())
+                .note(StringUtils.hasText(req.getNote()) ? req.getNote().trim() : null)
+                .build();
+
+        if (replaceDay) {
+            log.setSessions(new ArrayList<>(List.of(session)));
+            if (StringUtils.hasText(req.getNote())) {
+                log.setNote(req.getNote().trim());
+            }
+        } else {
+            ensureSessionsFromLegacy(log);
+            if (log.getSessions() == null) {
+                log.setSessions(new ArrayList<>());
+            }
+            log.getSessions().add(session);
+            if (StringUtils.hasText(req.getNote())) {
+                log.setNote(req.getNote().trim());
+            }
+        }
+
+        syncLegacyFromSessions(log);
+        AttendanceLog saved = attendanceLogRepository.save(log);
+        return toEntry(saved);
+    }
+
+    private void assertOwnerOrManager(String shopId, String actorUserId) {
+        if (!StringUtils.hasText(actorUserId)) throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        ShopRole role = shopUserRepository.findByShopIdAndUserIdAndDeletedFalse(shopId, actorUserId)
+                .map(su -> su.getRole())
+                .orElse(null);
+        if (role != ShopRole.OWNER && role != ShopRole.MANAGER) {
+            throw new BusinessException(ApiCode.UNAUTHORIZED);
+        }
+    }
+
+    /** Đồng bộ snapshot legacy {@code checkInAt}/{@code checkOutAt} từ danh sách session. */
+    private void syncLegacyFromSessions(AttendanceLog log) {
+        if (log == null) return;
+        if (log.getSessions() == null || log.getSessions().isEmpty()) {
+            log.setCheckInAt(null);
+            log.setCheckOutAt(null);
+            return;
+        }
+        LocalDateTime earliestIn = null;
+        LocalDateTime latestOut = null;
+        boolean anyOpen = false;
+        for (AttendanceLog.AttendanceSession s : log.getSessions()) {
+            if (s == null) continue;
+            if (s.getCheckInAt() != null) {
+                if (earliestIn == null || s.getCheckInAt().isBefore(earliestIn)) {
+                    earliestIn = s.getCheckInAt();
+                }
+            }
+            if (s.getCheckInAt() != null && s.getCheckOutAt() == null) {
+                anyOpen = true;
+            }
+        }
+        if (!anyOpen) {
+            for (AttendanceLog.AttendanceSession s : log.getSessions()) {
+                if (s != null && s.getCheckOutAt() != null) {
+                    if (latestOut == null || s.getCheckOutAt().isAfter(latestOut)) {
+                        latestOut = s.getCheckOutAt();
+                    }
+                }
+            }
+        }
+        log.setCheckInAt(earliestIn);
+        log.setCheckOutAt(anyOpen ? null : latestOut);
     }
 
     private AttendanceEntryResponse toEntry(AttendanceLog a) {

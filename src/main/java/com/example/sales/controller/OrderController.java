@@ -25,9 +25,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -236,6 +238,18 @@ public class OrderController {
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user) {
         OrderResponse confirmed = orderService.confirmPayment(user.getId(), shopId, orderId, paymentId, paymentMethod);
         return ApiResponseDto.success(ApiCode.ORDER_PAYMENT_CONFIRMED, confirmed);
+    }
+
+    @PostMapping(value = "/{orderId}/payment-proof", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequirePermission(Permission.ORDER_PAYMENT_CONFIRM)
+    @Operation(summary = "Upload ảnh chứng từ thanh toán", description = "Tuỳ chọn — thường dùng cho chuyển khoản; chỉ đơn đã thanh toán.")
+    public ApiResponseDto<OrderResponse> uploadPaymentProof(
+            @PathVariable String orderId,
+            @RequestParam String shopId,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal CustomUserDetails user) {
+        OrderResponse updated = orderService.uploadPaymentProof(user.getId(), shopId, orderId, file);
+        return ApiResponseDto.success(ApiCode.ORDER_UPDATED, updated);
     }
 
     @PutMapping("/{id}")

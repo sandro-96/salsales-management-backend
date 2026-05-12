@@ -8,6 +8,7 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.BaseService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -35,6 +36,15 @@ public class ShopCache extends BaseService {
     public Shop getShopBySlug(String slug) {
         return shopRepository.findBySlugAndDeletedFalse(slug)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
+    }
+
+    @Caching(evict = {
+            @CacheEvict(value = "shops", key = "#shopId"),
+            @CacheEvict(value = "shops", key = "#ownerId", condition = "#ownerId != null && !#ownerId.isBlank()"),
+            @CacheEvict(value = "shops", key = "#slug", condition = "#slug != null && !#slug.isBlank()")
+    })
+    public void evictAllShopKeys(String shopId, String ownerId, String slug) {
+        // Sau khi admin / owner đổi trạng thái shop — xóa mọi entry cache (id, ownerId, slug).
     }
 
     @CacheEvict(value = "shops", key = "#shopId")

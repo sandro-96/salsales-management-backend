@@ -17,4 +17,6 @@ public interface SupportTicketRepository extends MongoRepository<SupportTicket, 
     Page<SupportTicket> findByShopIdAndUserIdAndDeletedFalse(String shopId, String userId, Pageable pageable);
 
     Optional<SupportTicket> findByIdAndShopIdAndDeletedFalse(String id, String shopId);
+
+    Optional<SupportTicket> findByIdAndUserIdAndDeletedFalse(String id, String userId);
 }
