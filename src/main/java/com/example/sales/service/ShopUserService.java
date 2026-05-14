@@ -266,6 +266,7 @@ public class ShopUserService extends BaseService {
                             .tiktokUrl(shop.getTiktokUrl())
                             .shopeeUrl(shop.getShopeeUrl())
                             .toppingsEnabled(shop.isToppingsEnabled())
+                            .onlineSalesEnabled(shop.isOnlineSalesEnabled())
                             .active(shop.isActive())
                             .role(su != null ? su.getRole() : null)
                             .permissions(perms)

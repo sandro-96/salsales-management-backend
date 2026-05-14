@@ -73,5 +73,12 @@ public class Shop extends BaseEntity {
 
     /** Danh mục topping dùng chung toàn shop (khi {@code toppingsEnabled}). */
     private List<ShopTopping> shopToppings;
+
+    /**
+     * Bật chế độ bán hàng online (storefront công khai theo slug). Mặc định tắt.
+     * Khi bật, mọi guest đều có thể truy cập URL công khai để xem sản phẩm và đặt đơn COD.
+     */
+    @Builder.Default
+    private boolean onlineSalesEnabled = false;
 }
 

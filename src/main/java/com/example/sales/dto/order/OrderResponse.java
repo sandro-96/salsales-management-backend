@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/dto/order/OrderResponse.java
 package com.example.sales.dto.order;
 
+import com.example.sales.constant.OrderSource;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.PaymentStatus;
 import com.example.sales.model.tax.OrderTaxSnapshot;
@@ -54,6 +55,9 @@ public class OrderResponse {
     private String shippingMethod;
     private String trackingNumber;
     private String externalOrderRef;
+
+    /** Nguồn đơn (POS / ONLINE). Mặc định POS cho đơn cũ. */
+    private OrderSource orderSource;
 
     /** Thời điểm tạo đơn (audit). */
     private LocalDateTime createdAt;

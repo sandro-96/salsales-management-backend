@@ -23,5 +23,8 @@ public enum WebSocketMessageType {
 
     // Payment (per-branch topic; đi kèm ORDER_STATUS_CHANGED tương ứng)
     PAYMENT_SUCCEEDED,
-    PAYMENT_FAILED
+    PAYMENT_FAILED,
+
+    // Online sales storefront (shop-level topic)
+    ONLINE_ORDER_CREATED
 }

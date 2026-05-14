@@ -45,7 +45,8 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
             "/api/webhook/",
             "/api/admin/",
             "/api/2fa/",
-            "/api/uploads/"
+            "/api/uploads/",
+            "/api/storefront/"
     );
 
     private final SubscriptionRepository subscriptionRepository;

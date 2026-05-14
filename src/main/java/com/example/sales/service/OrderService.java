@@ -1187,6 +1187,7 @@ public class OrderService extends BaseService {
                 .shippingMethod(order.getShippingMethod())
                 .trackingNumber(order.getTrackingNumber())
                 .externalOrderRef(order.getExternalOrderRef())
+                .orderSource(order.getOrderSource())
                 .createdAt(order.getCreatedAt())
                 .build();
     }

@@ -115,6 +115,13 @@ public class ShopService extends BaseService {
         if (request.getToppingsEnabled() != null) {
             shop.setToppingsEnabled(request.getToppingsEnabled());
         }
+        if (request.getOnlineSalesEnabled() != null) {
+            boolean enable = request.getOnlineSalesEnabled();
+            if (enable && !StringUtils.hasText(shop.getSlug())) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            shop.setOnlineSalesEnabled(enable);
+        }
 
         if (request.getBusinessModel() != null) {
             request.setBusinessModel(request.getBusinessModel());
@@ -181,6 +188,7 @@ public class ShopService extends BaseService {
                     .tiktokUrl(shop.getTiktokUrl())
                     .shopeeUrl(shop.getShopeeUrl())
                     .toppingsEnabled(shop.isToppingsEnabled())
+                    .onlineSalesEnabled(shop.isOnlineSalesEnabled())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -205,6 +213,7 @@ public class ShopService extends BaseService {
                     .tiktokUrl(shop.getTiktokUrl())
                     .shopeeUrl(shop.getShopeeUrl())
                     .toppingsEnabled(shop.isToppingsEnabled())
+                    .onlineSalesEnabled(shop.isOnlineSalesEnabled())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -234,6 +243,7 @@ public class ShopService extends BaseService {
                 .tiktokUrl(shop.getTiktokUrl())
                 .shopeeUrl(shop.getShopeeUrl())
                 .toppingsEnabled(shop.isToppingsEnabled())
+                .onlineSalesEnabled(shop.isOnlineSalesEnabled())
                 .active(shop.isActive())
                 .industry(shop.getType().getIndustry())
                 .businessModel(shop.getBusinessModel());

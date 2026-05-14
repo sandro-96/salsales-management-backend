@@ -121,7 +121,12 @@ public enum ApiCode {
     // Payroll
     PAYROLL_RUN_NOT_FOUND("4169", "Không tìm thấy bảng lương."),
     PAYROLL_ALREADY_FINALIZED("4170", "Bảng lương đã được chốt, không thể chỉnh sửa."),
-    PAYROLL_ITEM_NOT_FOUND("4171", "Không tìm thấy bản ghi lương của nhân sự.");
+    PAYROLL_ITEM_NOT_FOUND("4171", "Không tìm thấy bản ghi lương của nhân sự."),
+
+    // Online sales storefront
+    ONLINE_SALES_DISABLED("4180", "Cửa hàng chưa bật chế độ bán hàng online."),
+    STOREFRONT_ORDER_CREATED("2020", "Đặt hàng thành công, shop sẽ liên hệ xác nhận."),
+    STOREFRONT_EMPTY_CART("4181", "Đơn hàng phải có ít nhất 1 sản phẩm.");
 
     private final String code;
     private final String message;

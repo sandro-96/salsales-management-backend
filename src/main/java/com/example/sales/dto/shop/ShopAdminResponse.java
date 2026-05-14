@@ -26,6 +26,7 @@ public class ShopAdminResponse {
     private String tiktokUrl;
     private String shopeeUrl;
     private boolean toppingsEnabled;
+    private boolean onlineSalesEnabled;
     private String logoUrl;
     private boolean active;
     private SubscriptionPlan plan;

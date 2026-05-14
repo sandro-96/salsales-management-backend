@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/ws/**",
                                 "/uploads/**",
-                                "/api/auth/**", "/api/webhook/**"
+                                "/api/auth/**", "/api/webhook/**",
+                                "/api/storefront/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

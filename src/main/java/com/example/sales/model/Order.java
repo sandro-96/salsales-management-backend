@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/model/Order.java
 package com.example.sales.model;
 
+import com.example.sales.constant.OrderSource;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.PaymentStatus;
 import com.example.sales.model.base.BaseEntity;
@@ -89,4 +90,11 @@ public class Order extends BaseEntity {
     private String trackingNumber;
     /** Mã tham chiếu đơn ngoài (VD Shopee) */
     private String externalOrderRef;
+
+    /**
+     * Nguồn phát sinh đơn (POS hoặc ONLINE storefront).
+     * Mặc định POS để giữ tương thích với dữ liệu cũ.
+     */
+    @Builder.Default
+    private OrderSource orderSource = OrderSource.POS;
 }

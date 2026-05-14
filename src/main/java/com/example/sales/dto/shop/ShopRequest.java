@@ -37,5 +37,8 @@ public class ShopRequest {
     /** Bật topping cho cửa hàng (mặc định false khi không gửi) */
     private Boolean toppingsEnabled;
 
+    /** Bật chế độ bán hàng online (storefront công khai theo slug) */
+    private Boolean onlineSalesEnabled;
+
     private boolean active = true;
 }

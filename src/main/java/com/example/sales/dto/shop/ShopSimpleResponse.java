@@ -22,6 +22,7 @@ public class ShopSimpleResponse {
     private String tiktokUrl;
     private String shopeeUrl;
     private boolean toppingsEnabled;
+    private boolean onlineSalesEnabled;
     private String address;
     private String slug;
     private boolean active;
