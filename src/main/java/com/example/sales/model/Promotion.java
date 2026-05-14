@@ -32,6 +32,13 @@ public class Promotion extends BaseEntity {
 
     private double discountValue;
 
+    /**
+     * Độ ưu tiên khi nhiều KM cùng áp dụng: số càng <strong>lớn</strong> càng được chọn trước.
+     * Mặc định 0.
+     */
+    @Builder.Default
+    private int priority = 0;
+
     private List<String> applicableProductIds;
 
     private LocalDateTime startDate;

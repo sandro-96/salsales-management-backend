@@ -2,7 +2,11 @@
 package com.example.sales.dto.promotion;
 
 import com.example.sales.constant.DiscountType;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -19,6 +23,13 @@ public class PromotionRequest {
 
     @Positive
     private double discountValue;
+
+    /**
+     * Ưu tiên khi trùng điều kiện (càng lớn càng áp dụng trước). Mặc định 0.
+     */
+    @Min(0)
+    @Max(1_000_000)
+    private Integer priority;
 
     private List<String> applicableProductIds;
 

@@ -15,6 +15,7 @@ public class PromotionResponse {
     private String name;
     private DiscountType discountType;
     private double discountValue;
+    private int priority;
     private List<String> applicableProductIds;
     private LocalDateTime startDate;
     private LocalDateTime endDate;

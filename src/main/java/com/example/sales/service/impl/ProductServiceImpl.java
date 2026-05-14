@@ -388,10 +388,15 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         product = productRepository.save(product);
 
         // Khi tắt (false): sync tắt activeInBranch trên tất cả BranchProduct
-        // Khi bật (true): KHÔNG tự động bật lại chi nhánh — để từng chi nhánh tự quản lý
+        // Khi bật (true): bật lại activeInBranch trên tất cả chi nhánh — đối xứng với bước tắt;
+        // POS và bán hàng lọc theo activeInBranch, nên nếu không bật lại thì SP không hiện sau khi kích hoạt shop.
+        List<BranchProduct> branchProducts = branchProductRepository.findByProductIdAndDeletedFalse(productId);
         if (!newActiveState) {
-            List<BranchProduct> branchProducts = branchProductRepository.findByProductIdAndDeletedFalse(productId);
             branchProducts.forEach(bp -> bp.setActiveInBranch(false));
+        } else {
+            branchProducts.forEach(bp -> bp.setActiveInBranch(true));
+        }
+        if (!branchProducts.isEmpty()) {
             branchProductRepository.saveAll(branchProducts);
         }
 
@@ -401,13 +406,14 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                 String.format("%s sản phẩm '%s' (SKU: %s) ở cấp shop%s",
                         newActiveState ? "Kích hoạt" : "Ngưng kinh doanh",
                         product.getName(), product.getSku(),
-                        newActiveState ? "" : " — đã tắt activeInBranch tại tất cả chi nhánh"));
+                        newActiveState
+                                ? " — đã bật activeInBranch tại tất cả chi nhánh"
+                                : " — đã tắt activeInBranch tại tất cả chi nhánh"));
 
         // Invalidate cache toàn shop
         productCache.evictByShop(shopId);
 
         // Trả về response đại diện (BranchProduct đầu tiên nếu có)
-        List<BranchProduct> branchProducts = branchProductRepository.findByProductIdAndDeletedFalse(productId);
         return toProductResponse(branchProducts.isEmpty() ? null : branchProducts.get(0), product);
     }
 
@@ -639,6 +645,24 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         return variants;
     }
 
+    /**
+     * Khởi tạo {@link BranchProductVariant} từ {@link Product#getVariants()} (giá/tồn mặc định giống {@link #createBranchProducts}).
+     * Mỗi lần gọi trả về list mới — gắn vào từng {@link BranchProduct} riêng biệt.
+     */
+    private List<BranchProductVariant> buildInitialBranchVariantsFromProduct(Product product) {
+        if (product.getVariants() == null || product.getVariants().isEmpty()) {
+            return null;
+        }
+        return product.getVariants().stream()
+                .map(v -> BranchProductVariant.builder()
+                        .variantId(v.getVariantId())
+                        .quantity(0)
+                        .price(v.getPrice())
+                        .branchCostPrice(v.getCostPrice())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     private List<BranchProduct> createBranchProducts(Shop shop, Product product, List<String> branchIds) {
         List<BranchProduct> branchProducts = new ArrayList<>();
         if (branchIds == null || branchIds.isEmpty()) return branchProducts;
@@ -653,21 +677,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
             throw new BusinessException(ApiCode.PRODUCT_EXISTS_IN_BRANCH);
         }
 
-        // Seed BranchProductVariant từ ProductVariant (giá mặc định của từng biến thể)
-        List<BranchProductVariant> seededVariants = null;
-        if (product.getVariants() != null && !product.getVariants().isEmpty()) {
-            seededVariants = product.getVariants().stream()
-                    .map(v -> BranchProductVariant.builder()
-                            .variantId(v.getVariantId())
-                            .quantity(0)
-                            .price(v.getPrice())
-                            .branchCostPrice(v.getCostPrice())
-                            .build())
-                    .collect(Collectors.toList());
-        }
-        final List<BranchProductVariant> finalSeededVariants = seededVariants;
-
-        // Khởi tạo BranchProduct với giá mặc định từ Product
+        // Khởi tạo BranchProduct với giá mặc định từ Product (mỗi chi nhánh một bản copy danh sách biến thể)
         for (String branchId : branchIds) {
             if (StringUtils.hasText(branchId)) {
                 BranchProduct branchProduct = BranchProduct.builder()
@@ -679,7 +689,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         .price(product.getDefaultPrice()) // Lấy giá mặc định từ Product
                         .branchCostPrice(product.getCostPrice())
                         .activeInBranch(product.isActive())
-                        .variants(finalSeededVariants)
+                        .variants(buildInitialBranchVariantsFromProduct(product))
                         .build();
                 branchProducts.add(branchProduct);
             }
@@ -791,7 +801,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         if (products.isEmpty()) return;
 
         // Branch vừa được tạo mới → chắc chắn chưa có BranchProduct nào
-        // Seed BranchProduct cho tất cả products hiện có của shop
+        // Seed BranchProduct cho tất cả products hiện có (kèm branchVariants từ Product.variants — đồng bộ với createBranchProducts)
         List<BranchProduct> branchProducts = products.stream()
                 .map(p -> BranchProduct.builder()
                         .productId(p.getId())
@@ -802,6 +812,7 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         .price(p.getDefaultPrice())
                         .branchCostPrice(p.getCostPrice())
                         .activeInBranch(p.isActive())
+                        .variants(buildInitialBranchVariantsFromProduct(p))
                         .build())
                 .collect(Collectors.toList());
 

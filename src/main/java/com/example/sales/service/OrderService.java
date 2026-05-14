@@ -22,6 +22,7 @@ import com.example.sales.model.*;
 import com.example.sales.repository.*;
 import com.example.sales.service.tax.OrderTaxApplier;
 import com.example.sales.util.OrderDisplayUtils;
+import com.example.sales.util.PromotionSelection;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -451,17 +452,18 @@ public class OrderService extends BaseService {
         return v.getPrice() > 0 ? v.getPrice() : bp.getPrice();
     }
 
-    private Promotion findApplicablePromotion(String shopId, String branchId, String productId) {
+    private Promotion findApplicablePromotion(String shopId, String branchId, String productId,
+                                              double unitBeforePromo) {
         LocalDateTime now = LocalDateTime.now();
-        return promotionRepository.findByShopIdAndDeletedFalse(shopId).stream()
+        List<Promotion> candidates = promotionRepository.findByShopIdAndDeletedFalse(shopId).stream()
                 .filter(Promotion::isActive)
-                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId)) // Khuyến mãi có thể áp dụng cho toàn bộ shop (branchId = null) hoặc riêng cho 1 branch
+                .filter(p -> p.getBranchId() == null || p.getBranchId().equals(branchId))
                 .filter(p -> !p.getStartDate().isAfter(now) && !p.getEndDate().isBefore(now))
                 .filter(p -> p.getApplicableProductIds() == null
                         || p.getApplicableProductIds().isEmpty()
-                        || p.getApplicableProductIds().contains(productId)) // Áp dụng cho masterProduct ID
-                .findFirst()
-                .orElse(null);
+                        || p.getApplicableProductIds().contains(productId))
+                .collect(Collectors.toList());
+        return PromotionSelection.selectWinningPromotion(candidates, unitBeforePromo);
     }
 
     public Page<OrderResponse> getShopOrders(String shopId, String branchId, Pageable pageable) {
@@ -1331,7 +1333,7 @@ public class OrderService extends BaseService {
         String promoName = null;
         String promoLabel = null;
 
-        Promotion promo = findApplicablePromotion(shopId, branchId, masterProduct.getId());
+        Promotion promo = findApplicablePromotion(shopId, branchId, masterProduct.getId(), unitBeforePromo);
         if (promo != null) {
             promoId = promo.getId();
             promoName = promo.getName();

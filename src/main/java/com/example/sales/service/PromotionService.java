@@ -36,11 +36,14 @@ public class PromotionService {
         String branchId = (request.getBranchId() != null && !request.getBranchId().isBlank())
                 ? request.getBranchId() : null;
 
+        int priority = request.getPriority() != null ? request.getPriority() : 0;
+
         Promotion promotion = Promotion.builder()
                 .shopId(shopId)
                 .name(request.getName())
                 .discountType(request.getDiscountType())
                 .discountValue(request.getDiscountValue())
+                .priority(priority)
                 .applicableProductIds(request.getApplicableProductIds())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
@@ -63,13 +66,16 @@ public class PromotionService {
                 .filter(p -> p.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PROMOTION_NOT_FOUND));
 
-        if (!Objects.equals(promotion.getBranchId(), request.getBranchId())) {
+        String requestBranchId = (request.getBranchId() != null && !request.getBranchId().isBlank())
+                ? request.getBranchId() : null;
+        if (!Objects.equals(promotion.getBranchId(), requestBranchId)) {
             throw new BusinessException(ApiCode.UNAUTHORIZED);
         }
 
         promotion.setName(request.getName());
         promotion.setDiscountType(request.getDiscountType());
         promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setPriority(request.getPriority() != null ? request.getPriority() : 0);
         promotion.setApplicableProductIds(request.getApplicableProductIds());
         promotion.setStartDate(request.getStartDate());
         promotion.setEndDate(request.getEndDate());
@@ -98,6 +104,7 @@ public class PromotionService {
                 .name(p.getName())
                 .discountType(p.getDiscountType())
                 .discountValue(p.getDiscountValue())
+                .priority(p.getPriority())
                 .applicableProductIds(p.getApplicableProductIds())
                 .startDate(p.getStartDate())
                 .endDate(p.getEndDate())
