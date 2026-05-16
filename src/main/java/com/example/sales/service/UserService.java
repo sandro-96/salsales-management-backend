@@ -30,10 +30,11 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ApiCode.USER_NOT_FOUND));
 
-        // Validate phone number if countryCode is provided
-        if (request.getCountryCode() != null && request.getPhone() != null) {
-            Country country = Country.fromCode(request.getCountryCode());
-            if (!request.getPhone().matches(country.getPhonePattern())) {
+        // Validate only when both country and non-empty phone are sent (partial PATCH-style updates).
+        if (StringUtils.hasText(request.getCountryCode()) && StringUtils.hasText(request.getPhone())) {
+            Country country = Country.fromCode(request.getCountryCode().trim());
+            String phone = request.getPhone().trim();
+            if (!phone.matches(country.getPhonePattern())) {
                 throw new BusinessException(ApiCode.INVALID_PHONE_NUMBER);
             }
         }
@@ -49,7 +50,7 @@ public class UserService {
             user.setMiddleName(request.getMiddleName());
         }
         if (request.getPhone() != null) {
-            user.setPhone(request.getPhone());
+            user.setPhone(StringUtils.hasText(request.getPhone()) ? request.getPhone().trim() : null);
         }
         if (request.getAddress() != null) {
             user.setAddress(request.getAddress());
