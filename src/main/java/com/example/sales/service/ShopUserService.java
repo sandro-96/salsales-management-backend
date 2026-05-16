@@ -130,12 +130,14 @@ public class ShopUserService extends BaseService {
                 .type(NotificationType.STAFF_ADDED)
                 .shopId(shopId)
                 .recipient(user.getId())
-                .title("Bạn đã được thêm vào cửa hàng")
-                .message(String.format("Bạn đã được thêm vào cửa hàng \"%s\" với vai trò %s.", shop.getName(), role))
                 .referenceId(shopId)
                 .referenceType("SHOP")
                 .actorId(performedByUserId)
                 .actorName(actor != null ? (actor.getFullName() != null ? actor.getFullName() : actor.getEmail()) : null)
+                .templateVar("titleKey", "STAFF_ADDED")
+                .templateVar("messageKey", "STAFF_ADDED")
+                .templateVar("shopName", shop.getName())
+                .templateVar("role", role.name())
                 .build());
 
         return toMemberResponse(savedShopUser, user, null);
@@ -218,12 +220,13 @@ public class ShopUserService extends BaseService {
                 .type(NotificationType.STAFF_REMOVED)
                 .shopId(shopId)
                 .recipient(userId)
-                .title("Bạn đã bị gỡ khỏi cửa hàng")
-                .message(String.format("Bạn không còn là thành viên của cửa hàng \"%s\".", shop.getName()))
                 .referenceId(shopId)
                 .referenceType("SHOP")
                 .actorId(performedByUserId)
                 .actorName(actor != null ? (actor.getFullName() != null ? actor.getFullName() : actor.getEmail()) : null)
+                .templateVar("titleKey", "STAFF_REMOVED")
+                .templateVar("messageKey", "STAFF_REMOVED")
+                .templateVar("shopName", shop.getName())
                 .build());
     }
 

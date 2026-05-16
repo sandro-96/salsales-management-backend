@@ -49,6 +49,10 @@ public class Branch extends BaseEntity {
     private String wifiSsid;
     private String wifiPassword;
 
+    /** Ngôn ngữ in hóa đơn / bill tại chi nhánh: {@code vi} hoặc {@code en}. */
+    @Builder.Default
+    private String invoiceLocale = "vi";
+
     @Builder.Default
     private boolean isDefault = false;
     @Builder.Default

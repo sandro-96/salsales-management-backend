@@ -177,7 +177,8 @@ public class OrderController {
             @RequestParam @Parameter(description = "ID chi nhánh") String branchId,
             @RequestParam @Parameter(description = "Tổng tiền hàng (cùng nghĩa totalPrice lúc tạo đơn)") double totalPrice) {
         if (totalPrice < 0 || totalPrice > 1_000_000_000_000d) {
-            return ApiResponseDto.error(ApiCode.VALIDATION_ERROR, "totalPrice must be between 0 and 1e12", null);
+            return ApiResponseDto.errorWithDetail(
+                    ApiCode.VALIDATION_ERROR, "totalPrice must be between 0 and 1e12");
         }
         OrderTaxSnapshot snapshot = orderTaxApplier.preview(shopId, branchId, totalPrice);
         return ApiResponseDto.success(ApiCode.ORDER_TAX_PREVIEW, snapshot);

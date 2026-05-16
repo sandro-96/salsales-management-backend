@@ -31,6 +31,7 @@ public class InAppNotificationSender implements NotificationSender {
                 envelope.getType(),
                 envelope.getTitle(),
                 envelope.getMessage(),
+                envelope.getTemplateVars(),
                 envelope.getReferenceId(),
                 envelope.getReferenceType(),
                 envelope.getActorId(),

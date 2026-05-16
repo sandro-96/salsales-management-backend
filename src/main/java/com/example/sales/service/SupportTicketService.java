@@ -295,11 +295,15 @@ public class SupportTicketService {
                 .toList();
 
         if (!adminIds.isEmpty()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("titleKey", "TICKET_CREATED");
+            data.put("messageKey", "TICKET_CREATED");
+            data.put("actor", ticket.getUserName());
+            data.put("subject", ticket.getSubject());
             notificationService.sendToMultiple(
                     ticket.getShopId(), adminIds,
                     NotificationType.TICKET_CREATED,
-                    "Yêu cầu hỗ trợ mới",
-                    ticket.getUserName() + " đã tạo ticket: " + ticket.getSubject(),
+                    null, null, data,
                     ticket.getId(), "TICKET",
                     creator.getId(), ticket.getUserName());
         }
@@ -316,11 +320,12 @@ public class SupportTicketService {
         if (replierIsCreator) {
             // Người tạo ticket phản hồi — ưu tiên báo assignee; nếu chưa assign thì fan-out tất cả admin.
             String assigneeId = ticket.getAssigneeId();
+            Map<String, Object> replyData = ticketReplyTemplateData(
+                    reply.getUserName(), ticket.getSubject(), false);
             if (assigneeId != null && !assigneeId.isBlank()) {
                 notificationService.send(ticket.getShopId(), assigneeId,
                         NotificationType.TICKET_REPLIED,
-                        "Phản hồi mới trên ticket",
-                        reply.getUserName() + " đã phản hồi: " + ticket.getSubject(),
+                        null, null, replyData,
                         ticket.getId(), "TICKET",
                         replier.getId(), reply.getUserName());
             } else {
@@ -328,20 +333,21 @@ public class SupportTicketService {
                         .filter(id -> !Objects.equals(id, replier.getId()))
                         .toList();
                 if (!adminIds.isEmpty()) {
+                    Map<String, Object> unassignedData = ticketReplyTemplateData(
+                            reply.getUserName(), ticket.getSubject(), true);
                     notificationService.sendToMultiple(ticket.getShopId(), adminIds,
                             NotificationType.TICKET_REPLIED,
-                            "Phản hồi mới trên ticket (chưa assign)",
-                            reply.getUserName() + " đã phản hồi: " + ticket.getSubject(),
+                            null, null, unassignedData,
                             ticket.getId(), "TICKET",
                             replier.getId(), reply.getUserName());
                 }
             }
         } else {
-            // Admin hoặc thành viên khác (non-creator) phản hồi → báo cho creator.
+            Map<String, Object> replyData = ticketReplyTemplateData(
+                    reply.getUserName(), ticket.getSubject(), false);
             notificationService.send(ticket.getShopId(), ticket.getUserId(),
                     NotificationType.TICKET_REPLIED,
-                    "Phản hồi mới trên ticket",
-                    reply.getUserName() + " đã phản hồi: " + ticket.getSubject(),
+                    null, null, replyData,
                     ticket.getId(), "TICKET",
                     replier.getId(), reply.getUserName());
 
@@ -357,10 +363,14 @@ public class SupportTicketService {
         if (previous == next) return;
         if (ticket.getUserId().equals(actorId)) return;
 
+        Map<String, Object> statusData = new HashMap<>();
+        statusData.put("titleKey", "TICKET_STATUS_CHANGED");
+        statusData.put("messageKey", "TICKET_STATUS_CHANGED");
+        statusData.put("subject", ticket.getSubject());
+        statusData.put("status", next.name());
         notificationService.send(ticket.getShopId(), ticket.getUserId(),
                 NotificationType.TICKET_STATUS_CHANGED,
-                "Trạng thái ticket đã thay đổi",
-                "Ticket \"" + ticket.getSubject() + "\" đã chuyển sang " + next,
+                null, null, statusData,
                 ticket.getId(), "TICKET",
                 actorId, null);
 
@@ -373,6 +383,16 @@ public class SupportTicketService {
 
     private static boolean isHighPriority(TicketPriority priority) {
         return priority == TicketPriority.HIGH || priority == TicketPriority.URGENT;
+    }
+
+    private static Map<String, Object> ticketReplyTemplateData(
+            String actor, String subject, boolean unassigned) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("titleKey", unassigned ? "TICKET_REPLIED_UNASSIGNED" : "TICKET_REPLIED");
+        data.put("messageKey", "TICKET_REPLIED");
+        data.put("actor", actor);
+        data.put("subject", subject);
+        return data;
     }
 
     private void sendTicketCreatedEmailsAsync(SupportTicket ticket, User creator) {

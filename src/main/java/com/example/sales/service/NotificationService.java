@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -25,12 +26,22 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    public void send(String shopId, String userId, NotificationType type,
+                     String title, String message,
+                     String referenceId, String referenceType,
+                     String actorId, String actorName) {
+        send(shopId, userId, type, title, message, null,
+                referenceId, referenceType, actorId, actorName);
+    }
+
     /**
-     * Create and persist a notification, then push via WebSocket.
-     * This is the main entry-point for other services to trigger notifications.
+     * Persist notification and push via WebSocket.
+     * Prefer {@code templateData} for system types; {@code title}/{@code message} optional
+     * (legacy / BROADCAST).
      */
     public void send(String shopId, String userId, NotificationType type,
                      String title, String message,
+                     Map<String, Object> templateData,
                      String referenceId, String referenceType,
                      String actorId, String actorName) {
         Notification notification = Notification.builder()
@@ -39,6 +50,7 @@ public class NotificationService {
                 .type(type)
                 .title(title)
                 .message(message)
+                .templateData(templateData)
                 .read(false)
                 .referenceId(referenceId)
                 .referenceType(referenceType)
@@ -59,15 +71,22 @@ public class NotificationService {
         }
     }
 
-    /**
-     * Send a notification to multiple users at once (e.g. all managers of a shop).
-     */
     public void sendToMultiple(String shopId, List<String> userIds, NotificationType type,
                                String title, String message,
                                String referenceId, String referenceType,
                                String actorId, String actorName) {
+        sendToMultiple(shopId, userIds, type, title, message, null,
+                referenceId, referenceType, actorId, actorName);
+    }
+
+    public void sendToMultiple(String shopId, List<String> userIds, NotificationType type,
+                               String title, String message,
+                               Map<String, Object> templateData,
+                               String referenceId, String referenceType,
+                               String actorId, String actorName) {
         for (String userId : userIds) {
-            send(shopId, userId, type, title, message, referenceId, referenceType, actorId, actorName);
+            send(shopId, userId, type, title, message, templateData,
+                    referenceId, referenceType, actorId, actorName);
         }
     }
 
@@ -142,6 +161,7 @@ public class NotificationService {
                 .type(n.getType())
                 .title(n.getTitle())
                 .message(n.getMessage())
+                .templateData(n.getTemplateData())
                 .read(n.isRead())
                 .referenceId(n.getReferenceId())
                 .referenceType(n.getReferenceType())

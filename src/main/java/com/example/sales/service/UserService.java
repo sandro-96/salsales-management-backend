@@ -76,6 +76,9 @@ public class UserService {
         if (request.getBirthDate() != null) {
             user.setBirthDate(request.getBirthDate());
         }
+        if (request.getLanguage() != null && !request.getLanguage().isBlank()) {
+            user.setLanguage(request.getLanguage().trim().toLowerCase());
+        }
         return buildUserResponse(userRepository.save(user));
     }
 

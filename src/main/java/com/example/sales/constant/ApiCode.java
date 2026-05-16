@@ -3,6 +3,8 @@ package com.example.sales.constant;
 
 import lombok.Getter;
 
+import java.util.Locale;
+
 @Getter
 public enum ApiCode {
     // Success
@@ -134,6 +136,11 @@ public enum ApiCode {
     ApiCode(String code, String message) {
         this.code = code;
         this.message = message;
+    }
+
+    /** i18n key in {@code messages_en.properties} / {@code messages_vi.properties}. */
+    public String getMessageKey() {
+        return "api." + name().toLowerCase(Locale.ROOT);
     }
 
 }

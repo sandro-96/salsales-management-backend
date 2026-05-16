@@ -18,6 +18,7 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
 
+import java.util.List;
 import java.util.Locale;
 
 @Configuration
@@ -32,7 +33,8 @@ public class WebConfig implements WebMvcConfigurer {
     @Bean
     public AcceptHeaderLocaleResolver localeResolver() {
         AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();
-        resolver.setDefaultLocale(Locale.ENGLISH);
+        resolver.setDefaultLocale(Locale.forLanguageTag("vi"));
+        resolver.setSupportedLocales(List.of(Locale.forLanguageTag("vi"), Locale.ENGLISH));
         return resolver;
     }
 
@@ -41,6 +43,7 @@ public class WebConfig implements WebMvcConfigurer {
         ReloadableResourceBundleMessageSource ms = new ReloadableResourceBundleMessageSource();
         ms.setBasename("classpath:messages");
         ms.setDefaultEncoding("UTF-8");
+        ms.setFallbackToSystemLocale(false);
         return ms;
     }
 

@@ -42,4 +42,8 @@ public class UpdateProfileRequest {
 
     @Size(max = 2, message = "Mã quốc gia không được vượt quá 2 ký tự")
     private String countryCode;
+
+    /** UI locale: {@code vi} or {@code en} (used for API/email i18n). */
+    @Size(max = 10)
+    private String language;
 }

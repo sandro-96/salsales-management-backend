@@ -47,6 +47,7 @@ public class BranchService {
                 .taxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()))
                 .wifiSsid(normalizeOptionalString(req.getWifiSsid()))
                 .wifiPassword(normalizeOptionalString(req.getWifiPassword()))
+                .invoiceLocale(normalizeInvoiceLocale(req.getInvoiceLocale()))
                 .active(req.isActive())
                 .isDefault(req.isDefault())
                 .slug(generateUniqueBranchSlug(
@@ -91,6 +92,7 @@ public class BranchService {
         branch.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()));
         branch.setWifiSsid(normalizeOptionalString(req.getWifiSsid()));
         branch.setWifiPassword(normalizeOptionalString(req.getWifiPassword()));
+        branch.setInvoiceLocale(normalizeInvoiceLocale(req.getInvoiceLocale()));
         branch.setActive(req.isActive());
 
         Branch saved = branchRepository.save(branch);
@@ -167,6 +169,7 @@ public class BranchService {
                 .taxRegistrationNumber(branch.getTaxRegistrationNumber())
                 .wifiSsid(branch.getWifiSsid())
                 .wifiPassword(branch.getWifiPassword())
+                .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .createdAt(branch.getCreatedAt())
@@ -182,6 +185,7 @@ public class BranchService {
                 .phone(branch.getPhone())
                 .wifiSsid(branch.getWifiSsid())
                 .wifiPassword(branch.getWifiPassword())
+                .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .build();
@@ -205,11 +209,23 @@ public class BranchService {
                 .taxRegistrationNumber(branch.getTaxRegistrationNumber())
                 .wifiSsid(branch.getWifiSsid())
                 .wifiPassword(branch.getWifiPassword())
+                .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
                 .createdAt(branch.getCreatedAt())
                 .updatedAt(branch.getUpdatedAt())
                 .build();
+    }
+
+    private static String normalizeInvoiceLocale(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return "vi";
+        }
+        String v = raw.trim().toLowerCase();
+        if (v.startsWith("en")) {
+            return "en";
+        }
+        return "vi";
     }
 
     private static String normalizeTaxRegistrationNumber(String raw) {

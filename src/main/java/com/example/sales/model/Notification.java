@@ -7,6 +7,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.Map;
+
 @Document(collection = "notifications")
 @CompoundIndex(name = "user_read_idx", def = "{'userId': 1, 'read': 1}")
 @CompoundIndex(name = "user_shop_idx", def = "{'userId': 1, 'shopId': 1}")
@@ -35,4 +37,7 @@ public class Notification extends BaseEntity {
 
     private String actorId;
     private String actorName;
+
+    /** Structured data for client-side i18n (shopName, titleKey, daysLeft, …). */
+    private Map<String, Object> templateData;
 }

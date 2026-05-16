@@ -17,6 +17,8 @@ public class BranchListResponse {
     private String wifiSsid;
     private String wifiPassword;
 
+    private String invoiceLocale;
+
     private boolean active;
     private boolean isDefault;
 }

@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
         log.warn("Validation error at {}: {}", request.getDescription(false), errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), errors));
+                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, null, errors));
     }
 
     /**
@@ -46,7 +46,7 @@ public class GlobalExceptionHandler {
         log.warn("Access denied at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponseDto.error(ApiCode.ACCESS_DENIED, ApiCode.ACCESS_DENIED.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.errorWithDetail(ApiCode.ACCESS_DENIED, ex.getMessage()));
     }
 
     /**
@@ -59,7 +59,7 @@ public class GlobalExceptionHandler {
                 request.getDescription(false), ex.getError().getCode(), ex.getError().getMessage());
         return ResponseEntity
                 .status(getHttpStatus(ex.getError()))
-                .body(ApiResponseDto.error(ex.getError(), ex.getError().getMessage(), null));
+                .body(ApiResponseDto.error(ex.getError()));
     }
 
     /**
@@ -71,7 +71,7 @@ public class GlobalExceptionHandler {
         log.warn("Resource not found at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(ApiResponseDto.error(ApiCode.NOT_FOUND, ApiCode.NOT_FOUND.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.errorWithDetail(ApiCode.NOT_FOUND, ex.getMessage()));
     }
 
     /**
@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
                 ex.getMessage(), ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponseDto.error(ApiCode.INTERNAL_ERROR, ApiCode.INTERNAL_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.errorWithDetail(ApiCode.INTERNAL_ERROR, ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -97,7 +97,7 @@ public class GlobalExceptionHandler {
         log.warn("Invalid argument at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.errorWithDetail(ApiCode.VALIDATION_ERROR, ex.getMessage()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -106,7 +106,7 @@ public class GlobalExceptionHandler {
         log.warn("Invalid JSON at {}: {}", request.getDescription(false), ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponseDto.error(ApiCode.VALIDATION_ERROR, ApiCode.VALIDATION_ERROR.getMessage(), ex.getMessage()));
+                .body(ApiResponseDto.errorWithDetail(ApiCode.VALIDATION_ERROR, ex.getMessage()));
     }
 
     /**

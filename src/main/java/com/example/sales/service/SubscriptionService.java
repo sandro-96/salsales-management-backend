@@ -139,23 +139,18 @@ public class SubscriptionService {
                 .build();
         historyRepository.save(history);
 
-        String successMsg = "Shop \"" + shop.getName() + "\" đã được gia hạn tới ngày "
-                + nextEnd.toLocalDate().format(FMT_D) + ". "
-                + "Ghi nhận thanh toán lúc " + now.format(FMT_DT) + ". "
-                + "Chu kỳ hiện tại kết thúc: " + nextEnd.format(FMT_DT) + ".";
-
         notificationDispatcher.dispatch(NotificationEnvelope.builder()
                 .type(NotificationType.BILLING_PAYMENT_SUCCESS)
                 .shopId(shopId)
                 .recipient(shop.getOwnerId())
-                .title("Thanh toán thành công")
-                .message(successMsg)
                 .referenceId(history.getId())
                 .referenceType("SUBSCRIPTION")
+                .templateVar("titleKey", "BILLING_PAYMENT_SUCCESS")
+                .templateVar("messageKey", "BILLING_PAYMENT_SUCCESS")
                 .templateVar("shopName", shop.getName())
                 .templateVar("shopId", shop.getId())
                 .templateVar("amount", String.format("%,d", BASIC_AMOUNT_VND))
-                .templateVar("until", nextEnd.toLocalDate().format(FMT_D))
+                .templateVar("untilDate", nextEnd.toLocalDate().format(FMT_D))
                 .templateVar("paidAt", now.format(FMT_DT))
                 .templateVar("periodEndAt", nextEnd.format(FMT_DT))
                 .templateVar("gateway", gateway != null ? gateway.name() : "MANUAL")
@@ -243,27 +238,24 @@ public class SubscriptionService {
 
         LocalDateTime failedAt = txn.getCompletedAt() != null
                 ? txn.getCompletedAt() : LocalDateTime.now();
-        String resultLabel = txn.getStatus() == PaymentTransactionStatus.CANCELLED
-                ? "đã bị huỷ" : "không thành công";
+        String paymentResult = txn.getStatus() == PaymentTransactionStatus.CANCELLED
+                ? "CANCELLED" : "FAILED";
         String safeReason = StringUtils.hasText(reason)
                 ? reason
                 : (StringUtils.hasText(txn.getFailureReason())
                         ? txn.getFailureReason()
-                        : "Giao dịch không thành công.");
+                        : "");
         String txnIdForMsg = StringUtils.hasText(txn.getProviderTxnRef())
                 ? txn.getProviderTxnRef() : (txn.getId() != null ? txn.getId() : "");
-        String message = "Giao dịch thanh toán cho cửa hàng \"" + shop.getName() + "\" "
-                + resultLabel + ". Mã giao dịch: " + txnIdForMsg
-                + (StringUtils.hasText(safeReason) ? ". Lý do: " + safeReason : ".");
 
         notificationDispatcher.dispatch(NotificationEnvelope.builder()
                 .type(NotificationType.BILLING_PAYMENT_FAILED)
                 .shopId(shop.getId())
                 .recipient(ownerId)
-                .title("Thanh toán không thành công")
-                .message(message)
                 .referenceId(txn.getId())
                 .referenceType("PAYMENT_TRANSACTION")
+                .templateVar("titleKey", "BILLING_PAYMENT_FAILED")
+                .templateVar("messageKey", "BILLING_PAYMENT_FAILED")
                 .templateVar("shopName", shop.getName())
                 .templateVar("shopId", shop.getId())
                 .templateVar("amount", String.format("%,d", txn.getAmountVnd()))
@@ -271,7 +263,7 @@ public class SubscriptionService {
                 .templateVar("transactionId", txnIdForMsg)
                 .templateVar("failedAt", failedAt.format(FMT_DT))
                 .templateVar("reason", safeReason)
-                .templateVar("resultLabel", resultLabel)
+                .templateVar("paymentResult", paymentResult)
                 .templateVar("subscriptionStatus", status != null ? status.name() : "")
                 .templateVar("periodEndAt", periodEndAt)
                 .templateVar("until", until)
@@ -308,17 +300,14 @@ public class SubscriptionService {
             return;
         }
         String amountStr = String.format("%,d", amountVnd);
-        String msg = "Shop \"" + shop.getName() + "\" (" + shop.getId() + ") đã báo đã chuyển khoản "
-                + amountStr + " ₫. Nội dung / mã tham chiếu: " + transactionId
-                + ". Vui lòng đối soát sao kê và xác nhận trên trang admin billing.";
 
         NotificationEnvelope.NotificationEnvelopeBuilder b = NotificationEnvelope.builder()
                 .type(NotificationType.BILLING_MANUAL_TRANSFER_PENDING)
                 .shopId(shop.getId())
-                .title("Chờ xác nhận chuyển khoản subscription")
-                .message(msg)
                 .referenceId(transactionId)
                 .referenceType("PAYMENT_TRANSACTION")
+                .templateVar("titleKey", "BILLING_MANUAL_TRANSFER_PENDING")
+                .templateVar("messageKey", "BILLING_MANUAL_TRANSFER_PENDING")
                 .templateVar("shopName", shop.getName())
                 .templateVar("shopId", shop.getId())
                 .templateVar("transactionId", transactionId)
@@ -396,14 +385,16 @@ public class SubscriptionService {
                 .build());
 
         if (sub.getOwnerId() != null) {
+            String titleKey = fromTrial ? "BILLING_PLAN_EXPIRED_TRIAL" : "BILLING_PLAN_EXPIRED";
             notificationDispatcher.dispatch(NotificationEnvelope.builder()
                     .type(NotificationType.BILLING_PLAN_EXPIRED)
                     .shopId(sub.getShopId())
                     .recipient(sub.getOwnerId())
-                    .title(fromTrial ? "Thời gian dùng thử đã kết thúc" : "Gói dịch vụ đã hết hạn")
-                    .message("Vui lòng thanh toán 99.000đ để tiếp tục sử dụng đầy đủ tính năng.")
                     .referenceId(sub.getId())
                     .referenceType("SUBSCRIPTION")
+                    .templateVar("titleKey", titleKey)
+                    .templateVar("messageKey", "BILLING_PLAN_EXPIRED")
+                    .templateVar("isTrial", fromTrial)
                     .dedupeKey("BILLING_EXPIRED:" + sub.getShopId()
                             + ":" + LocalDateTime.now().toLocalDate())
                     .build());

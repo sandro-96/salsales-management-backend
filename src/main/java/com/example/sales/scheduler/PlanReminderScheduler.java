@@ -1,4 +1,3 @@
-// File: src/main/java/com/example/sales/scheduler/PlanReminderScheduler.java
 package com.example.sales.scheduler;
 
 import com.example.sales.constant.NotificationType;
@@ -21,19 +20,14 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Mỗi sáng 7h gửi nhắc nhở thanh toán:
- * - T-3 ngày: cảnh báo nhẹ
- * - T-1 ngày: cảnh báo khẩn
- * <p>
- * Dedupe theo (type + shopId + expiryDate) nên mỗi mốc chỉ gửi 1 lần cho cùng kỳ.
- * Áp dụng cho subscription ACTIVE (hết {@code currentPeriodEnd}) và TRIAL ({@code trialEndsAt}).
+ * Mỗi sáng 7h gửi nhắc nhở thanh toán (T-3, T-1). Dedupe theo shop + expiry + offset.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class PlanReminderScheduler {
 
-    private static final int[] REMIND_DAY_OFFSETS = { 3, 1 };
+    private static final int[] REMIND_DAY_OFFSETS = {3, 1};
 
     private final SubscriptionRepository subscriptionRepository;
     private final ShopRepository shopRepository;
@@ -68,25 +62,26 @@ public class PlanReminderScheduler {
         Shop shop = shopOpt.get();
 
         boolean isUrgent = matchingOffset == 1;
-        String title = buildTitle(isTrial, isUrgent);
-        String message = buildMessage(shop.getName(), expiryDate, isTrial, isUrgent, matchingOffset);
+        String titleKey = resolveTitleKey(isTrial, isUrgent);
+        String messageKey = resolveMessageKey(isTrial, isUrgent);
 
         notificationDispatcher.dispatch(NotificationEnvelope.builder()
                 .type(NotificationType.BILLING_PLAN_EXPIRING_SOON)
                 .shopId(sub.getShopId())
                 .recipient(sub.getOwnerId())
-                .title(title)
-                .message(message)
                 .referenceId(sub.getShopId())
                 .referenceType("SUBSCRIPTION")
+                .templateVar("titleKey", titleKey)
+                .templateVar("messageKey", messageKey)
                 .templateVar("shopName", shop.getName())
-                .templateVar("expiryDate", expiryDate)
+                .templateVar("expiryDate", expiryDate.toString())
                 .templateVar("daysLeft", matchingOffset)
                 .templateVar("isTrial", isTrial)
+                .templateVar("isUrgent", isUrgent)
                 .dedupeKey("BILLING_EXPIRING_SOON:T-" + matchingOffset + ":"
                         + sub.getShopId() + ":" + expiryDate)
                 .build());
-        log.info("📧 Nhắc shop {} (T-{} ngày) hết hạn {} ({})",
+        log.info("Plan reminder shop {} (T-{} days) expiry {} ({})",
                 shop.getName(), matchingOffset, expiryDate, isTrial ? "TRIAL" : "ACTIVE");
     }
 
@@ -97,26 +92,25 @@ public class PlanReminderScheduler {
         return -1;
     }
 
-    private String buildTitle(boolean isTrial, boolean isUrgent) {
+    private static String resolveTitleKey(boolean isTrial, boolean isUrgent) {
         if (isTrial) {
             return isUrgent
-                    ? "⚠️ Thời gian dùng thử kết thúc ngày mai"
-                    : "Thời gian dùng thử sắp kết thúc";
+                    ? "BILLING_PLAN_EXPIRING_SOON_TRIAL_URGENT"
+                    : "BILLING_PLAN_EXPIRING_SOON_TRIAL";
         }
         return isUrgent
-                ? "⚠️ Gói dịch vụ hết hạn ngày mai"
-                : "Gói dịch vụ sắp hết hạn";
+                ? "BILLING_PLAN_EXPIRING_SOON_ACTIVE_URGENT"
+                : "BILLING_PLAN_EXPIRING_SOON_ACTIVE";
     }
 
-    private String buildMessage(String shopName, LocalDate expiryDate,
-                                boolean isTrial, boolean isUrgent, int daysLeft) {
-        String prefix = isUrgent
-                ? "Shop \"" + shopName + "\" sẽ hết hạn vào " + expiryDate + " (còn 1 ngày)."
-                : "Shop \"" + shopName + "\" sẽ hết hạn vào " + expiryDate
-                        + " (còn " + daysLeft + " ngày).";
-        String suffix = isTrial
-                ? " Vui lòng thanh toán 99.000đ để tiếp tục sử dụng sau khi hết trial."
-                : " Vui lòng thanh toán 99.000đ để gia hạn và tránh gián đoạn dịch vụ.";
-        return prefix + suffix;
+    private static String resolveMessageKey(boolean isTrial, boolean isUrgent) {
+        if (isTrial) {
+            return isUrgent
+                    ? "BILLING_PLAN_EXPIRING_SOON_TRIAL_URGENT"
+                    : "BILLING_PLAN_EXPIRING_SOON_TRIAL";
+        }
+        return isUrgent
+                ? "BILLING_PLAN_EXPIRING_SOON_ACTIVE_URGENT"
+                : "BILLING_PLAN_EXPIRING_SOON_ACTIVE";
     }
 }

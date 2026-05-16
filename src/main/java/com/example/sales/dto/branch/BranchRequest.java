@@ -36,6 +36,9 @@ public class BranchRequest {
     private String wifiSsid;
     private String wifiPassword;
 
+    /** Invoice/receipt language: {@code vi} or {@code en}. */
+    private String invoiceLocale;
+
     private boolean active = true;
     private boolean isDefault = false;
 }

@@ -31,7 +31,7 @@ public class BillingTransferInfoService {
                 .amountVnd(amountVnd)
                 .transferContent(null)
                 .qrImageUrl(resolveStaticQrOnly())
-                .instructions(buildStaticInstructions(amountVnd))
+                .instructions(null)
                 .build();
     }
 
@@ -53,7 +53,7 @@ public class BillingTransferInfoService {
                 .amountVnd(amountVnd)
                 .transferContent(content)
                 .qrImageUrl(buildQrUrl(content, amountVnd))
-                .instructions(buildPaymentInstructions(amountVnd, content))
+                .instructions(null)
                 .build();
     }
 
@@ -89,22 +89,6 @@ public class BillingTransferInfoService {
         if (s == null) return "";
         String t = s.trim();
         return t.length() > 22 ? t.substring(0, 22) : t;
-    }
-
-    private String buildStaticInstructions(long amountVnd) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Số tiền: ").append(String.format("%,d", amountVnd)).append(" ₫/tháng.\n");
-        sb.append("Sau khi bấm \"Thanh toán\", hệ thống sẽ cấp mã giao dịch — vui lòng ghi đúng nội dung chuyển khoản.\n");
-        sb.append("Admin sẽ xác nhận trong thời gian làm việc; bạn nhận thông báo khi gia hạn thành công.");
-        return sb.toString();
-    }
-
-    private String buildPaymentInstructions(long amountVnd, String transferContent) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("1) Chuyển đúng ").append(String.format("%,d", amountVnd)).append(" ₫ tới tài khoản trên.\n");
-        sb.append("2) Nội dung CK: ").append(transferContent).append(" (bắt buộc khớp).\n");
-        sb.append("3) Sau khi chuyển, chờ admin xác nhận — bạn sẽ nhận thông báo khi thanh toán được ghi nhận.");
-        return sb.toString();
     }
 
     private static String expandTemplate(String template, String transactionId, String shopId, String shopName) {

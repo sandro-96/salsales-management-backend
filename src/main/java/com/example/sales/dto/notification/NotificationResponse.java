@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @Builder
@@ -23,6 +24,8 @@ public class NotificationResponse {
 
     private String actorId;
     private String actorName;
+
+    private Map<String, Object> templateData;
 
     private LocalDateTime createdAt;
 }
