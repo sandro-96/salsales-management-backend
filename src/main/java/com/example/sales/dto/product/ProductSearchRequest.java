@@ -15,4 +15,6 @@ public class ProductSearchRequest {
     private String sortBy = "createdAt";
     private String sortDir = "desc";
     private String branchId; // nếu có chi nhánh, có thể để null nếu không có
+    /** ALL | IN_STOCK | LOW_STOCK | OUT_OF_STOCK | NOT_TRACKED */
+    private String stockStatus;
 }

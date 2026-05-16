@@ -8,6 +8,7 @@ import com.example.sales.dto.product.BranchProductRequest;
 import com.example.sales.dto.product.ProductRequest;
 import com.example.sales.dto.product.ProductResponse;
 import com.example.sales.dto.product.ProductSearchRequest;
+import com.example.sales.dto.product.ProductSummaryResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.RequirePermission;
 import com.example.sales.service.FileUploadService;
@@ -108,9 +109,27 @@ public class ProductCrudController {
             @Parameter(description = "ID cửa hàng") @PathVariable String shopId,
             @Parameter(description = "Từ khóa tìm kiếm theo tên / SKU / barcode (tùy chọn)")
             @RequestParam(required = false, defaultValue = "") String keyword,
+            @Parameter(description = "Lọc trạng thái bán (Product.active)")
+            @RequestParam(required = false) Boolean active,
+            @Parameter(description = "Lọc danh mục")
+            @RequestParam(required = false) String category,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<ProductResponse> response = productCache.getAllByShop(shopId, keyword, pageable);
+        Page<ProductResponse> response =
+                productCache.getAllByShop(shopId, keyword, active, category, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
+    }
+
+    @Operation(summary = "Thống kê sản phẩm cấp shop",
+            description = "Đếm tổng / đang bán / ngừng bán theo Product.active (tùy chọn lọc keyword, category).")
+    @GetMapping("/shops/{shopId}/products/summary")
+    @RequirePermission(Permission.PRODUCT_VIEW)
+    public ResponseEntity<ApiResponseDto<ProductSummaryResponse>> getProductSummary(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable String shopId,
+            @RequestParam(required = false, defaultValue = "") String keyword,
+            @RequestParam(required = false) String category) {
+        ProductSummaryResponse summary = productCache.getProductSummary(shopId, keyword, category);
+        return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, summary));
     }
 
     @Operation(summary = "Lấy danh sách sản phẩm theo chi nhánh",
@@ -126,8 +145,11 @@ public class ProductCrudController {
             @Parameter(description = "ID chi nhánh") @PathVariable String branchId,
             @Parameter(description = "Từ khóa tìm kiếm theo tên / SKU / barcode (tùy chọn)")
             @RequestParam(required = false, defaultValue = "") String keyword,
+            @Parameter(description = "Lọc trạng thái tồn: ALL | IN_STOCK | LOW_STOCK | OUT_OF_STOCK | NOT_TRACKED")
+            @RequestParam(required = false, defaultValue = "") String stockStatus,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<ProductResponse> response = productCache.getAllByBranch(shopId, branchId, keyword, pageable);
+        Page<ProductResponse> response =
+                productCache.getAllByBranch(shopId, branchId, keyword, stockStatus, pageable);
         return ResponseEntity.ok(ApiResponseDto.success(ApiCode.PRODUCT_LIST, response));
     }
 

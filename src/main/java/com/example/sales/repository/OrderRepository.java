@@ -1,6 +1,7 @@
 // File: src/main/java/com/example/sales/repository/OrderRepository.java
 package com.example.sales.repository;
 
+import com.example.sales.constant.OrderSource;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.model.Order;
 import org.springframework.data.domain.Page;
@@ -26,6 +27,18 @@ public interface OrderRepository extends MongoRepository<Order, String> {
 
     Page<Order> findByShopIdAndBranchIdAndDeletedFalseOrderByCreatedAtDesc(
             String shopId, String branchId, Pageable pageable);
+
+    Page<Order> findByShopIdAndOrderSourceAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, OrderSource orderSource, Pageable pageable);
+
+    Page<Order> findByShopIdAndBranchIdAndOrderSourceAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, String branchId, OrderSource orderSource, Pageable pageable);
+
+    Page<Order> findByShopIdAndOrderSourceAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, OrderSource orderSource, OrderStatus status, Pageable pageable);
+
+    Page<Order> findByShopIdAndBranchIdAndOrderSourceAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, String branchId, OrderSource orderSource, OrderStatus status, Pageable pageable);
 
     @Query(value = "{ 'shopId': ?0, 'branchId': ?1, 'deleted': false, 'isPaid': false, 'status': { $nin: ?2 } }")
     Page<Order> findOpenOrdersByShopIdAndBranchId(

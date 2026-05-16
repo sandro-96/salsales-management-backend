@@ -68,8 +68,17 @@ public class ProductCache {
      */
     @Cacheable(value = CACHE_NAME, key = "#shopId + ':all:kw=' + #keyword + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
     public Page<ProductResponse> getAllByShop(String shopId, String keyword, Pageable pageable) {
-        if (!StringUtils.hasText(keyword)) {
-            // Fast path: không có keyword → query trực tiếp
+        return getAllByShop(shopId, keyword, null, null, pageable);
+    }
+
+    @Cacheable(value = CACHE_NAME, key = "#shopId + ':all:kw=' + #keyword + ':act=' + #active + ':cat=' + #category + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
+    public Page<ProductResponse> getAllByShop(
+            String shopId, String keyword, Boolean active, String category, Pageable pageable) {
+        boolean hasKeyword = StringUtils.hasText(keyword);
+        boolean hasCategory = StringUtils.hasText(category);
+        boolean hasActive = active != null;
+
+        if (!hasKeyword && !hasCategory && !hasActive) {
             Page<Product> productsPage = productRepository.findByShopIdAndDeletedFalse(shopId, pageable);
             Shop shop = loadShop(shopId);
             List<ProductResponse> responses = productsPage.getContent().stream()
@@ -77,10 +86,26 @@ public class ProductCache {
                     .collect(Collectors.toList());
             return new PageImpl<>(responses, pageable, productsPage.getTotalElements());
         }
-        // Keyword path: lọc qua ProductSearchHelper
-        ProductSearchRequest req = new ProductSearchRequest();
-        req.setKeyword(keyword);
-        return doSearch(shopId, null, req, pageable);
+
+        String kw = hasKeyword ? keyword : null;
+        String cat = hasCategory ? category : null;
+        Page<Product> productsPage =
+                productSearchHelper.findProductsAtShopLevel(shopId, kw, cat, active, pageable);
+        Shop shop = loadShop(shopId);
+        List<ProductResponse> responses = productsPage.getContent().stream()
+                .map(p -> productMapper.toResponse(null, p, shop))
+                .collect(Collectors.toList());
+        return new PageImpl<>(responses, pageable, productsPage.getTotalElements());
+    }
+
+    public com.example.sales.dto.product.ProductSummaryResponse getProductSummary(
+            String shopId, String keyword, String category) {
+        String kw = StringUtils.hasText(keyword) ? keyword : null;
+        String cat = StringUtils.hasText(category) ? category : null;
+        long total = productSearchHelper.countProductsAtShopLevel(shopId, kw, cat, null);
+        long active = productSearchHelper.countProductsAtShopLevel(shopId, kw, cat, true);
+        long inactive = productSearchHelper.countProductsAtShopLevel(shopId, kw, cat, false);
+        return new com.example.sales.dto.product.ProductSummaryResponse(total, active, inactive);
     }
 
     /**
@@ -88,18 +113,23 @@ public class ProductCache {
      * Khi có keyword sẽ tìm theo name/SKU/barcode trên collection products.
      * Cache key: "{shopId}:{branchId}:kw={keyword}:p{page}:s{size}:{sort}"
      */
-    @Cacheable(value = CACHE_NAME, key = "#shopId + ':' + #branchId + ':kw=' + #keyword + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
-    public Page<ProductResponse> getAllByBranch(String shopId, String branchId, String keyword, Pageable pageable) {
-        if (!StringUtils.hasText(keyword)) {
-            // Fast path: không có keyword → query trực tiếp
-            Page<BranchProduct> branchProductsPage =
-                    branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
-            return toResponsePage(branchProductsPage, pageable);
+    @Cacheable(value = CACHE_NAME, key = "#shopId + ':' + #branchId + ':kw=' + #keyword + ':st=' + #stockStatus + ':p' + #pageable.pageNumber + ':s' + #pageable.pageSize + ':' + #pageable.sort")
+    public Page<ProductResponse> getAllByBranch(
+            String shopId, String branchId, String keyword, String stockStatus, Pageable pageable) {
+        if (StringUtils.hasText(keyword) || StringUtils.hasText(stockStatus)) {
+            ProductSearchRequest req = new ProductSearchRequest();
+            req.setKeyword(keyword != null ? keyword : "");
+            req.setStockStatus(stockStatus);
+            return doSearch(shopId, branchId, req, pageable);
         }
-        // Keyword path: lọc qua ProductSearchHelper
-        ProductSearchRequest req = new ProductSearchRequest();
-        req.setKeyword(keyword);
-        return doSearch(shopId, branchId, req, pageable);
+        Page<BranchProduct> branchProductsPage =
+                branchProductRepository.findByShopIdAndBranchIdAndDeletedFalse(shopId, branchId, pageable);
+        return toResponsePage(branchProductsPage, pageable);
+    }
+
+    public com.example.sales.dto.inventory.InventorySummaryResponse getBranchInventorySummary(
+            String shopId, String branchId, String keyword) {
+        return productSearchHelper.computeBranchInventorySummary(shopId, branchId, keyword);
     }
 
     /**

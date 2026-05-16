@@ -5,7 +5,9 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.InventoryType;
 import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.cache.ProductCache;
 import com.example.sales.dto.inventory.InventoryRequest;
+import com.example.sales.dto.inventory.InventorySummaryResponse;
 import com.example.sales.dto.inventory.InventoryTransactionResponse;
 import com.example.sales.dto.inventory.InventoryWeightRequest;
 import com.example.sales.security.CustomUserDetails;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final ProductCache productCache;
 
     // ✅ Endpoint để nhập sản phẩm vào kho
     @PostMapping("/import")
@@ -153,6 +156,20 @@ public class InventoryController {
                 user.getId(), shopId, request.getBranchId(), request.getBranchProductId(),
                 request.getWeight(), request.getUnit(), request.getNote(), request.getReferenceId());
         return ApiResponseDto.success(ApiCode.SUCCESS, newStock);
+    }
+
+    @GetMapping("/branches/{branchId}/summary")
+    @RequirePermission(Permission.INVENTORY_VIEW)
+    @Operation(summary = "Thống kê tồn kho theo chi nhánh",
+            description = "Đếm SP theo dõi tồn, tổng tồn, sắp hết, hết hàng, không theo dõi. Hỗ trợ lọc keyword.")
+    public ApiResponseDto<InventorySummaryResponse> getBranchSummary(
+            @AuthenticationPrincipal @Parameter(hidden = true) CustomUserDetails user,
+            @PathVariable String shopId,
+            @PathVariable String branchId,
+            @RequestParam(required = false, defaultValue = "") String keyword) {
+        InventorySummaryResponse summary =
+                productCache.getBranchInventorySummary(shopId, branchId, keyword);
+        return ApiResponseDto.success(ApiCode.SUCCESS, summary);
     }
 
     // ✅ Endpoint để lấy lịch sử giao dịch tồn kho

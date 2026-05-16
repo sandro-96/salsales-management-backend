@@ -5,6 +5,7 @@ import com.example.sales.cache.OrderCache;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.constant.AppConstants;
 import com.example.sales.constant.DiscountType;
+import com.example.sales.constant.OrderSource;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.PaymentStatus;
 import com.example.sales.constant.TableStatus;
@@ -466,7 +467,20 @@ public class OrderService extends BaseService {
         return PromotionSelection.selectWinningPromotion(candidates, unitBeforePromo);
     }
 
-    public Page<OrderResponse> getShopOrders(String shopId, String branchId, Pageable pageable) {
+    public Page<OrderResponse> getShopOrders(
+            String shopId, String branchId, OrderSource orderSource, Pageable pageable) {
+        if (orderSource == OrderSource.ONLINE || orderSource == OrderSource.POS) {
+            if (StringUtils.hasText(branchId)) {
+                return orderRepository
+                        .findByShopIdAndBranchIdAndOrderSourceAndDeletedFalseOrderByCreatedAtDesc(
+                                shopId, branchId, orderSource, pageable)
+                        .map(this::toResponse);
+            }
+            return orderRepository
+                    .findByShopIdAndOrderSourceAndDeletedFalseOrderByCreatedAtDesc(
+                            shopId, orderSource, pageable)
+                    .map(this::toResponse);
+        }
         if (StringUtils.hasText(branchId)) {
             return orderRepository
                     .findByShopIdAndBranchIdAndDeletedFalseOrderByCreatedAtDesc(shopId, branchId, pageable)
@@ -476,7 +490,20 @@ public class OrderService extends BaseService {
                 .map(this::toResponse);
     }
 
-    public Page<OrderResponse> getOrdersByStatus(String shopId, OrderStatus status, String branchId, Pageable pageable) {
+    public Page<OrderResponse> getOrdersByStatus(
+            String shopId, OrderStatus status, String branchId, OrderSource orderSource, Pageable pageable) {
+        if (orderSource == OrderSource.ONLINE || orderSource == OrderSource.POS) {
+            if (StringUtils.hasText(branchId)) {
+                return orderRepository
+                        .findByShopIdAndBranchIdAndOrderSourceAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+                                shopId, branchId, orderSource, status, pageable)
+                        .map(this::toResponse);
+            }
+            return orderRepository
+                    .findByShopIdAndOrderSourceAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+                            shopId, orderSource, status, pageable)
+                    .map(this::toResponse);
+        }
         if (StringUtils.hasText(branchId)) {
             return orderRepository
                     .findByShopIdAndBranchIdAndStatusAndDeletedFalse(shopId, branchId, status, pageable)

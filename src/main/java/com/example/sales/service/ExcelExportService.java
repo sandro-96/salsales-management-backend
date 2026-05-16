@@ -152,7 +152,7 @@ public class ExcelExportService {
         Page<ProductResponse> page;
         do {
             if (StringUtils.hasText(branchId)) {
-                page = productCache.getAllByBranch(shopId, branchId, "", pageable);
+                page = productCache.getAllByBranch(shopId, branchId, "", "", pageable);
             } else {
                 page = productCache.getAllByShop(shopId, "", pageable);
             }

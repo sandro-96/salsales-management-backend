@@ -2,6 +2,7 @@
 package com.example.sales.controller;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.OrderSource;
 import com.example.sales.constant.OrderStatus;
 import com.example.sales.constant.Permission;
 import com.example.sales.dto.ApiResponseDto;
@@ -42,6 +43,17 @@ public class OrderController {
     private final OrderService orderService;
     private final OrderTaxApplier orderTaxApplier;
 
+    private static OrderSource parseOrderSource(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return OrderSource.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
     @GetMapping
     @RequirePermission(Permission.ORDER_VIEW)
     @Operation(summary = "Lấy danh sách đơn hàng", description = "Lấy danh sách đơn hàng của cửa hàng với phân trang")
@@ -55,8 +67,9 @@ public class OrderController {
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam(required = false) @Parameter(description = "Lọc theo chi nhánh; bỏ qua = tất cả chi nhánh") String branchId,
+            @RequestParam(required = false) @Parameter(description = "Lọc nguồn đơn: POS hoặc ONLINE") String orderSource,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> orders = orderService.getShopOrders(shopId, branchId, pageable);
+        Page<OrderResponse> orders = orderService.getShopOrders(shopId, branchId, parseOrderSource(orderSource), pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 
@@ -323,8 +336,9 @@ public class OrderController {
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam @Parameter(description = "Trạng thái đơn hàng (PENDING, COMPLETED, CANCELLED, v.v.)") OrderStatus status,
             @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
+            @RequestParam(required = false) @Parameter(description = "Lọc nguồn đơn: POS hoặc ONLINE") String orderSource,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> filtered = orderService.getOrdersByStatus(shopId, status, branchId, pageable);
+        Page<OrderResponse> filtered = orderService.getOrdersByStatus(shopId, status, branchId, parseOrderSource(orderSource), pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, filtered);
     }
 }
