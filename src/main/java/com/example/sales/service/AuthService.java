@@ -49,6 +49,12 @@ public class AuthService {
     @Value("${app.frontend.verify-url}")
     private String verifyUrl;
 
+    @Value("${app.fe.url:}")
+    private String feUrl;
+
+    @Value("${app.brand.name:Sổ thu chi}")
+    private String brandName;
+
     @Value("${app.reset-token.expiry-minutes}")
     private long resetTokenExpiryMinutes;
 
@@ -85,7 +91,7 @@ public class AuthService {
                 "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
                 "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
 
-        mailService.send(user.getEmail(), "Xác thực tài khoản - Sandro Sales", html);
+        mailService.send(user.getEmail(), "Xác thực tài khoản - " + brandName, html);
     }
 
     public JwtResponse login(LoginRequest request) {
@@ -169,16 +175,61 @@ public class AuthService {
         }
     }
 
+    /**
+     * Luôn trả success về phía client (không tiết lộ email có tồn tại hay không).
+     */
     public void forgotPassword(String email) {
-        User user = userRepository.findByEmailAndDeletedFalse(email)
-                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.USER_NOT_FOUND));
-
+        if (!StringUtils.hasText(email)) {
+            return;
+        }
+        String trimmed = email.trim();
+        Optional<User> optional = userRepository.findByEmailAndDeletedFalse(trimmed);
+        if (optional.isEmpty()) {
+            optional = userRepository.findByEmailAndDeletedFalse(trimmed.toLowerCase());
+        }
+        if (optional.isEmpty()) {
+            log.info("[Auth] forgot-password: no user for email={}", trimmed);
+            return;
+        }
+        User user = optional.get();
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
         user.setResetTokenExpiry(Instant.now().plusSeconds(resetTokenExpiryMinutes * 60));
         userRepository.save(user);
 
-        System.out.println("Gửi email tới " + email + ": Token đặt lại mật khẩu: " + token);
+        String base = feUrl == null ? "" : feUrl.replaceAll("/+$", "");
+        String resetLink = base + "/reset-password?token=" + token;
+        String displayName = user.getFullName() != null ? user.getFullName() : user.getEmail();
+        String html = "<p>Xin chào " + displayName + ",</p>" +
+                "<p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản " + brandName + ".</p>" +
+                "<p>Vui lòng nhấn vào liên kết sau để đặt mật khẩu mới:</p>" +
+                "<p><a href=\"" + resetLink + "\">Đặt lại mật khẩu</a></p>" +
+                "<p><i>Liên kết này sẽ hết hạn sau " + resetTokenExpiryMinutes + " phút.</i></p>" +
+                "<p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>";
+        try {
+            mailService.send(user.getEmail(), "Đặt lại mật khẩu - " + brandName, html);
+        } catch (Exception ex) {
+            log.warn("Không thể gửi mail forgot-password tới {}: {}", user.getEmail(), ex.getMessage());
+        }
+    }
+
+    public void resetPasswordWithToken(String token, String newPassword) {
+        if (!StringUtils.hasText(token) || !StringUtils.hasText(newPassword)) {
+            throw new BusinessException(ApiCode.INVALID_TOKEN);
+        }
+        User user = userRepository.findByResetTokenAndDeletedFalse(token.trim())
+                .orElseThrow(() -> new BusinessException(ApiCode.INVALID_TOKEN));
+
+        if (user.getResetTokenExpiry() == null
+                || user.getResetTokenExpiry().isBefore(Instant.now())) {
+            throw new BusinessException(ApiCode.TOKEN_EXPIRED);
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+        log.info("[Auth] Password reset completed for userId={}", user.getId());
     }
 
     public void resendVerification(String email) {
@@ -204,7 +255,7 @@ public class AuthService {
                 "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
                 "<p><i>Liên kết này sẽ hết hạn sau 15 phút.</i></p>";
 
-        mailService.send(user.getEmail(), "Gửi lại xác thực tài khoản - Sandro Sales", html);
+        mailService.send(user.getEmail(), "Gửi lại xác thực tài khoản - " + brandName, html);
     }
 
     public void verifyEmail(String token) {

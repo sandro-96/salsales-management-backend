@@ -12,6 +12,7 @@ public interface UserRepository extends MongoRepository<User, String> {
     Optional<User> findByEmailAndDeletedFalse(String email);
     Optional<User> findByIdAndDeletedFalse(String id);
     Optional<User> findByVerificationTokenAndDeletedFalse(String token);
+    Optional<User> findByResetTokenAndDeletedFalse(String resetToken);
     Optional<User> findByGoogleIdAndDeletedFalse(String googleId);
 
     List<User> findByRoleAndDeletedFalse(UserRole role);

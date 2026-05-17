@@ -52,6 +52,9 @@ public class AdminUserService {
     @Value("${app.fe.url:}")
     private String feUrl;
 
+    @Value("${app.brand.name:Sổ thu chi}")
+    private String brandName;
+
     @Value("${app.reset-token.expiry-minutes:15}")
     private long resetTokenExpiryMinutes;
 
@@ -197,7 +200,7 @@ public class AdminUserService {
                 "<a href=\"" + resetLink + "\">Đặt lại mật khẩu</a>" +
                 "<p><i>Liên kết này sẽ hết hạn sau " + resetTokenExpiryMinutes + " phút.</i></p>";
         try {
-            mailService.send(user.getEmail(), "[Admin] Đặt lại mật khẩu - Sandro Sales", html);
+            mailService.send(user.getEmail(), "[Admin] Đặt lại mật khẩu - " + brandName, html);
         } catch (Exception ex) {
             log.warn("Không thể gửi mail reset password tới {}: {}", user.getEmail(), ex.getMessage());
         }
@@ -221,7 +224,7 @@ public class AdminUserService {
                 "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
                 "<p><i>Liên kết này sẽ hết hạn sau " + resetTokenExpiryMinutes + " phút.</i></p>";
         try {
-            mailService.send(user.getEmail(), "[Admin] Xác thực tài khoản - Sandro Sales", html);
+            mailService.send(user.getEmail(), "[Admin] Xác thực tài khoản - " + brandName, html);
         } catch (Exception ex) {
             log.warn("Không thể gửi mail verify tới {}: {}", user.getEmail(), ex.getMessage());
         }

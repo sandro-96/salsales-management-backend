@@ -73,6 +73,18 @@ public class AuthController {
         return ApiResponseDto.success(ApiCode.EMAIL_SENT);
     }
 
+    @PostMapping("/reset-password")
+    @Operation(summary = "Đặt lại mật khẩu", description = "Đặt mật khẩu mới bằng token từ email quên mật khẩu.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Đặt lại mật khẩu thành công"),
+            @ApiResponse(responseCode = "400", description = "Token không hợp lệ hoặc đã hết hạn")
+    })
+    public ApiResponseDto<?> resetPassword(
+            @RequestBody @Valid @Parameter(description = "Token và mật khẩu mới") ResetPasswordRequest request) {
+        authService.resetPasswordWithToken(request.getToken(), request.getNewPassword());
+        return ApiResponseDto.success(ApiCode.PASSWORD_CHANGED);
+    }
+
     @PostMapping("/resend-verification")
     @Operation(summary = "Gửi lại email xác minh", description = "Gửi lại email xác minh nếu người dùng chưa xác thực.")
     @ApiResponses({
