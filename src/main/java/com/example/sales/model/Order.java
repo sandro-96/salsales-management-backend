@@ -73,6 +73,9 @@ public class Order extends BaseEntity {
     /** SĐT khách ghi nhận trên đơn — tách với khách loyalty. */
     private String guestPhone;
 
+    /** SĐT chuẩn hoá để tra cứu lịch sử theo tài khoản user. */
+    private String guestPhoneNormalized;
+
     @Builder.Default
     private long pointsEarned = 0;
 

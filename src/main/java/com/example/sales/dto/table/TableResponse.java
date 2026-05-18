@@ -20,6 +20,18 @@ public class TableResponse {
 
     /** Bàn “luôn trống” (vd: Mang đi): không chuyển sang OCCUPIED khi có đơn. */
     private Boolean alwaysAvailable;
+
+    /** Token public dùng cho QR self-ordering tại bàn (UUID). */
+    private String qrToken;
+
+    /** Cho phép QR ordering ở bàn này (owner có thể tắt riêng từng bàn). */
+    private boolean qrOrderingEnabled;
+
+    /**
+     * URL đầy đủ khách scan QR sẽ truy cập, dạng {@code <feUrl>/t/<shopSlug>/<qrToken>}.
+     * Server compose sẵn để FE chỉ việc dùng (hiển thị / generate ảnh QR).
+     */
+    private String qrUrl;
 }
 
 

@@ -32,9 +32,15 @@ public class BranchRequest {
     /** MST riêng chi nhánh; để trống = dùng MST cửa hàng */
     private String taxRegistrationNumber;
 
-    /** Wi‑Fi khách — tuỳ chọn, có thể in trên hóa đơn */
+    /** Wi‑Fi khách — tuỳ chọn, có thể in trên hóa đơn / tem QR bàn */
     private String wifiSsid;
     private String wifiPassword;
+
+    /** Chuyển khoản khách — tuỳ chọn, in trên tem QR bàn */
+    private String paymentBankName;
+    private String paymentAccountNumber;
+    private String paymentAccountHolder;
+    private String paymentTransferNote;
 
     /** Invoice/receipt language: {@code vi} or {@code en}. */
     private String invoiceLocale;

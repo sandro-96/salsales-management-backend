@@ -45,9 +45,16 @@ public class Branch extends BaseEntity {
      */
     private String taxRegistrationNumber;
 
-    /** Wi‑Fi phục vụ khách tại điểm bán — có thể in trên hóa đơn */
+    /** Wi‑Fi phục vụ khách tại điểm bán — có thể in trên hóa đơn / tem QR bàn */
     private String wifiSsid;
     private String wifiPassword;
+
+    /** Thông tin chuyển khoản khách (in trên tem QR bàn) */
+    private String paymentBankName;
+    private String paymentAccountNumber;
+    private String paymentAccountHolder;
+    /** Gợi ý nội dung CK, vd "Thanh toan" */
+    private String paymentTransferNote;
 
     /** Ngôn ngữ in hóa đơn / bill tại chi nhánh: {@code vi} hoặc {@code en}. */
     @Builder.Default

@@ -26,6 +26,7 @@ import com.example.sales.repository.OrderRepository;
 import com.example.sales.repository.ProductRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.service.SequenceService;
+import com.example.sales.util.PhoneUtils;
 import com.example.sales.service.notification.OnlineOrderNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -150,10 +151,66 @@ public class StorefrontService {
             throw new BusinessException(ApiCode.STOREFRONT_EMPTY_CART);
         }
 
+        BuiltOrderItems built = buildOrderItemsFromRequest(shop, request.getItems());
+        List<OrderItem> orderItems = built.items();
+        double totalPrice = built.totalPrice();
+
+        // Tìm chi nhánh mặc định để gắn đơn (Order yêu cầu branchId)
+        String defaultBranchId = resolveDefaultBranchId(shop.getId());
+
+        Order order = new Order();
+        order.setShopId(shop.getId());
+        order.setBranchId(defaultBranchId);
+        order.setOrderSource(OrderSource.ONLINE);
+        order.setStatus(OrderStatus.PENDING);
+        order.setItems(orderItems);
+        order.setTotalPrice(totalPrice);
+        order.setTotalAmount(totalPrice); // chưa có thuế / shipping fee ở MVP
+        order.setPaymentMethod("COD");
+        order.setShippingMethod("COD");
+        order.setPaid(false);
+        order.setPaymentStatus(PaymentStatus.PENDING_COLLECTION);
+        String guestPhone = request.getCustomerPhone().trim();
+        order.setGuestName(request.getCustomerName().trim());
+        order.setGuestPhone(guestPhone);
+        order.setGuestPhoneNormalized(PhoneUtils.normalizeForMatch(guestPhone));
+        order.setNote(composeShippingNote(request));
+        order.setOrderCode(generateOrderCode(shop.getId()));
+
+        Order saved = orderRepository.save(order);
+
+        // Thông báo (best-effort: WebSocket + email)
+        notifyOwnerSafely(shop, saved);
+
+        return StorefrontOrderResponse.builder()
+                .id(saved.getId())
+                .orderCode(saved.getOrderCode())
+                .customerName(saved.getGuestName())
+                .customerPhone(saved.getGuestPhone())
+                .totalAmount(saved.getTotalAmount())
+                .paymentMethod(saved.getPaymentMethod())
+                .status(saved.getStatus() != null ? saved.getStatus().name() : null)
+                .build();
+    }
+
+    // ---------- Public helpers (shared with TableOrderingService) ----------
+
+    /**
+     * Bundle kết quả {@link #buildOrderItemsFromRequest}: danh sách {@link OrderItem} đã
+     * resolve product / variant + tổng tiền hàng (chưa thuế).
+     */
+    public record BuiltOrderItems(List<OrderItem> items, double totalPrice) {}
+
+    /**
+     * Resolve mỗi {@link StorefrontOrderItemRequest} thành {@link OrderItem} hoàn chỉnh:
+     * load product, validate variant, lấy giá hiện tại, lưu snapshot SKU/tên. Dùng chung
+     * cho storefront online lẫn QR self-ordering tại bàn. Không track inventory (MVP).
+     */
+    public BuiltOrderItems buildOrderItemsFromRequest(Shop shop, List<StorefrontOrderItemRequest> lines) {
         List<OrderItem> orderItems = new ArrayList<>();
         double totalPrice = 0.0;
 
-        for (StorefrontOrderItemRequest line : request.getItems()) {
+        for (StorefrontOrderItemRequest line : lines) {
             Product product = productRepository.findByIdAndShopIdAndDeletedFalse(line.getProductId(), shop.getId())
                     .filter(Product::isActive)
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
@@ -197,44 +254,26 @@ public class StorefrontService {
                     .quantity(qty)
                     .price(linePrice)
                     .priceAfterDiscount(linePrice)
-                    .trackInventory(false) // bỏ qua tồn kho cho MVP online
+                    .trackInventory(false)
                     .build());
         }
+        return new BuiltOrderItems(orderItems, totalPrice);
+    }
 
-        // Tìm chi nhánh mặc định để gắn đơn (Order yêu cầu branchId)
-        String defaultBranchId = resolveDefaultBranchId(shop.getId());
+    /**
+     * Sinh mã đơn dạng {@code DH-YYYYMMDD-NNN} theo shop. Cùng generator với storefront
+     * để TableOrderingService (cùng package) dùng lại.
+     */
+    public String generateOrderCodeFor(String shopId) {
+        return generateOrderCode(shopId);
+    }
 
-        Order order = new Order();
-        order.setShopId(shop.getId());
-        order.setBranchId(defaultBranchId);
-        order.setOrderSource(OrderSource.ONLINE);
-        order.setStatus(OrderStatus.PENDING);
-        order.setItems(orderItems);
-        order.setTotalPrice(totalPrice);
-        order.setTotalAmount(totalPrice); // chưa có thuế / shipping fee ở MVP
-        order.setPaymentMethod("COD");
-        order.setShippingMethod("COD");
-        order.setPaid(false);
-        order.setPaymentStatus(PaymentStatus.PENDING_COLLECTION);
-        order.setGuestName(request.getCustomerName().trim());
-        order.setGuestPhone(request.getCustomerPhone().trim());
-        order.setNote(composeShippingNote(request));
-        order.setOrderCode(generateOrderCode(shop.getId()));
-
-        Order saved = orderRepository.save(order);
-
-        // Thông báo (best-effort: WebSocket + email)
-        notifyOwnerSafely(shop, saved);
-
-        return StorefrontOrderResponse.builder()
-                .id(saved.getId())
-                .orderCode(saved.getOrderCode())
-                .customerName(saved.getGuestName())
-                .customerPhone(saved.getGuestPhone())
-                .totalAmount(saved.getTotalAmount())
-                .paymentMethod(saved.getPaymentMethod())
-                .status(saved.getStatus() != null ? saved.getStatus().name() : null)
-                .build();
+    /**
+     * Resolve chi nhánh mặc định của shop (ưu tiên branch có flag {@code isDefault}).
+     * Expose để TableOrderingService dùng khi bàn không có branchId rõ ràng (fallback).
+     */
+    public String resolveDefaultBranchIdFor(String shopId) {
+        return resolveDefaultBranchId(shopId);
     }
 
     // ---------- Internal helpers ----------

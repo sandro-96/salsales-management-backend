@@ -80,5 +80,13 @@ public class Shop extends BaseEntity {
      */
     @Builder.Default
     private boolean onlineSalesEnabled = false;
+
+    /**
+     * Bật chế độ khách tự order tại bàn qua QR code (dine-in self-service). Mặc định tắt.
+     * Khi bật, khách quét QR ở bàn → mở URL {@code /t/{slug}/{qrToken}} để xem menu & đặt món;
+     * mỗi bàn duy trì 1 tab/đơn duy nhất (gộp các lần quét). Staff thu tiền tại quầy qua POS.
+     */
+    @Builder.Default
+    private boolean tableOrderingEnabled = false;
 }
 

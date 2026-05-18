@@ -46,8 +46,12 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
             "/api/admin/",
             "/api/2fa/",
             "/api/uploads/",
-            "/api/storefront/"
+            "/api/storefront/",
+            "/api/notifications"
     );
+
+    /** GET không cần membership shop (danh sách shop của user). */
+    private static final String SHOP_MY_LIST_PATH = "/api/shop/my";
 
     private final SubscriptionRepository subscriptionRepository;
     private final ShopContextResolver shopContextResolver;
@@ -83,12 +87,24 @@ public class SubscriptionGuardInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        if ("GET".equalsIgnoreCase(method) && path != null && path.startsWith(SHOP_MY_LIST_PATH)) {
+            return true;
+        }
+
         String hint = ShopContextResolver.shopIdHintFrom(request);
         boolean explicitShopContext = StringUtils.hasText(hint);
 
         Shop shop = null;
         if (explicitShopContext || isWriteMethod(method)) {
-            shop = shopContextResolver.resolveShopForWriteGuard(user.getId(), hint);
+            try {
+                shop = shopContextResolver.resolveShopForWriteGuard(user.getId(), hint);
+            } catch (BusinessException ex) {
+                if (ApiCode.ACCESS_DENIED.equals(ex.getError()) && !isWriteMethod(method)) {
+                    log.debug("[ShopGuard] bỏ qua X-Shop-Id không hợp lệ trên GET {}", path);
+                    return true;
+                }
+                throw ex;
+            }
         }
 
         if (shop != null && !shop.isActive() && isWriteMethod(method)) {

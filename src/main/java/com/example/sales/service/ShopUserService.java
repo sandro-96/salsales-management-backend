@@ -270,6 +270,7 @@ public class ShopUserService extends BaseService {
                             .shopeeUrl(shop.getShopeeUrl())
                             .toppingsEnabled(shop.isToppingsEnabled())
                             .onlineSalesEnabled(shop.isOnlineSalesEnabled())
+                            .tableOrderingEnabled(shop.isTableOrderingEnabled())
                             .active(shop.isActive())
                             .role(su != null ? su.getRole() : null)
                             .permissions(perms)

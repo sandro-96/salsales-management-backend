@@ -56,6 +56,9 @@ public class User extends BaseEntity {
 
     private String phone;
 
+    /** SĐT chuẩn hoá để khớp đơn storefront (guestPhoneNormalized). */
+    private String phoneNormalized;
+
     private String address;
     private String city;
     private String state;

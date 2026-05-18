@@ -33,5 +33,19 @@ public class Table extends BaseEntity {
      * để trỏ đơn — cho phép nhiều đơn cùng {@code tableId} song song (POS quản lý theo tab/đơn).
      */
     private Boolean alwaysAvailable;
+
+    /**
+     * Token public (UUID) dùng cho QR self-ordering tại bàn. URL khách quét dạng
+     * {@code /t/{shopSlug}/{qrToken}} → guest có thể xem menu và tạo đơn IN_STORE.
+     * Có thể revoke bằng cách regenerate (qrToken mới); token cũ sẽ ngừng hoạt động.
+     */
+    private String qrToken;
+
+    /**
+     * Cho phép QR ordering trên bàn này. Owner có thể tắt riêng từng bàn (vd bàn VIP,
+     * bàn đang sửa chữa) mà không ảnh hưởng các bàn khác.
+     */
+    @Builder.Default
+    private boolean qrOrderingEnabled = true;
 }
 

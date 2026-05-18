@@ -22,5 +22,10 @@ public class TableRequest {
      * Bàn “luôn trống” (vd: Mang đi): không chuyển sang OCCUPIED khi có đơn.
      */
     private Boolean alwaysAvailable;
+
+    /**
+     * Cho phép QR self-ordering trên bàn này. Null ở create = mặc định true.
+     */
+    private Boolean qrOrderingEnabled;
 }
 

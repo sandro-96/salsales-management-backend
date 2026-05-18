@@ -13,6 +13,7 @@ import com.example.sales.model.Shop;
 import com.example.sales.model.Subscription;
 import com.example.sales.model.SubscriptionHistory;
 import com.example.sales.repository.SubscriptionHistoryRepository;
+import com.example.sales.exception.BusinessException;
 import com.example.sales.security.Audited;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.BillingTransferInfoService;
@@ -36,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -62,7 +64,10 @@ public class SubscriptionController {
             @AuthenticationPrincipal @Parameter(description = "Người dùng hiện tại") CustomUserDetails user,
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
-        Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
+        Shop shop = shopContextResolver.resolveSubscriptionShop(user.getId(), hint);
+        if (shop == null) {
+            return ApiResponseDto.success(ApiCode.SUCCESS, null);
+        }
         Subscription sub = subscriptionService.ensureSubscription(shop);
         return ApiResponseDto.success(ApiCode.SUCCESS, subscriptionService.toDto(sub));
     }
@@ -75,7 +80,10 @@ public class SubscriptionController {
             @AuthenticationPrincipal CustomUserDetails user,
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
-        Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
+        Shop shop = shopContextResolver.resolveSubscriptionShop(user.getId(), hint);
+        if (shop == null) {
+            return ApiResponseDto.success(ApiCode.SUCCESS, null);
+        }
         Subscription sub = subscriptionService.ensureSubscription(shop);
         SubscriptionTransferInstructionsDto dto =
                 billingTransferInfoService.buildStaticPreview(sub.getAmountVnd());
@@ -95,7 +103,7 @@ public class SubscriptionController {
             @RequestBody(required = false) SubscriptionPayRequest req,
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
-        Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
+        Shop shop = requireSubscriptionShop(user.getId(), hint);
         Subscription sub = subscriptionService.ensureSubscription(shop);
 
         PaymentGatewayType requested = req != null ? req.getGateway() : null;
@@ -134,10 +142,21 @@ public class SubscriptionController {
             @AuthenticationPrincipal CustomUserDetails user,
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
-        Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
+        Shop shop = shopContextResolver.resolveSubscriptionShop(user.getId(), hint);
+        if (shop == null) {
+            return ApiResponseDto.success(ApiCode.SUCCESS, Collections.emptyList());
+        }
         List<SubscriptionHistory> history = subscriptionHistoryRepository
                 .findByShopIdOrderByCreatedAtDesc(shop.getId());
         return ApiResponseDto.success(ApiCode.SUCCESS, history);
+    }
+
+    private Shop requireSubscriptionShop(String userId, String hint) {
+        Shop shop = shopContextResolver.resolveSubscriptionShop(userId, hint);
+        if (shop == null) {
+            throw new BusinessException(ApiCode.SHOP_NOT_FOUND);
+        }
+        return shop;
     }
 
     @PostMapping("/manual-transfer/reported")
@@ -149,7 +168,7 @@ public class SubscriptionController {
             @RequestBody(required = false) SubscriptionManualTransferReportRequest body,
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
-        Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
+        Shop shop = requireSubscriptionShop(user.getId(), hint);
         String ref = body != null ? body.getProviderTxnRef() : null;
         subscriptionService.reportShopManualTransferSent(shop.getId(), user.getId(), ref);
         Subscription sub = subscriptionService.ensureSubscription(shop);
@@ -166,7 +185,7 @@ public class SubscriptionController {
             @RequestBody(required = false) SubscriptionManualTransferReportRequest body,
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
-        Shop shop = shopContextResolver.resolveShopForSubscription(user.getId(), hint);
+        Shop shop = requireSubscriptionShop(user.getId(), hint);
         String ref = body != null ? body.getProviderTxnRef() : null;
         subscriptionService.cancelShopPendingManualTransfer(shop.getId(), user.getId(), ref);
         Subscription sub = subscriptionService.ensureSubscription(shop);

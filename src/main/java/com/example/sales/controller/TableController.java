@@ -138,6 +138,24 @@ public class TableController {
         return ApiResponseDto.success(ApiCode.SUCCESS, tableService.updateTable(user.getId(), id, request));
     }
 
+    @PostMapping("/{id}/qr-token/regenerate")
+    @RequirePermission(Permission.TABLE_UPDATE)
+    @Operation(summary = "Tạo lại QR token cho bàn",
+            description = "Sinh qrToken mới (UUID). Token cũ ngừng hoạt động ngay, mọi QR đã in cần in lại.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Token mới được sinh thành công"),
+            @ApiResponse(responseCode = "401", description = "Không có quyền truy cập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện hành động này"),
+            @ApiResponse(responseCode = "404", description = "Bàn không tìm thấy")
+    })
+    public ApiResponseDto<TableResponse> regenerateQrToken(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable @Parameter(description = "ID của cửa hàng") String shopId,
+            @PathVariable @Parameter(description = "ID của bàn") String id) {
+        return ApiResponseDto.success(ApiCode.SUCCESS,
+                tableService.regenerateQrToken(user.getId(), shopId, id));
+    }
+
     @DeleteMapping("/{id}")
     @RequirePermission(Permission.TABLE_DELETE)
     @Operation(summary = "Xóa bàn", description = "Xóa mềm một bàn nếu bàn không đang được sử dụng")

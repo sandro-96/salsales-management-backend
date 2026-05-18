@@ -95,6 +95,20 @@ public class ShopContextResolver {
     /**
      * Subscription/billing: chủ shop hoặc user được mời ({@code shop_users}) của shop đó.
      */
+    public boolean hasAnyShopForUser(String userId) {
+        return !collectDistinctShopIdsForUser(userId).isEmpty();
+    }
+
+    /**
+     * Subscription read APIs: null khi user chưa có shop và không gửi shopId hint.
+     */
+    public Shop resolveSubscriptionShop(String userId, String shopIdHint) {
+        if (!StringUtils.hasText(shopIdHint) && !hasAnyShopForUser(userId)) {
+            return null;
+        }
+        return resolveShopForSubscription(userId, shopIdHint);
+    }
+
     public Shop resolveShopForSubscription(String userId, String shopIdHint) {
         if (!StringUtils.hasText(shopIdHint)) {
             Set<String> shopIds = collectDistinctShopIdsForUser(userId);

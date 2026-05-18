@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +41,19 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     Page<Order> findByShopIdAndBranchIdAndOrderSourceAndStatusAndDeletedFalseOrderByCreatedAtDesc(
             String shopId, String branchId, OrderSource orderSource, OrderStatus status, Pageable pageable);
 
+    Page<Order> findByShopIdAndOrderSourceInAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, Collection<OrderSource> orderSources, Pageable pageable);
+
+    Page<Order> findByShopIdAndBranchIdAndOrderSourceInAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, String branchId, Collection<OrderSource> orderSources, Pageable pageable);
+
+    Page<Order> findByShopIdAndOrderSourceInAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, Collection<OrderSource> orderSources, OrderStatus status, Pageable pageable);
+
+    Page<Order> findByShopIdAndBranchIdAndOrderSourceInAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+            String shopId, String branchId, Collection<OrderSource> orderSources, OrderStatus status,
+            Pageable pageable);
+
     @Query(value = "{ 'shopId': ?0, 'branchId': ?1, 'deleted': false, 'isPaid': false, 'status': { $nin: ?2 } }")
     Page<Order> findOpenOrdersByShopIdAndBranchId(
             String shopId, String branchId, List<OrderStatus> excludedStatuses, Pageable pageable);
@@ -47,4 +61,18 @@ public interface OrderRepository extends MongoRepository<Order, String> {
     @Query(value = "{ 'shopId': ?0, 'deleted': false, 'isPaid': false, 'status': { $nin: ?1 }, '_id': { $in: ?2 } }")
     List<Order> findOpenOrdersByShopIdAndIdIn(
             String shopId, List<OrderStatus> excludedStatuses, List<String> ids);
+
+    @Query(value = """
+            {
+              'deleted': false,
+              'orderSource': 'ONLINE',
+              '$or': [
+                { 'guestPhoneNormalized': ?0 },
+                { 'guestPhone': { '$in': ?1 } }
+              ]
+            }
+            """,
+            sort = "{ 'createdAt': -1 }")
+    Page<Order> findOnlineOrdersByPhoneMatch(
+            String guestPhoneNormalized, List<String> guestPhoneVariants, Pageable pageable);
 }

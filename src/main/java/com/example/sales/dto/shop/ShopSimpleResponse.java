@@ -23,6 +23,7 @@ public class ShopSimpleResponse {
     private String shopeeUrl;
     private boolean toppingsEnabled;
     private boolean onlineSalesEnabled;
+    private boolean tableOrderingEnabled;
     private String address;
     private String slug;
     private boolean active;

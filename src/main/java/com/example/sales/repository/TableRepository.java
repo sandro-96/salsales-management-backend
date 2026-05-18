@@ -15,5 +15,13 @@ public interface TableRepository extends MongoRepository<Table, String> {
     Page<Table> findByShopIdAndBranchIdAndDeletedFalse(String shopId, String branchId, Pageable pageable);
 
     Optional<Table> findByIdAndDeletedFalse(String id);
+
+    /**
+     * Dùng cho QR self-ordering: resolve bàn từ public {@code qrToken}.
+     * Token là UUID nên unique toàn hệ thống (xác suất collision ~ 0).
+     */
+    Optional<Table> findByQrTokenAndDeletedFalse(String qrToken);
+
+    List<Table> findByQrTokenIsNullAndDeletedFalse();
 }
 

@@ -27,6 +27,7 @@ public class ShopAdminResponse {
     private String shopeeUrl;
     private boolean toppingsEnabled;
     private boolean onlineSalesEnabled;
+    private boolean tableOrderingEnabled;
     private String logoUrl;
     private boolean active;
     private SubscriptionPlan plan;

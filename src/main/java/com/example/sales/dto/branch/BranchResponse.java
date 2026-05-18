@@ -34,6 +34,11 @@ public class BranchResponse {
     private String wifiSsid;
     private String wifiPassword;
 
+    private String paymentBankName;
+    private String paymentAccountNumber;
+    private String paymentAccountHolder;
+    private String paymentTransferNote;
+
     private String invoiceLocale;
 
     private boolean active;

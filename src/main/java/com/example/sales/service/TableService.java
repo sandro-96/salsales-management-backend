@@ -15,6 +15,7 @@ import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.TableRepository;
 import com.example.sales.service.realtime.RealtimeEventPublisher;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +34,9 @@ public class TableService {
     private final AuditLogService auditLogService;
     private final ShopUserService shopUserService;
     private final RealtimeEventPublisher realtimeEventPublisher;
+
+    @Value("${app.fe.url:}")
+    private String feUrl;
 
     @Transactional
     public TableResponse create(String userId, TableRequest request) {
@@ -64,6 +69,9 @@ public class TableService {
                 .capacity(request.getCapacity())
                 .note(request.getNote())
                 .alwaysAvailable(Boolean.TRUE.equals(request.getAlwaysAvailable()))
+                .qrToken(generateQrToken())
+                .qrOrderingEnabled(request.getQrOrderingEnabled() == null
+                        || Boolean.TRUE.equals(request.getQrOrderingEnabled()))
                 .build();
 
         Table saved = tableRepository.save(table);
@@ -183,6 +191,12 @@ public class TableService {
         table.setNote(request.getNote());
         table.setStatus(Optional.ofNullable(request.getStatus()).orElse(TableStatus.AVAILABLE));
         table.setAlwaysAvailable(Boolean.TRUE.equals(request.getAlwaysAvailable()));
+        if (request.getQrOrderingEnabled() != null) {
+            table.setQrOrderingEnabled(Boolean.TRUE.equals(request.getQrOrderingEnabled()));
+        }
+        if (!StringUtils.hasText(table.getQrToken())) {
+            table.setQrToken(generateQrToken());
+        }
 
         Table saved = tableRepository.save(table);
         auditLogService.log(userId, table.getShopId(), saved.getId(), "TABLE", "UPDATED",
@@ -212,6 +226,30 @@ public class TableService {
         publishTable(saved, toResponse(saved, null), WebSocketMessageType.TABLE_DELETED);
     }
 
+    /**
+     * Tạo lại {@code qrToken} cho bàn — token cũ ngừng hoạt động ngay.
+     */
+    @Transactional
+    public TableResponse regenerateQrToken(String userId, String shopId, String tableId) {
+        shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER);
+
+        Table table = tableRepository.findByIdAndDeletedFalse(tableId)
+                .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+        if (!shopId.equals(table.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
+        }
+        table.setQrToken(generateQrToken());
+        Table saved = tableRepository.save(table);
+
+        auditLogService.log(userId, shopId, saved.getId(), "TABLE", "QR_TOKEN_REGENERATED",
+                String.format("Tạo lại QR token cho bàn: %s", saved.getName()));
+
+        Shop shop = shopRepository.findByIdAndDeletedFalse(shopId).orElse(null);
+        TableResponse resp = toResponse(saved, shop);
+        publishTable(saved, resp, WebSocketMessageType.TABLE_UPDATED);
+        return resp;
+    }
+
     private void publishTable(Table table, TableResponse payload, WebSocketMessageType type) {
         if (table == null) return;
         realtimeEventPublisher.publishTableEvent(table.getShopId(), table.getBranchId(), type, payload);
@@ -230,6 +268,21 @@ public class TableService {
                 .note(table.getNote())
                 .currentOrderId(always ? null : table.getCurrentOrderId())
                 .alwaysAvailable(always)
+                .qrToken(table.getQrToken())
+                .qrOrderingEnabled(table.isQrOrderingEnabled())
+                .qrUrl(buildQrUrl(shop, table))
                 .build();
+    }
+
+    private String buildQrUrl(Shop shop, Table table) {
+        if (shop == null || !StringUtils.hasText(table.getQrToken()) || !StringUtils.hasText(shop.getSlug())) {
+            return null;
+        }
+        String base = feUrl == null ? "" : feUrl.replaceAll("/+$", "");
+        return base + "/t/" + shop.getSlug() + "/" + table.getQrToken();
+    }
+
+    private String generateQrToken() {
+        return UUID.randomUUID().toString().replace("-", "");
     }
 }

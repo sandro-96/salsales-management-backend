@@ -5,9 +5,11 @@ import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponseDto;
 import com.example.sales.dto.ChangePasswordRequest;
 import com.example.sales.dto.UpdateProfileRequest;
+import com.example.sales.dto.user.UserOrderHistoryItem;
 import com.example.sales.dto.user.UserResponse;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.service.FileUploadService;
+import com.example.sales.service.UserOrderHistoryService;
 import com.example.sales.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +17,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    private final UserOrderHistoryService userOrderHistoryService;
     private final FileUploadService fileUploadService;
 
     @GetMapping("/me")
@@ -57,6 +63,22 @@ public class UserController {
         }
         UserResponse updated = userService.updateProfile(user.getId(), request);
         return ApiResponseDto.success(ApiCode.USER_UPDATED, updated);
+    }
+
+    @GetMapping("/order-history")
+    @Operation(summary = "Lịch sử đặt hàng online",
+            description = "Trả về các đơn storefront đã đặt với SĐT trùng số điện thoại trong hồ sơ user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lấy lịch sử thành công"),
+            @ApiResponse(responseCode = "400", description = "User chưa có số điện thoại"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực")
+    })
+    public ApiResponseDto<Page<UserOrderHistoryItem>> getOrderHistory(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<UserOrderHistoryItem> page =
+                userOrderHistoryService.getStorefrontOrderHistory(user.getId(), pageable);
+        return ApiResponseDto.success(ApiCode.USER_ORDER_HISTORY, page);
     }
 
     @PostMapping("/change-password")

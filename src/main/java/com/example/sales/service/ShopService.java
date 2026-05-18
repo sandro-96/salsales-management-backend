@@ -122,6 +122,13 @@ public class ShopService extends BaseService {
             }
             shop.setOnlineSalesEnabled(enable);
         }
+        if (request.getTableOrderingEnabled() != null) {
+            boolean enable = request.getTableOrderingEnabled();
+            if (enable && !StringUtils.hasText(shop.getSlug())) {
+                throw new BusinessException(ApiCode.VALIDATION_ERROR);
+            }
+            shop.setTableOrderingEnabled(enable);
+        }
 
         if (request.getBusinessModel() != null) {
             request.setBusinessModel(request.getBusinessModel());
@@ -189,6 +196,7 @@ public class ShopService extends BaseService {
                     .shopeeUrl(shop.getShopeeUrl())
                     .toppingsEnabled(shop.isToppingsEnabled())
                     .onlineSalesEnabled(shop.isOnlineSalesEnabled())
+                    .tableOrderingEnabled(shop.isTableOrderingEnabled())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -214,6 +222,7 @@ public class ShopService extends BaseService {
                     .shopeeUrl(shop.getShopeeUrl())
                     .toppingsEnabled(shop.isToppingsEnabled())
                     .onlineSalesEnabled(shop.isOnlineSalesEnabled())
+                    .tableOrderingEnabled(shop.isTableOrderingEnabled())
                     .logoUrl(shop.getLogoUrl())
                     .active(shop.isActive())
                     .plan(shop.getPlan())
@@ -244,6 +253,7 @@ public class ShopService extends BaseService {
                 .shopeeUrl(shop.getShopeeUrl())
                 .toppingsEnabled(shop.isToppingsEnabled())
                 .onlineSalesEnabled(shop.isOnlineSalesEnabled())
+                .tableOrderingEnabled(shop.isTableOrderingEnabled())
                 .active(shop.isActive())
                 .industry(shop.getType().getIndustry())
                 .businessModel(shop.getBusinessModel());

@@ -4,6 +4,7 @@ package com.example.sales.service.notification;
 import com.example.sales.constant.WebSocketMessageType;
 import com.example.sales.model.Order;
 import com.example.sales.model.Shop;
+import com.example.sales.model.Table;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.service.MailService;
@@ -46,7 +47,17 @@ public class OnlineOrderNotifier {
     @Async
     public void notifyOnlineOrderCreated(Shop shop, Order order) {
         publishWebSocketEvent(shop, order);
-        sendEmailToOwner(shop, order);
+        sendEmailToOwner(shop, order, /* tableName */ null);
+    }
+
+    /**
+     * Thông báo đơn IN_STORE (khách quét QR tại bàn) cho owner: cùng channel WS như
+     * đơn online + email với prefix "[Đơn tại bàn ...]" để phân biệt.
+     */
+    @Async
+    public void notifyInStoreOrderCreated(Shop shop, Order order, Table table) {
+        publishWebSocketEvent(shop, order);
+        sendEmailToOwner(shop, order, table != null ? table.getName() : null);
     }
 
     private void publishWebSocketEvent(Shop shop, Order order) {
@@ -56,6 +67,7 @@ public class OnlineOrderNotifier {
             payload.put("orderCode", order.getOrderCode());
             payload.put("shopId", shop.getId());
             payload.put("branchId", order.getBranchId());
+            payload.put("tableId", order.getTableId());
             payload.put("customerName", order.getGuestName());
             payload.put("customerPhone", order.getGuestPhone());
             payload.put("totalAmount", order.getTotalAmount());
@@ -70,7 +82,7 @@ public class OnlineOrderNotifier {
         }
     }
 
-    private void sendEmailToOwner(Shop shop, Order order) {
+    private void sendEmailToOwner(Shop shop, Order order, String tableName) {
         if (!StringUtils.hasText(shop.getOwnerId())) {
             return;
         }
@@ -79,6 +91,11 @@ public class OnlineOrderNotifier {
             if (owner == null || !StringUtils.hasText(owner.getEmail())) {
                 return;
             }
+
+            boolean isInStore = StringUtils.hasText(tableName);
+            String subject = isInStore
+                    ? "Đơn tại bàn " + tableName + " #" + order.getOrderCode()
+                    : "Đơn hàng online mới #" + order.getOrderCode();
 
             Map<String, Object> model = new HashMap<>();
             model.put("ownerName", StringUtils.hasText(owner.getEmail()) ? owner.getEmail() : "Chủ shop");
@@ -89,13 +106,13 @@ public class OnlineOrderNotifier {
             model.put("totalAmount", formatCurrency(order.getTotalAmount(), shop.getCurrency()));
             model.put("addressNote", order.getNote() == null ? "" : order.getNote());
             model.put("orderUrl", buildOrderUrl(order.getId()));
+            model.put("tableName", tableName == null ? "" : tableName);
 
-            mailService.sendHtmlTemplate(owner.getEmail(),
-                    "Đơn hàng online mới #" + order.getOrderCode(),
+            mailService.sendHtmlTemplate(owner.getEmail(), subject,
                     "emails/online-order-created",
                     model);
         } catch (Exception ex) {
-            log.warn("Failed sending online order email (shop={}, order={}): {}",
+            log.warn("Failed sending order email (shop={}, order={}): {}",
                     shop.getId(), order.getId(), ex.getMessage());
         }
     }

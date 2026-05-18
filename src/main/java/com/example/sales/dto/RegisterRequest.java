@@ -24,4 +24,12 @@ public class RegisterRequest {
 
     @Size(max = 50, message = "Tên đệm không được vượt quá 50 ký tự")
     private String middleName;
+
+    @NotBlank(message = "Số điện thoại không được để trống")
+    @Size(max = 30, message = "Số điện thoại không hợp lệ")
+    private String phone;
+
+    /** Mặc định VN nếu không gửi. */
+    @Size(max = 5)
+    private String countryCode;
 }

@@ -1,6 +1,7 @@
 package com.example.sales.service;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.constant.Country;
 import com.example.sales.constant.UserRole;
 import com.example.sales.constant.WebSocketMessageType;
 import com.example.sales.dto.JwtResponse;
@@ -14,6 +15,7 @@ import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
 import com.example.sales.security.JwtUtil;
 import com.example.sales.util.FileUtil;
+import com.example.sales.util.PhoneUtils;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -62,6 +64,16 @@ public class AuthService {
     private String googleClientId;
 
     public void register(RegisterRequest request) {
+        String countryCode = StringUtils.hasText(request.getCountryCode())
+                ? request.getCountryCode().trim()
+                : "VN";
+        Country country = Country.fromCode(countryCode);
+        String phoneCompact = PhoneUtils.compact(request.getPhone());
+        if (!StringUtils.hasText(phoneCompact) || !phoneCompact.matches(country.getPhonePattern())) {
+            throw new BusinessException(ApiCode.INVALID_PHONE_NUMBER);
+        }
+        String phoneNormalized = PhoneUtils.normalizeForMatch(phoneCompact);
+
         Optional<User> existingUserOpt = userRepository.findByEmailAndDeletedFalse(request.getEmail());
         String token = UUID.randomUUID().toString();
 
@@ -80,6 +92,9 @@ public class AuthService {
             user.setLastName(request.getLastName());
             user.setMiddleName(request.getMiddleName());
         }
+        user.setPhone(phoneCompact);
+        user.setPhoneNormalized(phoneNormalized);
+        user.setCountryCode(countryCode);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setVerificationToken(token);
         user.setVerificationExpiry(Instant.now().plusSeconds(resetTokenExpiryMinutes * 60));

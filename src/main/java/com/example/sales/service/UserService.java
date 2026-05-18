@@ -8,6 +8,7 @@ import com.example.sales.dto.user.UserResponse;
 import com.example.sales.exception.BusinessException;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
+import com.example.sales.util.PhoneUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -50,7 +51,14 @@ public class UserService {
             user.setMiddleName(request.getMiddleName());
         }
         if (request.getPhone() != null) {
-            user.setPhone(StringUtils.hasText(request.getPhone()) ? request.getPhone().trim() : null);
+            if (StringUtils.hasText(request.getPhone())) {
+                String phoneCompact = PhoneUtils.compact(request.getPhone());
+                user.setPhone(phoneCompact);
+                user.setPhoneNormalized(PhoneUtils.normalizeForMatch(phoneCompact));
+            } else {
+                user.setPhone(null);
+                user.setPhoneNormalized(null);
+            }
         }
         if (request.getAddress() != null) {
             user.setAddress(request.getAddress());

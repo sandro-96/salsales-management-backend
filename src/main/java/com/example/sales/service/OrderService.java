@@ -469,7 +469,20 @@ public class OrderService extends BaseService {
 
     public Page<OrderResponse> getShopOrders(
             String shopId, String branchId, OrderSource orderSource, Pageable pageable) {
-        if (orderSource == OrderSource.ONLINE || orderSource == OrderSource.POS) {
+        if (orderSource != null && orderSource.isGuestCheckout()) {
+            var sources = OrderSource.guestCheckoutSources();
+            if (StringUtils.hasText(branchId)) {
+                return orderRepository
+                        .findByShopIdAndBranchIdAndOrderSourceInAndDeletedFalseOrderByCreatedAtDesc(
+                                shopId, branchId, sources, pageable)
+                        .map(this::toResponse);
+            }
+            return orderRepository
+                    .findByShopIdAndOrderSourceInAndDeletedFalseOrderByCreatedAtDesc(
+                            shopId, sources, pageable)
+                    .map(this::toResponse);
+        }
+        if (orderSource == OrderSource.POS) {
             if (StringUtils.hasText(branchId)) {
                 return orderRepository
                         .findByShopIdAndBranchIdAndOrderSourceAndDeletedFalseOrderByCreatedAtDesc(
@@ -492,7 +505,20 @@ public class OrderService extends BaseService {
 
     public Page<OrderResponse> getOrdersByStatus(
             String shopId, OrderStatus status, String branchId, OrderSource orderSource, Pageable pageable) {
-        if (orderSource == OrderSource.ONLINE || orderSource == OrderSource.POS) {
+        if (orderSource != null && orderSource.isGuestCheckout()) {
+            var sources = OrderSource.guestCheckoutSources();
+            if (StringUtils.hasText(branchId)) {
+                return orderRepository
+                        .findByShopIdAndBranchIdAndOrderSourceInAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+                                shopId, branchId, sources, status, pageable)
+                        .map(this::toResponse);
+            }
+            return orderRepository
+                    .findByShopIdAndOrderSourceInAndStatusAndDeletedFalseOrderByCreatedAtDesc(
+                            shopId, sources, status, pageable)
+                    .map(this::toResponse);
+        }
+        if (orderSource == OrderSource.POS) {
             if (StringUtils.hasText(branchId)) {
                 return orderRepository
                         .findByShopIdAndBranchIdAndOrderSourceAndStatusAndDeletedFalseOrderByCreatedAtDesc(

@@ -128,7 +128,16 @@ public enum ApiCode {
     // Online sales storefront
     ONLINE_SALES_DISABLED("4180", "Cửa hàng chưa bật chế độ bán hàng online."),
     STOREFRONT_ORDER_CREATED("2020", "Đặt hàng thành công, shop sẽ liên hệ xác nhận."),
-    STOREFRONT_EMPTY_CART("4181", "Đơn hàng phải có ít nhất 1 sản phẩm.");
+    STOREFRONT_EMPTY_CART("4181", "Đơn hàng phải có ít nhất 1 sản phẩm."),
+    USER_PHONE_REQUIRED("4182", "Vui lòng cập nhật số điện thoại trong hồ sơ để xem lịch sử đặt hàng."),
+    USER_ORDER_HISTORY("2021", "Lấy lịch sử đặt hàng thành công."),
+
+    // Table self-ordering qua QR
+    TABLE_QR_NOT_FOUND("4183", "Mã QR không hợp lệ hoặc đã bị thay đổi. Vui lòng quét lại."),
+    TABLE_ORDERING_DISABLED("4184", "Bàn này hiện không nhận order qua QR. Vui lòng gọi nhân viên."),
+    TABLE_INACTIVE("4185", "Bàn không còn hoạt động."),
+    IN_STORE_ORDER_CREATED("2022", "Đã gửi yêu cầu tới quầy, vui lòng chờ phục vụ."),
+    IN_STORE_ORDER_APPENDED("2023", "Đã thêm món vào đơn hiện tại của bàn.");
 
     private final String code;
     private final String message;

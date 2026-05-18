@@ -40,5 +40,8 @@ public class ShopRequest {
     /** Bật chế độ bán hàng online (storefront công khai theo slug) */
     private Boolean onlineSalesEnabled;
 
+    /** Bật chế độ khách tự order tại bàn qua QR (dine-in self-service) */
+    private Boolean tableOrderingEnabled;
+
     private boolean active = true;
 }

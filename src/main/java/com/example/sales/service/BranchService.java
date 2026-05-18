@@ -47,6 +47,10 @@ public class BranchService {
                 .taxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()))
                 .wifiSsid(normalizeOptionalString(req.getWifiSsid()))
                 .wifiPassword(normalizeOptionalString(req.getWifiPassword()))
+                .paymentBankName(normalizeOptionalString(req.getPaymentBankName()))
+                .paymentAccountNumber(normalizeOptionalString(req.getPaymentAccountNumber()))
+                .paymentAccountHolder(normalizeOptionalString(req.getPaymentAccountHolder()))
+                .paymentTransferNote(normalizeOptionalString(req.getPaymentTransferNote()))
                 .invoiceLocale(normalizeInvoiceLocale(req.getInvoiceLocale()))
                 .active(req.isActive())
                 .isDefault(req.isDefault())
@@ -92,6 +96,10 @@ public class BranchService {
         branch.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(req.getTaxRegistrationNumber()));
         branch.setWifiSsid(normalizeOptionalString(req.getWifiSsid()));
         branch.setWifiPassword(normalizeOptionalString(req.getWifiPassword()));
+        branch.setPaymentBankName(normalizeOptionalString(req.getPaymentBankName()));
+        branch.setPaymentAccountNumber(normalizeOptionalString(req.getPaymentAccountNumber()));
+        branch.setPaymentAccountHolder(normalizeOptionalString(req.getPaymentAccountHolder()));
+        branch.setPaymentTransferNote(normalizeOptionalString(req.getPaymentTransferNote()));
         branch.setInvoiceLocale(normalizeInvoiceLocale(req.getInvoiceLocale()));
         branch.setActive(req.isActive());
 
@@ -169,6 +177,10 @@ public class BranchService {
                 .taxRegistrationNumber(branch.getTaxRegistrationNumber())
                 .wifiSsid(branch.getWifiSsid())
                 .wifiPassword(branch.getWifiPassword())
+                .paymentBankName(branch.getPaymentBankName())
+                .paymentAccountNumber(branch.getPaymentAccountNumber())
+                .paymentAccountHolder(branch.getPaymentAccountHolder())
+                .paymentTransferNote(branch.getPaymentTransferNote())
                 .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
@@ -185,6 +197,10 @@ public class BranchService {
                 .phone(branch.getPhone())
                 .wifiSsid(branch.getWifiSsid())
                 .wifiPassword(branch.getWifiPassword())
+                .paymentBankName(branch.getPaymentBankName())
+                .paymentAccountNumber(branch.getPaymentAccountNumber())
+                .paymentAccountHolder(branch.getPaymentAccountHolder())
+                .paymentTransferNote(branch.getPaymentTransferNote())
                 .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
@@ -209,6 +225,10 @@ public class BranchService {
                 .taxRegistrationNumber(branch.getTaxRegistrationNumber())
                 .wifiSsid(branch.getWifiSsid())
                 .wifiPassword(branch.getWifiPassword())
+                .paymentBankName(branch.getPaymentBankName())
+                .paymentAccountNumber(branch.getPaymentAccountNumber())
+                .paymentAccountHolder(branch.getPaymentAccountHolder())
+                .paymentTransferNote(branch.getPaymentTransferNote())
                 .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
