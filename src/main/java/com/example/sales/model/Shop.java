@@ -31,7 +31,10 @@ public class Shop extends BaseEntity {
     private ShopType type;
     private BusinessModel businessModel;
     private String address;
+    /** SĐT chính (đồng bộ với phần tử đầu của {@link #phones}). */
     private String phone;
+    /** Danh sách SĐT liên hệ cửa hàng. */
+    private List<String> phones;
     private String logoUrl;
     private Country countryCode;
     private String slug;

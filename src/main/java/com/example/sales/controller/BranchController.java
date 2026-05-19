@@ -49,7 +49,7 @@ public class BranchController {
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId) {
 
         return ApiResponseDto.success(ApiCode.SUCCESS,
-                branchService.getAll(shopId));
+                branchService.getAll(user.getId(), shopId));
     }
 
     //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
@@ -128,7 +128,7 @@ public class BranchController {
     ) {
         return ApiResponseDto.success(
                 ApiCode.SUCCESS,
-                branchService.getById(id)
+                branchService.getById(user.getId(), shopId, id)
         );
     }
 
@@ -143,6 +143,6 @@ public class BranchController {
             @PathVariable("slug") String slug,
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.getBySlug(shopId, slug));
+        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.getBySlug(user.getId(), shopId, slug));
     }
 }

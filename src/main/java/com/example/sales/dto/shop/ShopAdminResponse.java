@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -20,6 +21,7 @@ public class ShopAdminResponse {
     private Country countryCode;
     private String address;
     private String phone;
+    private List<String> phones;
     private String taxRegistrationNumber;
     private String zaloPageUrl;
     private String facebookUrl;

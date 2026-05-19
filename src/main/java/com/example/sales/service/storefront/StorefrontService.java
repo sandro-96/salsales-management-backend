@@ -347,6 +347,8 @@ public class StorefrontService {
                 .logoUrl(shop.getLogoUrl())
                 .address(shop.getAddress())
                 .phone(shop.getPhone())
+                .phones(com.example.sales.util.PhoneContactUtils.resolveForResponse(
+                        shop.getPhones(), shop.getPhone()))
                 .currency(shop.getCurrency())
                 .zaloPageUrl(shop.getZaloPageUrl())
                 .facebookUrl(shop.getFacebookUrl())
@@ -369,6 +371,8 @@ public class StorefrontService {
                         .name(b.getName())
                         .address(b.getAddress())
                         .phone(b.getPhone())
+                        .phones(com.example.sales.util.PhoneContactUtils.resolveForResponse(
+                                b.getPhones(), b.getPhone()))
                         .openingTime(b.getOpeningTime())
                         .closingTime(b.getClosingTime())
                         .isDefault(b.isDefault())

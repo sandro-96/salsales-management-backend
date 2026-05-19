@@ -8,6 +8,8 @@ import com.example.sales.constant.SubscriptionPlan;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class ShopResponse {
@@ -18,6 +20,7 @@ public class ShopResponse {
     private Country countryCode;
     private String address;
     private String phone;
+    private List<String> phones;
     private String taxRegistrationNumber;
     private String zaloPageUrl;
     private String facebookUrl;

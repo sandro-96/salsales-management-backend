@@ -26,6 +26,7 @@ import java.lang.reflect.Method;
 public class RequirePermissionAspect {
 
     private final PermissionChecker permissionChecker;
+    private final com.example.sales.service.BranchAccessService branchAccessService;
 
     @Before("@annotation(com.example.sales.security.RequirePermission)")
     public void checkPermission(JoinPoint joinPoint) throws NoSuchMethodException {
@@ -63,11 +64,17 @@ public class RequirePermissionAspect {
                     extracted.user.getId(), requiredPermission, extracted.shopId);
             throw new BusinessException(ApiCode.ACCESS_DENIED);
         }
+
+        if (extracted.branchId != null) {
+            branchAccessService.assertBranchAccess(
+                    extracted.shopId, extracted.user.getId(), extracted.branchId);
+        }
     }
 
     private ExtractedParams extractParams(Object[] args, Annotation[][] paramAnnotations, MethodSignature signature) {
         CustomUserDetails user = null;
         String shopId = null;
+        String branchId = null;
 
         String[] paramNames = signature.getParameterNames();
 
@@ -79,11 +86,15 @@ public class RequirePermissionAspect {
                     String marker = pathVariableName(pv, paramNames[i]);
                     if ("shopId".equals(marker)) {
                         shopId = args[i] != null ? String.valueOf(args[i]) : null;
+                    } else if ("branchId".equals(marker)) {
+                        branchId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
                 } else if (annotation instanceof RequestParam rp) {
                     String marker = requestParamName(rp, paramNames[i]);
                     if ("shopId".equals(marker)) {
                         shopId = args[i] != null ? String.valueOf(args[i]) : null;
+                    } else if ("branchId".equals(marker)) {
+                        branchId = args[i] != null ? String.valueOf(args[i]) : null;
                     }
                 }
             }
@@ -99,10 +110,10 @@ public class RequirePermissionAspect {
         log.debug("Extracted params: user={}, shopId={}",
                 user != null ? user.getId() : null, shopId);
 
-        return new ExtractedParams(user, shopId);
+        return new ExtractedParams(user, shopId, branchId);
     }
 
-    private record ExtractedParams(CustomUserDetails user, String shopId) {
+    private record ExtractedParams(CustomUserDetails user, String shopId, String branchId) {
     }
 
     /** Spring dùng {@code value} hoặc {@code name} (alias); khi rỗng thì dùng tên tham số bytecode (cần {@code -parameters}). */

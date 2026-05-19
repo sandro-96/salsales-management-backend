@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalTime;
+import java.util.List;
 
 /**
  * Thông tin chi nhánh hiển thị trên footer storefront công khai.
@@ -18,6 +19,7 @@ public class StorefrontBranchResponse {
     private String name;
     private String address;
     private String phone;
+    private List<String> phones;
     private LocalTime openingTime;
     private LocalTime closingTime;
     private boolean isDefault;

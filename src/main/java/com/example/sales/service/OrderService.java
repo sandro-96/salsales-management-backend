@@ -69,6 +69,7 @@ public class OrderService extends BaseService {
     private final SequenceService sequenceService;
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final FileUploadService fileUploadService;
+    private final BranchAccessService branchAccessService;
 
     private static final DateTimeFormatter ORDER_CODE_DATE = DateTimeFormatter.BASIC_ISO_DATE;
 
@@ -77,6 +78,7 @@ public class OrderService extends BaseService {
 
     @Transactional
     public OrderResponse createOrder(String userId, String branchId, String shopId, OrderRequest request) {
+        final String orderBranchId = branchAccessService.effectiveBranchFilter(shopId, userId, branchId);
         Order order = new Order();
         order.setShopId(shopId);
         order.setTableId(request.getTableId());
@@ -108,11 +110,11 @@ public class OrderService extends BaseService {
             order.setExternalOrderRef(request.getExternalOrderRef().trim());
         }
 
-        if (branchId == null || branchId.isBlank()) {
+        if (orderBranchId == null || orderBranchId.isBlank()) {
             log.error("Branch ID không được để trống");
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
-        order.setBranchId(branchId);
+        order.setBranchId(orderBranchId);
         order.setOrderCode(generateOrderCode(shopId));
 
         Shop orderShop = shopRepository.findByIdAndDeletedFalse(shopId)
@@ -128,7 +130,7 @@ public class OrderService extends BaseService {
 
             // Lấy BranchProduct cho chi nhánh và sản phẩm cụ thể
             BranchProduct branchProduct = branchProductRepository
-                    .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), branchId)
+                    .findByProductIdAndBranchIdAndDeletedFalse(masterProduct.getId(), orderBranchId)
                     .orElseThrow(() -> new ResourceNotFoundException(ApiCode.PRODUCT_NOT_FOUND));
 
             OrderItem item = buildOrderItemLine(
@@ -140,7 +142,7 @@ public class OrderService extends BaseService {
                     reqItem.getQuantity(),
                     reqItem.getWeight(),
                     shopId,
-                    branchId);
+                    orderBranchId);
 
             double lineQty = effectiveLineQty(item);
             totals[0] += lineQty;
@@ -189,6 +191,7 @@ public class OrderService extends BaseService {
 
     public void cancelOrder(String userId, String shopId, String orderId) {
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -231,6 +234,7 @@ public class OrderService extends BaseService {
 
     public OrderResponse confirmPayment(String userId, String shopId, String orderId, String paymentId, String paymentMethod) {
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
@@ -285,6 +289,7 @@ public class OrderService extends BaseService {
         }
 
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
         if (!order.isPaid()) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
@@ -310,6 +315,7 @@ public class OrderService extends BaseService {
 
     public OrderResponse updateStatus(String userId, String shopId, String orderId, OrderStatus newStatus) {
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
 
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.COMPLETED) {
             log.error("Không thể cập nhật trạng thái đơn hàng đã hủy hoặc đã hoàn thành");
@@ -468,7 +474,8 @@ public class OrderService extends BaseService {
     }
 
     public Page<OrderResponse> getShopOrders(
-            String shopId, String branchId, OrderSource orderSource, Pageable pageable) {
+            String userId, String shopId, String branchId, OrderSource orderSource, Pageable pageable) {
+        branchId = branchAccessService.effectiveBranchFilter(shopId, userId, branchId);
         if (orderSource != null && orderSource.isGuestCheckout()) {
             var sources = OrderSource.guestCheckoutSources();
             if (StringUtils.hasText(branchId)) {
@@ -504,7 +511,8 @@ public class OrderService extends BaseService {
     }
 
     public Page<OrderResponse> getOrdersByStatus(
-            String shopId, OrderStatus status, String branchId, OrderSource orderSource, Pageable pageable) {
+            String userId, String shopId, OrderStatus status, String branchId, OrderSource orderSource, Pageable pageable) {
+        branchId = branchAccessService.effectiveBranchFilter(shopId, userId, branchId);
         if (orderSource != null && orderSource.isGuestCheckout()) {
             var sources = OrderSource.guestCheckoutSources();
             if (StringUtils.hasText(branchId)) {
@@ -539,15 +547,17 @@ public class OrderService extends BaseService {
                 .map(this::toResponse);
     }
 
-    public OrderResponse getOrderById(String shopId, String orderId) {
+    public OrderResponse getOrderById(String userId, String shopId, String orderId) {
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
         return toResponse(order);
     }
 
     /**
      * Mở đơn POS theo orderCode hoặc id đơn: chỉ đơn chưa thanh toán; nếu branchId có thì phải khớp chi nhánh đơn.
      */
-    public OrderResponse lookupOrderForPosEdit(String shopId, String branchId, String orderCode, String orderId) {
+    public OrderResponse lookupOrderForPosEdit(String userId, String shopId, String branchId, String orderCode, String orderId) {
+        branchId = branchAccessService.effectiveBranchFilter(shopId, userId, branchId);
         Order order;
         if (StringUtils.hasText(orderCode)) {
             String trimmed = orderCode.trim();
@@ -568,10 +578,12 @@ public class OrderService extends BaseService {
                 && !branchId.equals(order.getBranchId())) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
         return toResponse(order);
     }
 
-    public Page<OrderResponse> getOpenOrders(String shopId, String branchId, Pageable pageable) {
+    public Page<OrderResponse> getOpenOrders(String userId, String shopId, String branchId, Pageable pageable) {
+        branchId = branchAccessService.effectiveBranchFilter(shopId, userId, branchId);
         if (!StringUtils.hasText(branchId)) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
@@ -584,6 +596,7 @@ public class OrderService extends BaseService {
     @Transactional
     public OrderResponse moveTable(String userId, String shopId, String orderId, String toTableId) {
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
@@ -648,6 +661,7 @@ public class OrderService extends BaseService {
     public Map<String, OrderResponse> splitOrder(String userId, String shopId, String orderId,
                                                  com.example.sales.dto.order.OrderSplitRequest request) {
         Order src = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, src);
         if (src.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);
         }
@@ -848,6 +862,10 @@ public class OrderService extends BaseService {
         if (target == null || !shopId.equals(target.getShopId())) {
             throw new ResourceNotFoundException(ApiCode.ORDER_NOT_FOUND);
         }
+        branchAccessService.assertOrderBranchAccess(shopId, userId, target);
+        for (Order o : byId.values()) {
+            branchAccessService.assertOrderBranchAccess(shopId, userId, o);
+        }
         if (!StringUtils.hasText(target.getBranchId())) {
             throw new BusinessException(ApiCode.VALIDATION_ERROR);
         }
@@ -1039,6 +1057,7 @@ public class OrderService extends BaseService {
     @Transactional
     public OrderResponse updateOrder(String userId, String shopId, String orderId, OrderUpdateRequest request) {
         Order order = orderCache.getOrderByShop(orderId, shopId);
+        branchAccessService.assertOrderBranchAccess(shopId, userId, order);
 
         if (order.isPaid()) {
             throw new BusinessException(ApiCode.ORDER_ALREADY_PAID);

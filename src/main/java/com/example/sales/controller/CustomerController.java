@@ -46,7 +46,8 @@ public class CustomerController {
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tuỳ chọn)") String branchId,
             @ModelAttribute CustomerSearchRequest searchRequest) {
-        return ApiResponseDto.success(ApiCode.CUSTOMER_LIST, customerService.searchCustomers(shopId, branchId, searchRequest));
+        return ApiResponseDto.success(ApiCode.CUSTOMER_LIST,
+                customerService.searchCustomers(user.getId(), shopId, branchId, searchRequest));
     }
 
     @GetMapping("/{id}")
@@ -62,7 +63,7 @@ public class CustomerController {
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @PathVariable @Parameter(description = "ID của khách hàng") String id) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, customerService.getById(shopId, id));
+        return ApiResponseDto.success(ApiCode.SUCCESS, customerService.getById(user.getId(), shopId, id));
     }
 
     @PostMapping

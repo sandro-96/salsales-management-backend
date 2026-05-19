@@ -33,6 +33,7 @@ public class TableService {
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
     private final ShopUserService shopUserService;
+    private final BranchAccessService branchAccessService;
     private final RealtimeEventPublisher realtimeEventPublisher;
 
     @Value("${app.fe.url:}")
@@ -41,7 +42,9 @@ public class TableService {
     @Transactional
     public TableResponse create(String userId, TableRequest request) {
         String shopId = request.getShopId();
-        String branchId = request.getBranchId();
+        String branchId = branchAccessService.effectiveBranchFilter(
+                shopId, userId, request.getBranchId());
+        request.setBranchId(branchId);
 
         // Kiểm tra quyền truy cập
         shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER);
@@ -85,6 +88,10 @@ public class TableService {
     public Page<TableResponse> getByShop(String userId, String shopId, String branchId, Pageable pageable) {
         // Kiểm tra quyền truy cập
         shopUserService.requireAnyRole(shopId, userId, ShopRole.OWNER, ShopRole.MANAGER, ShopRole.STAFF, ShopRole.CASHIER);
+        branchId = branchAccessService.effectiveBranchFilter(shopId, userId, branchId);
+        if (!StringUtils.hasText(branchId)) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
 
         // Kiểm tra cửa hàng tồn tại
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
@@ -104,6 +111,7 @@ public class TableService {
         if (!shopId.equals(table.getShopId())) {
             throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
         }
+        branchAccessService.assertBranchAccess(shopId, userId, table.getBranchId());
         // Bàn “luôn trống”: không có khái niệm “một đơn gắn bàn” — không dùng currentOrderId để resume.
         if (Boolean.TRUE.equals(table.getAlwaysAvailable())) {
             return null;
@@ -143,6 +151,10 @@ public class TableService {
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+        if (!shopId.equals(table.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
+        }
+        branchAccessService.assertBranchAccess(shopId, userId, table.getBranchId());
 
         table.setStatus(status);
         Table saved = tableRepository.save(table);
@@ -161,6 +173,7 @@ public class TableService {
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+        branchAccessService.assertBranchAccess(request.getShopId(), userId, table.getBranchId());
 
         // Kiểm tra bàn không đang được sử dụng
         if (table.getStatus() == TableStatus.OCCUPIED) {
@@ -213,6 +226,10 @@ public class TableService {
 
         Table table = tableRepository.findByIdAndDeletedFalse(tableId)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND));
+        if (!shopId.equals(table.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
+        }
+        branchAccessService.assertBranchAccess(shopId, userId, table.getBranchId());
 
         // Kiểm tra bàn không đang được sử dụng
         if (table.getStatus() == TableStatus.OCCUPIED) {
@@ -238,6 +255,7 @@ public class TableService {
         if (!shopId.equals(table.getShopId())) {
             throw new ResourceNotFoundException(ApiCode.TABLE_NOT_FOUND);
         }
+        branchAccessService.assertBranchAccess(shopId, userId, table.getBranchId());
         table.setQrToken(generateQrToken());
         Table saved = tableRepository.save(table);
 

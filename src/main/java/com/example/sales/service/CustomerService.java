@@ -30,8 +30,11 @@ public class CustomerService {
     private final CustomerSearchHelper customerSearchHelper;
     private final AuditLogService auditLogService;
     private final ExcelExportService excelExportService;
+    private final BranchAccessService branchAccessService;
 
-    public Page<CustomerResponse> searchCustomers(String shopId, String branchId, CustomerSearchRequest request) {
+    public Page<CustomerResponse> searchCustomers(
+            String userId, String shopId, String branchId, CustomerSearchRequest request) {
+        branchId = branchAccessService.effectiveBranchFilter(shopId, userId, branchId);
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
         List<Customer> customers = customerSearchHelper.search(shopId, branchId, request, pageable);
         long total = customerSearchHelper.count(shopId, branchId, request);
@@ -39,14 +42,19 @@ public class CustomerService {
         return new PageImpl<>(responses, pageable, total);
     }
 
-    public CustomerResponse getById(String shopId, String id) {
+    public CustomerResponse getById(String userId, String shopId, String id) {
         Customer customer = customerRepository.findByIdAndDeletedFalse(id)
                 .filter(c -> c.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.CUSTOMER_NOT_FOUND));
+        branchAccessService.assertBranchAccess(shopId, userId, customer.getBranchId());
         return toResponse(customer);
     }
 
     public CustomerResponse createCustomer(String shopId, String userId, CustomerRequest request) {
+        if (request.getBranchId() != null && !request.getBranchId().isBlank()) {
+            request.setBranchId(branchAccessService.effectiveBranchFilter(
+                    shopId, userId, request.getBranchId()));
+        }
         String phone = normalizePhone(request.getPhone());
         String email = normalizeEmail(request.getEmail());
         assertUniquePhoneEmail(shopId, null, phone, email);

@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -27,7 +28,10 @@ public class Branch extends BaseEntity {
     private String slug;
     private String name;
     private String address;
+    /** SĐT chính (đồng bộ với phần tử đầu của {@link #phones}). */
     private String phone;
+    /** Danh sách SĐT liên hệ chi nhánh. */
+    private List<String> phones;
     private LocalDate openingDate;
 
     private LocalTime openingTime;

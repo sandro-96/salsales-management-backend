@@ -105,7 +105,7 @@ public class OnlineOrderNotifier {
             model.put("customerPhone", order.getGuestPhone());
             model.put("totalAmount", formatCurrency(order.getTotalAmount(), shop.getCurrency()));
             model.put("addressNote", order.getNote() == null ? "" : order.getNote());
-            model.put("orderUrl", buildOrderUrl(order.getId()));
+            model.put("orderUrl", buildOrderUrl(order));
             model.put("tableName", tableName == null ? "" : tableName);
 
             mailService.sendHtmlTemplate(owner.getEmail(), subject,
@@ -117,9 +117,16 @@ public class OnlineOrderNotifier {
         }
     }
 
-    private String buildOrderUrl(String orderId) {
+    private String buildOrderUrl(Order order) {
         String base = feUrl == null ? "" : feUrl.replaceAll("/+$", "");
-        return base + "/orders?orderId=" + (orderId == null ? "" : orderId);
+        StringBuilder url = new StringBuilder(base).append("/orders?source=ONLINE");
+        if (order != null && StringUtils.hasText(order.getBranchId())) {
+            url.append("&branchId=").append(order.getBranchId());
+        }
+        if (order != null && StringUtils.hasText(order.getId())) {
+            url.append("&orderId=").append(order.getId());
+        }
+        return url.toString();
     }
 
     private String formatCurrency(double amount, String currency) {

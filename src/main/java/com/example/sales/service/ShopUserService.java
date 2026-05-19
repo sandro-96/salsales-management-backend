@@ -263,6 +263,8 @@ public class ShopUserService extends BaseService {
                             .countryCode(shop.getCountryCode())
                             .address(shop.getAddress())
                             .phone(shop.getPhone())
+                            .phones(com.example.sales.util.PhoneContactUtils.resolveForResponse(
+                                    shop.getPhones(), shop.getPhone()))
                             .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                             .zaloPageUrl(shop.getZaloPageUrl())
                             .facebookUrl(shop.getFacebookUrl())
@@ -277,6 +279,10 @@ public class ShopUserService extends BaseService {
                             .industry(shop.getType().getIndustry())
                             .businessModel(shop.getBusinessModel())
                             .slug(shop.getSlug());
+                    staffProfileRepository.findByShopIdAndUserIdAndDeletedFalse(shop.getId(), userId)
+                            .map(StaffProfile::getBranchId)
+                            .filter(org.springframework.util.StringUtils::hasText)
+                            .ifPresent(b::assignedBranchId);
                     if (sub != null) {
                         b.subscriptionStatus(sub.getStatus())
                                 .subscriptionDaysRemaining(subscriptionService.computeDaysRemainingForList(sub));

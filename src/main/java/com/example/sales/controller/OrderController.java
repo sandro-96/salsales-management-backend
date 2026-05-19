@@ -69,7 +69,8 @@ public class OrderController {
             @RequestParam(required = false) @Parameter(description = "Lọc theo chi nhánh; bỏ qua = tất cả chi nhánh") String branchId,
             @RequestParam(required = false) @Parameter(description = "Lọc nguồn: POS, hoặc ONLINE (gồm cả đơn QR tại bàn IN_STORE)") String orderSource,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> orders = orderService.getShopOrders(shopId, branchId, parseOrderSource(orderSource), pageable);
+        Page<OrderResponse> orders = orderService.getShopOrders(
+                user.getId(), shopId, branchId, parseOrderSource(orderSource), pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 
@@ -87,7 +88,8 @@ public class OrderController {
             @RequestParam(required = false) String branchId,
             @RequestParam(required = false) String orderCode,
             @RequestParam(required = false) String orderId) {
-        OrderResponse order = orderService.lookupOrderForPosEdit(shopId, branchId, orderCode, orderId);
+        OrderResponse order = orderService.lookupOrderForPosEdit(
+                user.getId(), shopId, branchId, orderCode, orderId);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, order);
     }
 
@@ -104,7 +106,7 @@ public class OrderController {
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @PathVariable @Parameter(description = "ID của đơn hàng") String id) {
-        OrderResponse order = orderService.getOrderById(shopId, id);
+        OrderResponse order = orderService.getOrderById(user.getId(), shopId, id);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, order);
     }
 
@@ -172,7 +174,7 @@ public class OrderController {
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @RequestParam @Parameter(description = "ID của chi nhánh") String branchId,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> orders = orderService.getOpenOrders(shopId, branchId, pageable);
+        Page<OrderResponse> orders = orderService.getOpenOrders(user.getId(), shopId, branchId, pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, orders);
     }
 
@@ -338,7 +340,8 @@ public class OrderController {
             @RequestParam(required = false) @Parameter(description = "ID của chi nhánh (tùy chọn)") String branchId,
             @RequestParam(required = false) @Parameter(description = "Lọc nguồn: POS, hoặc ONLINE (gồm cả đơn QR tại bàn IN_STORE)") String orderSource,
             @Parameter(description = "Thông tin phân trang (page, size, sort)") Pageable pageable) {
-        Page<OrderResponse> filtered = orderService.getOrdersByStatus(shopId, status, branchId, parseOrderSource(orderSource), pageable);
+        Page<OrderResponse> filtered = orderService.getOrdersByStatus(
+                user.getId(), shopId, status, branchId, parseOrderSource(orderSource), pageable);
         return ApiResponseDto.success(ApiCode.ORDER_LIST, filtered);
     }
 }

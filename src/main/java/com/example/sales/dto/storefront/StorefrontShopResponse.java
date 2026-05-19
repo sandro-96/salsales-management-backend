@@ -19,6 +19,7 @@ public class StorefrontShopResponse {
     private String logoUrl;
     private String address;
     private String phone;
+    private List<String> phones;
     private String currency;
 
     /** Liên kết mạng xã hội — hiển thị ở footer storefront. */

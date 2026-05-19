@@ -4,6 +4,8 @@ package com.example.sales.dto.branch;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class BranchListResponse {
@@ -13,6 +15,7 @@ public class BranchListResponse {
     private String name;
     private String address;
     private String phone;
+    private List<String> phones;
 
     private String wifiSsid;
     private String wifiPassword;

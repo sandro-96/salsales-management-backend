@@ -9,6 +9,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class ShopRequest {
@@ -21,6 +23,9 @@ public class ShopRequest {
     private BusinessModel businessModel;
 
     private String phone;
+
+    /** Nhiều SĐT; nếu gửi thì ưu tiên hơn {@link #phone}. */
+    private List<String> phones;
 
     private String address;
 

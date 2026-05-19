@@ -14,9 +14,13 @@ import com.example.sales.model.ShopUser;
 import com.example.sales.repository.BranchRepository;
 import com.example.sales.repository.ShopRepository;
 import com.example.sales.repository.ShopUserRepository;
+import com.example.sales.repository.StaffProfileRepository;
 import com.example.sales.security.CustomUserDetails;
 import com.example.sales.security.PermissionUtils;
+import com.example.sales.util.PhoneContactUtils;
 import com.example.sales.util.SlugUtils;
+
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -29,6 +33,7 @@ public class ShopService extends BaseService {
     private final ShopRepository shopRepository;
     private final AuditLogService auditLogService;
     private final ShopUserRepository shopUserRepository;
+    private final StaffProfileRepository staffProfileRepository;
     private final BranchRepository branchRepository;
     private final ShopCache shopCache;
     private final ShopUserService shopUserService;
@@ -44,7 +49,7 @@ public class ShopService extends BaseService {
         shop.setName(request.getName());
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
-        shop.setPhone(request.getPhone());
+        applyShopPhones(shop, request.getPhones(), request.getPhone());
         shop.setLogoUrl(logoUrl);
         shop.setOwnerId(userId);
         shop.setCountryCode(request.getCountryCode());
@@ -71,7 +76,10 @@ public class ShopService extends BaseService {
                 .shopId(savedShop.getId())
                 .name(savedShop.getName())
                 .address(request.getAddress())
-                .phone(request.getPhone())
+                .phone(PhoneContactUtils.primaryPhone(
+                        PhoneContactUtils.normalizePhones(request.getPhones(), request.getPhone())))
+                .phones(nonEmptyOrNull(
+                        PhoneContactUtils.normalizePhones(request.getPhones(), request.getPhone())))
                 .slug(branchService.generateUniqueBranchSlug(
                     savedShop.getId(),
                     savedShop.getName()
@@ -103,7 +111,7 @@ public class ShopService extends BaseService {
         shop.setName(request.getName());
         shop.setType(request.getType());
         shop.setAddress(request.getAddress());
-        shop.setPhone(request.getPhone());
+        applyShopPhones(shop, request.getPhones(), request.getPhone());
         shop.setCountryCode(request.getCountryCode());
         shop.setTaxRegistrationNumber(normalizeTaxRegistrationNumber(request.getTaxRegistrationNumber()));
         shop.setZaloPageUrl(normalizeOptionalString(request.getZaloPageUrl()));
@@ -189,6 +197,7 @@ public class ShopService extends BaseService {
                     .countryCode(shop.getCountryCode())
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
+                    .phones(PhoneContactUtils.resolveForResponse(shop.getPhones(), shop.getPhone()))
                     .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                     .zaloPageUrl(shop.getZaloPageUrl())
                     .facebookUrl(shop.getFacebookUrl())
@@ -215,6 +224,7 @@ public class ShopService extends BaseService {
                     .countryCode(shop.getCountryCode())
                     .address(shop.getAddress())
                     .phone(shop.getPhone())
+                    .phones(PhoneContactUtils.resolveForResponse(shop.getPhones(), shop.getPhone()))
                     .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                     .zaloPageUrl(shop.getZaloPageUrl())
                     .facebookUrl(shop.getFacebookUrl())
@@ -246,6 +256,7 @@ public class ShopService extends BaseService {
                 .address(shop.getAddress())
                 .slug(shop.getSlug())
                 .phone(shop.getPhone())
+                .phones(PhoneContactUtils.resolveForResponse(shop.getPhones(), shop.getPhone()))
                 .taxRegistrationNumber(shop.getTaxRegistrationNumber())
                 .zaloPageUrl(shop.getZaloPageUrl())
                 .facebookUrl(shop.getFacebookUrl())
@@ -268,9 +279,23 @@ public class ShopService extends BaseService {
                             builder.permissions(PermissionUtils.getDefaultPermissions(su.getRole()));
                         }
                     });
+            staffProfileRepository.findByShopIdAndUserIdAndDeletedFalse(shop.getId(), currentUserId)
+                    .map(com.example.sales.model.StaffProfile::getBranchId)
+                    .filter(StringUtils::hasText)
+                    .ifPresent(builder::assignedBranchId);
         }
 
         return builder.build();
+    }
+
+    private static void applyShopPhones(Shop shop, List<String> phones, String legacyPhone) {
+        List<String> normalized = PhoneContactUtils.normalizePhones(phones, legacyPhone);
+        shop.setPhones(nonEmptyOrNull(normalized));
+        shop.setPhone(PhoneContactUtils.primaryPhone(normalized));
+    }
+
+    private static List<String> nonEmptyOrNull(List<String> phones) {
+        return phones == null || phones.isEmpty() ? null : phones;
     }
 
     private static String normalizeTaxRegistrationNumber(String raw) {

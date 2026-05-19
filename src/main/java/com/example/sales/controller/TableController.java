@@ -89,7 +89,7 @@ public class TableController {
         if (orderId == null) {
             return ApiResponseDto.success(ApiCode.SUCCESS, null);
         }
-        OrderResponse order = orderService.getOrderById(shopId, orderId);
+        OrderResponse order = orderService.getOrderById(user.getId(), shopId, orderId);
         // Self-heal: if table.currentOrderId points to a closed order, clear it and return null.
         if (order == null
                 || order.isPaid()

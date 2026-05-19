@@ -5,6 +5,7 @@ import com.example.sales.constant.*;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -16,6 +17,7 @@ public class ShopSimpleResponse {
     private String logoUrl;
     private Country countryCode;
     private String phone;
+    private List<String> phones;
     private String taxRegistrationNumber;
     private String zaloPageUrl;
     private String facebookUrl;
@@ -30,6 +32,8 @@ public class ShopSimpleResponse {
     private boolean isTrackInventory;
     private BusinessModel businessModel;
     private ShopRole role;
+    /** Chi nhánh được gán (STAFF/CASHIER); null = không giới hạn theo CN. */
+    private String assignedBranchId;
     private ShopIndustry industry;
     private Set<Permission> permissions;
 

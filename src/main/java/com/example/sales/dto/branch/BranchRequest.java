@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -17,6 +18,9 @@ public class BranchRequest {
 
     private String address;
     private String phone;
+
+    /** Nhiều SĐT; nếu gửi thì ưu tiên hơn {@link #phone}. */
+    private List<String> phones;
 
     private LocalDate openingDate;
 

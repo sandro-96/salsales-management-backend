@@ -11,7 +11,9 @@ import com.example.sales.exception.ResourceNotFoundException;
 import com.example.sales.model.Branch;
 import com.example.sales.repository.BranchRepository;
 import com.example.sales.util.SlugUtils;
+import com.example.sales.util.PhoneContactUtils;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -24,11 +26,20 @@ public class BranchService {
     private final BranchRepository branchRepository;
     private final AuditLogService auditLogService;
     private final ProductService productService;
+    private final BranchAccessService branchAccessService;
 
 
-    public List<BranchListResponse> getAll(String shopId) {
+    public List<BranchListResponse> getAll(String userId, String shopId) {
         List<Branch> branches = branchRepository.findAllByShopIdAndDeletedFalse(shopId);
-        return branches.stream().map(this::toListResponse).toList();
+        List<BranchListResponse> all = branches.stream().map(this::toListResponse).toList();
+        if (branchAccessService.hasShopWideBranchAccess(shopId, userId)) {
+            return all;
+        }
+        return branchAccessService.getAssignedBranchId(shopId, userId)
+                .map(assigned -> all.stream()
+                        .filter(b -> assigned.equals(b.getId()))
+                        .toList())
+                .orElse(all);
     }
 
     public BranchResponse create(String userId, String shopId, BranchRequest req) {
@@ -36,7 +47,8 @@ public class BranchService {
                 .shopId(shopId)
                 .name(req.getName())
                 .address(req.getAddress())
-                .phone(req.getPhone())
+                .phone(branchPrimaryPhone(req))
+                .phones(branchPhonesOrNull(req))
                 .openingDate(req.getOpeningDate())
                 .openingTime(req.getOpeningTime())
                 .closingTime(req.getClosingTime())
@@ -85,7 +97,7 @@ public class BranchService {
 
         branch.setName(req.getName());
         branch.setAddress(req.getAddress());
-        branch.setPhone(req.getPhone());
+        applyBranchPhones(branch, req);
         branch.setOpeningDate(req.getOpeningDate());
         branch.setOpeningTime(req.getOpeningTime());
         branch.setClosingTime(req.getClosingTime());
@@ -133,17 +145,20 @@ public class BranchService {
                 String.format("Xoá mềm chi nhánh: %s - %s", branch.getName(), branch.getAddress()));
     }
 
-    public BranchDetailResponse getById(String id) {
+    public BranchDetailResponse getById(String userId, String shopId, String id) {
         Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
-
+        if (!shopId.equals(branch.getShopId())) {
+            throw new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND);
+        }
+        branchAccessService.assertBranchAccess(shopId, userId, branch.getId());
         return toDetailResponse(branch);
     }
 
-    public BranchDetailResponse getBySlug(String shopId, String slug) {
+    public BranchDetailResponse getBySlug(String userId, String shopId, String slug) {
         Branch branch = branchRepository.findByShopIdAndSlugAndDeletedFalse(shopId, slug)
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
-
+        branchAccessService.assertBranchAccess(shopId, userId, branch.getId());
         return toDetailResponse(branch);
     }
 
@@ -167,6 +182,7 @@ public class BranchService {
                 .name(branch.getName())
                 .address(branch.getAddress())
                 .phone(branch.getPhone())
+                .phones(PhoneContactUtils.resolveForResponse(branch.getPhones(), branch.getPhone()))
                 .openingDate(branch.getOpeningDate())
                 .openingTime(branch.getOpeningTime())
                 .closingTime(branch.getClosingTime())
@@ -195,6 +211,7 @@ public class BranchService {
                 .name(branch.getName())
                 .address(branch.getAddress())
                 .phone(branch.getPhone())
+                .phones(PhoneContactUtils.resolveForResponse(branch.getPhones(), branch.getPhone()))
                 .wifiSsid(branch.getWifiSsid())
                 .wifiPassword(branch.getWifiPassword())
                 .paymentBankName(branch.getPaymentBankName())
@@ -215,6 +232,7 @@ public class BranchService {
                 .name(branch.getName())
                 .address(branch.getAddress())
                 .phone(branch.getPhone())
+                .phones(PhoneContactUtils.resolveForResponse(branch.getPhones(), branch.getPhone()))
                 .openingDate(branch.getOpeningDate())
                 .openingTime(branch.getOpeningTime())
                 .closingTime(branch.getClosingTime())
@@ -235,6 +253,22 @@ public class BranchService {
                 .createdAt(branch.getCreatedAt())
                 .updatedAt(branch.getUpdatedAt())
                 .build();
+    }
+
+    private static void applyBranchPhones(Branch branch, BranchRequest req) {
+        List<String> normalized = PhoneContactUtils.normalizePhones(req.getPhones(), req.getPhone());
+        branch.setPhones(normalized.isEmpty() ? null : normalized);
+        branch.setPhone(PhoneContactUtils.primaryPhone(normalized));
+    }
+
+    private static String branchPrimaryPhone(BranchRequest req) {
+        return PhoneContactUtils.primaryPhone(
+                PhoneContactUtils.normalizePhones(req.getPhones(), req.getPhone()));
+    }
+
+    private static List<String> branchPhonesOrNull(BranchRequest req) {
+        List<String> normalized = PhoneContactUtils.normalizePhones(req.getPhones(), req.getPhone());
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private static String normalizeInvoiceLocale(String raw) {
