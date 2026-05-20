@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Trạng thái subscription hiển thị cho client (shop owner). Chỉ chứa thông tin public,
@@ -36,6 +37,10 @@ public class SubscriptionDto {
     private long periodDaysRemaining;
 
     private long amountVnd;
+    /** Giá 1 tháng (VND) — dùng để tính tổng theo số tháng chọn. */
+    private long monthlyAmountVnd;
+    /** Các kỳ thanh toán shop được chọn: 1, 3, 6, 9, 12. */
+    private List<Integer> allowedBillingMonths;
     private PaymentGatewayType gateway;
 
     private LocalDateTime lastPaymentAt;

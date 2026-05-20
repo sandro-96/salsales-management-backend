@@ -105,6 +105,7 @@ public class VNPayGateway implements PaymentGateway {
                 .gateway(PaymentGatewayType.VNPAY)
                 .providerTxnRef(txnRef)
                 .amountVnd(request.getAmountVnd())
+                .billingMonths(Math.max(1, request.getBillingMonths()))
                 .status(PaymentTransactionStatus.PENDING)
                 .rawInitRequest(queryString)
                 .build());

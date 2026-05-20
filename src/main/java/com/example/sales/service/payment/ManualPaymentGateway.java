@@ -50,6 +50,7 @@ public class ManualPaymentGateway implements PaymentGateway {
             meta.put("shopId", request.getShopId());
             meta.put("ownerId", request.getOwnerId());
             meta.put("amountVnd", request.getAmountVnd());
+            meta.put("billingMonths", request.getBillingMonths());
             rawInit = objectMapper.writeValueAsString(meta);
         } catch (Exception ex) {
             rawInit = "{}";
@@ -61,6 +62,7 @@ public class ManualPaymentGateway implements PaymentGateway {
                 .gateway(PaymentGatewayType.MANUAL)
                 .providerTxnRef(tx)
                 .amountVnd(request.getAmountVnd())
+                .billingMonths(Math.max(1, request.getBillingMonths()))
                 .status(PaymentTransactionStatus.PENDING)
                 .rawInitRequest(rawInit)
                 .build());

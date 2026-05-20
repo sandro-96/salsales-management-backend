@@ -98,6 +98,7 @@ public class MoMoGateway implements PaymentGateway {
                 .gateway(PaymentGatewayType.MOMO)
                 .providerTxnRef(orderId)
                 .amountVnd(request.getAmountVnd())
+                .billingMonths(Math.max(1, request.getBillingMonths()))
                 .status(PaymentTransactionStatus.PENDING)
                 .rawInitRequest(json)
                 .build());

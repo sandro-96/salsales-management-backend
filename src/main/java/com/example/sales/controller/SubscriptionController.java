@@ -78,15 +78,19 @@ public class SubscriptionController {
                     + "Nếu chưa cấu hình app.billing.transfer thì trả data null.")
     public ApiResponseDto<SubscriptionTransferInstructionsDto> getTransferInfo(
             @AuthenticationPrincipal CustomUserDetails user,
+            @org.springframework.web.bind.annotation.RequestParam(name = "billingMonths", defaultValue = "1")
+            int billingMonths,
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
         Shop shop = shopContextResolver.resolveSubscriptionShop(user.getId(), hint);
         if (shop == null) {
             return ApiResponseDto.success(ApiCode.SUCCESS, null);
         }
-        Subscription sub = subscriptionService.ensureSubscription(shop);
+        subscriptionService.ensureSubscription(shop);
+        int months = SubscriptionService.normalizeBillingMonths(billingMonths);
         SubscriptionTransferInstructionsDto dto =
-                billingTransferInfoService.buildStaticPreview(sub.getAmountVnd());
+                billingTransferInfoService.buildStaticPreview(
+                        SubscriptionService.amountVndForMonths(months));
         return ApiResponseDto.success(ApiCode.SUCCESS, dto);
     }
 
@@ -104,15 +108,20 @@ public class SubscriptionController {
             HttpServletRequest request) {
         String hint = ShopContextResolver.shopIdHintFrom(request);
         Shop shop = requireSubscriptionShop(user.getId(), hint);
-        Subscription sub = subscriptionService.ensureSubscription(shop);
+        subscriptionService.ensureSubscription(shop);
+        int billingMonths = req != null
+                ? SubscriptionService.normalizeBillingMonths(req.getBillingMonths())
+                : 1;
+        long amountVnd = SubscriptionService.amountVndForMonths(billingMonths);
 
         PaymentGatewayType requested = req != null ? req.getGateway() : null;
         PaymentGateway gateway = gatewayRegistry.resolve(requested);
         PaymentInitiation init = gateway.initiatePayment(PaymentRequest.builder()
                 .shopId(shop.getId())
                 .ownerId(shop.getOwnerId())
-                .amountVnd(sub.getAmountVnd())
-                .description("Gia han goi BASIC cho shop " + shop.getName())
+                .amountVnd(amountVnd)
+                .billingMonths(billingMonths)
+                .description("Gia han goi BASIC " + billingMonths + " thang cho shop " + shop.getName())
                 .returnUrl(req != null ? req.getReturnUrl() : null)
                 .build());
 

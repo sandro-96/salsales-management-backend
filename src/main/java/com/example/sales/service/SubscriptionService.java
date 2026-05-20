@@ -54,7 +54,8 @@ public class SubscriptionService {
 
     public static final long TRIAL_DAYS = 30L;
     public static final long BASIC_AMOUNT_VND = 99_000L;
-    private static final int BILLING_CYCLE_MONTHS = 1;
+    public static final java.util.List<Integer> ALLOWED_BILLING_MONTHS =
+            java.util.List.of(1, 3, 6, 9, 12);
 
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionHistoryRepository historyRepository;
@@ -92,8 +93,20 @@ public class SubscriptionService {
         return sub;
     }
 
+    public static int normalizeBillingMonths(Integer months) {
+        int m = months == null || months <= 0 ? 1 : months;
+        if (!ALLOWED_BILLING_MONTHS.contains(m)) {
+            throw new BusinessException(ApiCode.VALIDATION_ERROR);
+        }
+        return m;
+    }
+
+    public static long amountVndForMonths(int billingMonths) {
+        return BASIC_AMOUNT_VND * normalizeBillingMonths(billingMonths);
+    }
+
     /**
-     * Ghi nhận 1 lần thanh toán thành công — kéo dài subscription thêm {@code BILLING_CYCLE_MONTHS}.
+     * Ghi nhận 1 lần thanh toán thành công — kéo dài subscription thêm {@code billingMonths} tháng.
      * Nếu đang TRIAL/EXPIRED/CANCELLED: bắt đầu chu kỳ mới từ now; nếu ACTIVE còn hạn: cộng từ
      * {@code currentPeriodEnd} để không lãng phí ngày còn lại.
      */
@@ -101,6 +114,16 @@ public class SubscriptionService {
                                       String transactionId,
                                       PaymentGatewayType gateway,
                                       String actorUserId) {
+        int months = resolveBillingMonthsFromTransaction(shopId, transactionId);
+        return recordPayment(shopId, transactionId, gateway, actorUserId, months);
+    }
+
+    public Subscription recordPayment(String shopId,
+                                      String transactionId,
+                                      PaymentGatewayType gateway,
+                                      String actorUserId,
+                                      int billingMonths) {
+        int months = normalizeBillingMonths(billingMonths);
         Shop shop = shopRepository.findByIdAndDeletedFalse(shopId)
                 .orElseThrow(() -> new BusinessException(ApiCode.SHOP_NOT_FOUND));
         Subscription sub = ensureSubscription(shop);
@@ -111,7 +134,7 @@ public class SubscriptionService {
                 && sub.getCurrentPeriodEnd().isAfter(now)
                 ? sub.getCurrentPeriodEnd()
                 : now;
-        LocalDateTime nextEnd = base.plusMonths(BILLING_CYCLE_MONTHS);
+        LocalDateTime nextEnd = base.plusMonths(months);
 
         SubscriptionStatus previousStatus = sub.getStatus();
         sub.setStatus(SubscriptionStatus.ACTIVE);
@@ -132,13 +155,14 @@ public class SubscriptionService {
                 .userId(actorUserId != null ? actorUserId : shop.getOwnerId())
                 .oldPlan(null)
                 .newPlan(null)
-                .durationMonths(BILLING_CYCLE_MONTHS)
+                .durationMonths(months)
                 .transactionId(transactionId)
                 .paymentMethod(gateway != null ? gateway.name() : "MANUAL")
                 .actionType(SubscriptionActionType.PAYMENT)
                 .build();
         historyRepository.save(history);
 
+        long paidAmount = amountVndForMonths(months);
         notificationDispatcher.dispatch(NotificationEnvelope.builder()
                 .type(NotificationType.BILLING_PAYMENT_SUCCESS)
                 .shopId(shopId)
@@ -149,7 +173,8 @@ public class SubscriptionService {
                 .templateVar("messageKey", "BILLING_PAYMENT_SUCCESS")
                 .templateVar("shopName", shop.getName())
                 .templateVar("shopId", shop.getId())
-                .templateVar("amount", String.format("%,d", BASIC_AMOUNT_VND))
+                .templateVar("amount", String.format("%,d", paidAmount))
+                .templateVar("billingMonths", String.valueOf(months))
                 .templateVar("untilDate", nextEnd.toLocalDate().format(FMT_D))
                 .templateVar("paidAt", now.format(FMT_DT))
                 .templateVar("periodEndAt", nextEnd.format(FMT_DT))
@@ -158,9 +183,20 @@ public class SubscriptionService {
                 .templateVar("subscriptionStatus", SubscriptionStatus.ACTIVE.name())
                 .dedupeKey("BILLING_PAYMENT_SUCCESS:" + history.getId())
                 .build());
-        log.info("[Subscription] shop {} gia hạn ACTIVE tới {} (tx={}, gw={})",
-                shopId, nextEnd, transactionId, gateway);
+        log.info("[Subscription] shop {} gia hạn ACTIVE +{} tháng tới {} (tx={}, gw={})",
+                shopId, months, nextEnd, transactionId, gateway);
         return sub;
+    }
+
+    private int resolveBillingMonthsFromTransaction(String shopId, String transactionId) {
+        if (!StringUtils.hasText(transactionId)) {
+            return 1;
+        }
+        return paymentTransactionRepository.findByProviderTxnRef(transactionId.trim())
+                .filter(t -> shopId.equals(t.getShopId()) && !t.isDeleted())
+                .map(PaymentTransaction::getBillingMonths)
+                .map(SubscriptionService::normalizeBillingMonths)
+                .orElse(1);
     }
 
     /**
@@ -430,6 +466,8 @@ public class SubscriptionService {
                 .nextBillingDate(sub.getNextBillingDate())
                 .periodDaysRemaining(periodDays)
                 .amountVnd(sub.getAmountVnd())
+                .monthlyAmountVnd(BASIC_AMOUNT_VND)
+                .allowedBillingMonths(ALLOWED_BILLING_MONTHS)
                 .gateway(sub.getGateway())
                 .lastPaymentAt(sub.getLastPaymentAt())
                 .lastPaymentTransactionId(sub.getLastPaymentTransactionId());

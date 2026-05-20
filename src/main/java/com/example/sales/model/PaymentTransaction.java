@@ -58,6 +58,10 @@ public class PaymentTransaction extends BaseEntity {
     @Builder.Default
     private long amountVnd = 0L;
 
+    /** Số tháng gia hạn khi admin/gateway xác nhận thanh toán (1, 3, 6, 9 hoặc 12). */
+    @Builder.Default
+    private int billingMonths = 1;
+
     @Builder.Default
     private PaymentTransactionStatus status = PaymentTransactionStatus.PENDING;
 
