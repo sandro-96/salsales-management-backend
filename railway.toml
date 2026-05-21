@@ -7,6 +7,7 @@ builder = "NIXPACKS"
 buildCommand = "chmod +x mvnw && ./mvnw -DskipTests package"
 
 [deploy]
-startCommand = "java -jar target/sales-0.0.1-SNAPSHOT.jar --spring.profiles.active=staging"
+# Free tier ~512MB: cap heap so JVM + metaspace không OOM kill container
+startCommand = "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0 -jar target/sales-0.0.1-SNAPSHOT.jar --spring.profiles.active=staging"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
