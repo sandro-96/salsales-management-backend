@@ -1,0 +1,11 @@
+# Railway — free tier staging API
+# Docs: https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "./mvnw -DskipTests package"
+
+[deploy]
+startCommand = "java -jar target/sales-0.0.1-SNAPSHOT.jar --spring.profiles.active=staging"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

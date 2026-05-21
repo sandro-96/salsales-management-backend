@@ -36,3 +36,12 @@ Thông thường bạn có thể mở Swagger UI tại:
 ```bash
 .\mvnw.cmd test
 ```
+
+## Staging (~$0)
+
+Triển khai Vercel + Atlas M0 + Railway: xem [docs/deploy/STAGING.md](../salsales-management-web/docs/deploy/STAGING.md) (trong repo web).
+
+- Profile: `staging` → `application-staging.properties`
+- Biến mẫu: `env.staging.example`
+- Railway: `railway.toml`
+- CORS nhiều origin: `FRONTEND_CORS_ORIGINS` (vd. `https://app.vercel.app,https://*.vercel.app`)
