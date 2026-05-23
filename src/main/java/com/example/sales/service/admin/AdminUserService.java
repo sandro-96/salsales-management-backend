@@ -13,6 +13,7 @@ import com.example.sales.model.Shop;
 import com.example.sales.model.ShopUser;
 import com.example.sales.model.User;
 import com.example.sales.repository.UserRepository;
+import com.example.sales.config.AppBrandProperties;
 import com.example.sales.service.MailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,12 +49,10 @@ public class AdminUserService {
     private final MongoTemplate mongoTemplate;
     private final UserRepository userRepository;
     private final MailService mailService;
+    private final AppBrandProperties appBrand;
 
     @Value("${app.fe.url:}")
     private String feUrl;
-
-    @Value("${app.brand.name:Sổ thu chi}")
-    private String brandName;
 
     @Value("${app.reset-token.expiry-minutes:15}")
     private long resetTokenExpiryMinutes;
@@ -200,7 +199,7 @@ public class AdminUserService {
                 "<a href=\"" + resetLink + "\">Đặt lại mật khẩu</a>" +
                 "<p><i>Liên kết này sẽ hết hạn sau " + resetTokenExpiryMinutes + " phút.</i></p>";
         try {
-            mailService.send(user.getEmail(), "[Admin] Đặt lại mật khẩu - " + brandName, html);
+            mailService.send(user.getEmail(), "[Admin] Đặt lại mật khẩu - " + appBrand.getName(), html);
         } catch (Exception ex) {
             log.warn("Không thể gửi mail reset password tới {}: {}", user.getEmail(), ex.getMessage());
         }
@@ -224,7 +223,7 @@ public class AdminUserService {
                 "<a href=\"" + verifyLink + "\">Xác thực tài khoản</a>" +
                 "<p><i>Liên kết này sẽ hết hạn sau " + resetTokenExpiryMinutes + " phút.</i></p>";
         try {
-            mailService.send(user.getEmail(), "[Admin] Xác thực tài khoản - " + brandName, html);
+            mailService.send(user.getEmail(), "[Admin] Xác thực tài khoản - " + appBrand.getName(), html);
         } catch (Exception ex) {
             log.warn("Không thể gửi mail verify tới {}: {}", user.getEmail(), ex.getMessage());
         }

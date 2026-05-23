@@ -10,6 +10,8 @@
 ### Cấu hình môi trường (dev)
 Backend dùng profile `dev` mặc định (xem `src/main/resources/application.properties`).
 
+File `.env` ở thư mục gốc backend phải lưu **UTF-8** (trong VS Code/Cursor: góc phải status bar → UTF-8). Nếu `APP_BRAND_NAME` có dấu tiếng Việt mà email hiện `Sá»•` thay vì `Sổ`, đổi encoding file hoặc bỏ biến để dùng default trong `application.properties`.
+
 Các biến môi trường thường cần (dev có default an toàn để chạy local):
 - **MongoDB**: `MONGODB_URI`, `MONGODB_DATABASE`
 - **JWT**: `APP_JWT_SECRET` (khuyến nghị đặt chuỗi >= 32 ký tự)
@@ -18,6 +20,7 @@ Các biến môi trường thường cần (dev có default an toàn để chạ
 - **Webhook**: `WEBHOOK_SECRET`
 - **AWS S3** (nếu dùng upload): `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, `AWS_S3_BUCKET`, `AWS_REGION`
 - **Mail** (nếu bật gửi mail): `MAIL_USERNAME`, `MAIL_PASSWORD` (+ tuỳ chọn `MAIL_HOST`, `MAIL_PORT`)
+- **Thông báo đăng ký mới** (gửi tới mọi `ROLE_ADMIN` + email phụ): `ADMIN_USER_REGISTRATION_NOTIFY_ENABLED` (mặc định `true`), `ADMIN_REGISTRATION_NOTIFY_EMAILS` (tuỳ chọn, phân tách bằng dấu phẩy)
 
 ### Chạy
 

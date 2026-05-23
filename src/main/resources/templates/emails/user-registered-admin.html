@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng ký tài khoản mới</title>
+</head>
+<body style="font-family: Arial, sans-serif; background: #f5f6f8; margin: 0; padding: 24px;">
+<div style="max-width: 640px; margin: auto; background: #fff; padding: 24px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+    <h2 style="color: #2563eb; margin-top: 0;">👤 Tài khoản mới trên <span th:text="${brandName}">SalesApp</span></h2>
+
+    <p>Chào <strong th:text="${adminName}">Admin</strong>,</p>
+
+    <p>Một người dùng vừa đăng ký trên hệ thống. Thông tin tóm tắt:</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+        <tr>
+            <td style="padding: 6px 0; color: #666; width: 160px;">Họ tên</td>
+            <td style="padding: 6px 0;"><strong th:text="${userFullName}">—</strong></td>
+        </tr>
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Email</td>
+            <td style="padding: 6px 0;" th:text="${userEmail}">email@example.com</td>
+        </tr>
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Số điện thoại</td>
+            <td style="padding: 6px 0;" th:text="${userPhone}">—</td>
+        </tr>
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Quốc gia</td>
+            <td style="padding: 6px 0;" th:text="${countryCode}">VN</td>
+        </tr>
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Hình thức đăng ký</td>
+            <td style="padding: 6px 0;" th:text="${registrationMethodLabel}">Email</td>
+        </tr>
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Trạng thái xác thực</td>
+            <td style="padding: 6px 0;" th:text="${verificationStatus}">Chờ xác thực</td>
+        </tr>
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Thời gian</td>
+            <td style="padding: 6px 0;" th:text="${registeredAt}">—</td>
+        </tr>
+    </table>
+
+    <p style="margin-top: 24px;">
+        <a th:href="${userAdminUrl}" href="#"
+           style="display: inline-block; background: #2563eb; color: #fff; padding: 10px 18px; border-radius: 6px; text-decoration: none;">
+            Xem user trên trang quản trị
+        </a>
+    </p>
+
+    <hr style="margin-top: 28px; border: none; border-top: 1px solid #eee;">
+    <p style="font-size: 12px; color: #999;">Email tự động từ hệ thống — không trả lời email này.</p>
+</div>
+</body>
+</html>
