@@ -1,0 +1,14 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+!env.staging.example
+mongo.txt
+structures/
+docs/
+*.md
+!README.md

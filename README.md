@@ -30,7 +30,9 @@ Các biến môi trường thường cần (dev có default an toàn để chạ
 
 Mặc định chạy ở `http://localhost:8080`.
 
-**UTF-8 (Windows):** Project bật `spring.mandatory-file-encoding=UTF-8`. `mvnw spring-boot:run` đã cấu hình JVM UTF-8 qua `.mvn/jvm.config` + Spring Boot plugin. Nếu chạy từ **IDE** (Run main class) mà lỗi `IllegalStateException ... UTF-8`, thêm VM options: `-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8`, hoặc set biến môi trường `JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8`.
+**UTF-8 (Windows local):** Profile `dev` bật `spring.mandatory-file-encoding=UTF-8`. `mvnw spring-boot:run` dùng `.mvn/jvm.config` + plugin JVM UTF-8. IDE: VM options `-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8`.
+
+**Railway/Docker:** Profile `staging`/`prod` không bật mandatory encoding (Alpine cần `LANG=C.UTF-8` trong `Dockerfile` — đã cấu hình). Tiếng Việt vẫn qua `Utf8TextUtil` + mail UTF-8.
 
 ### Swagger
 Thông thường bạn có thể mở Swagger UI tại:
