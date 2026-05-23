@@ -1,5 +1,7 @@
 package com.example.sales.config;
 
+import com.example.sales.util.Utf8TextUtil;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -48,6 +50,13 @@ public class BillingTransferProperties {
 
     public boolean isDisplayReady() {
         return enabled && hasBankAccount();
+    }
+
+    @PostConstruct
+    void normalizeTextFields() {
+        bankName = Utf8TextUtil.fixUtf8Mojibake(bankName);
+        accountHolder = Utf8TextUtil.fixUtf8Mojibake(accountHolder);
+        transferContentTemplate = Utf8TextUtil.fixUtf8Mojibake(transferContentTemplate);
     }
 
     private static boolean notBlank(String s) {

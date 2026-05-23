@@ -10,7 +10,7 @@
 ### Cấu hình môi trường (dev)
 Backend dùng profile `dev` mặc định (xem `src/main/resources/application.properties`).
 
-File `.env` ở thư mục gốc backend phải lưu **UTF-8** (trong VS Code/Cursor: góc phải status bar → UTF-8). Nếu `APP_BRAND_NAME` có dấu tiếng Việt mà email hiện `Sá»•` thay vì `Sổ`, đổi encoding file hoặc bỏ biến để dùng default trong `application.properties`.
+File `.env` ở thư mục gốc backend phải lưu **UTF-8** (trong VS Code/Cursor: góc phải status bar → **UTF-8** → Save). Nếu tên chủ TK / brand hiện ký tự `` hoặc `Sá»•`, file đang lưu ANSI/Windows-1252 — mở lại `.env`, chọn **Save with Encoding → UTF-8**, hoặc tạm bỏ dấu (`CHU THANH TRI`).
 
 Các biến môi trường thường cần (dev có default an toàn để chạy local):
 - **MongoDB**: `MONGODB_URI`, `MONGODB_DATABASE`

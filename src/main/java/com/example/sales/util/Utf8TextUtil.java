@@ -32,7 +32,8 @@ public final class Utf8TextUtil {
     }
 
     private static boolean looksLikeMojibake(String s) {
-        return s.contains("Ã")
+        return s.contains("\uFFFD")
+                || s.contains("Ã")
                 || s.contains("á»")
                 || s.contains("Æ°")
                 || s.contains("Ä")
