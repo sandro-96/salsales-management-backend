@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +28,7 @@ public class BranchService {
     private final AuditLogService auditLogService;
     private final ProductService productService;
     private final BranchAccessService branchAccessService;
+    private final FileUploadService fileUploadService;
 
 
     public List<BranchListResponse> getAll(String userId, String shopId) {
@@ -42,7 +44,7 @@ public class BranchService {
                 .orElse(all);
     }
 
-    public BranchResponse create(String userId, String shopId, BranchRequest req) {
+    public BranchResponse create(String userId, String shopId, BranchRequest req, String paymentQrImageUrl) {
         Branch branch = Branch.builder()
                 .shopId(shopId)
                 .name(req.getName())
@@ -63,6 +65,7 @@ public class BranchService {
                 .paymentAccountNumber(normalizeOptionalString(req.getPaymentAccountNumber()))
                 .paymentAccountHolder(normalizeOptionalString(req.getPaymentAccountHolder()))
                 .paymentTransferNote(normalizeOptionalString(req.getPaymentTransferNote()))
+                .paymentQrImageUrl(normalizeOptionalString(paymentQrImageUrl))
                 .invoiceLocale(normalizeInvoiceLocale(req.getInvoiceLocale()))
                 .active(req.isActive())
                 .isDefault(req.isDefault())
@@ -90,7 +93,7 @@ public class BranchService {
         return toResponse(saved);
     }
 
-    public BranchResponse update(String userId, String shopId, String id, BranchRequest req) {
+    public BranchResponse update(String userId, String shopId, String id, BranchRequest req, String paymentQrImageUrl) {
         Branch branch = branchRepository.findByIdAndDeletedFalse(id)
                 .filter(b -> b.getShopId().equals(shopId))
                 .orElseThrow(() -> new ResourceNotFoundException(ApiCode.BRANCH_NOT_FOUND));
@@ -112,6 +115,10 @@ public class BranchService {
         branch.setPaymentAccountNumber(normalizeOptionalString(req.getPaymentAccountNumber()));
         branch.setPaymentAccountHolder(normalizeOptionalString(req.getPaymentAccountHolder()));
         branch.setPaymentTransferNote(normalizeOptionalString(req.getPaymentTransferNote()));
+        if (StringUtils.hasText(paymentQrImageUrl)) {
+            fileUploadService.delete(branch.getPaymentQrImageUrl());
+            branch.setPaymentQrImageUrl(paymentQrImageUrl.trim());
+        }
         branch.setInvoiceLocale(normalizeInvoiceLocale(req.getInvoiceLocale()));
         branch.setActive(req.isActive());
 
@@ -162,6 +169,10 @@ public class BranchService {
         return toDetailResponse(branch);
     }
 
+    public String uploadPaymentQr(String shopId, MultipartFile file) {
+        return fileUploadService.upload(file, "branches/" + shopId + "/payment-qr");
+    }
+
     public String generateUniqueBranchSlug(String shopId, String name) {
         String baseSlug = SlugUtils.toSlug(name);
         String slug = baseSlug;
@@ -197,6 +208,7 @@ public class BranchService {
                 .paymentAccountNumber(branch.getPaymentAccountNumber())
                 .paymentAccountHolder(branch.getPaymentAccountHolder())
                 .paymentTransferNote(branch.getPaymentTransferNote())
+                .paymentQrImageUrl(branch.getPaymentQrImageUrl())
                 .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
@@ -218,6 +230,7 @@ public class BranchService {
                 .paymentAccountNumber(branch.getPaymentAccountNumber())
                 .paymentAccountHolder(branch.getPaymentAccountHolder())
                 .paymentTransferNote(branch.getPaymentTransferNote())
+                .paymentQrImageUrl(branch.getPaymentQrImageUrl())
                 .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())
@@ -247,6 +260,7 @@ public class BranchService {
                 .paymentAccountNumber(branch.getPaymentAccountNumber())
                 .paymentAccountHolder(branch.getPaymentAccountHolder())
                 .paymentTransferNote(branch.getPaymentTransferNote())
+                .paymentQrImageUrl(branch.getPaymentQrImageUrl())
                 .invoiceLocale(branch.getInvoiceLocale())
                 .active(branch.isActive())
                 .isDefault(branch.isDefault())

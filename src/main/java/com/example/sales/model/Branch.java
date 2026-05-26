@@ -59,6 +59,8 @@ public class Branch extends BaseEntity {
     private String paymentAccountHolder;
     /** Gợi ý nội dung CK, vd "Thanh toan" */
     private String paymentTransferNote;
+    /** Ảnh QR chuyển khoản riêng của chi nhánh, hiển thị cho khách trên màn hình phụ. */
+    private String paymentQrImageUrl;
 
     /** Ngôn ngữ in hóa đơn / bill tại chi nhánh: {@code vi} hoặc {@code en}. */
     @Builder.Default

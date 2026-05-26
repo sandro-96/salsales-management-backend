@@ -40,6 +40,7 @@ public class BranchResponse {
     private String paymentAccountNumber;
     private String paymentAccountHolder;
     private String paymentTransferNote;
+    private String paymentQrImageUrl;
 
     private String invoiceLocale;
 

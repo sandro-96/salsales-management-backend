@@ -24,6 +24,7 @@ public class BranchListResponse {
     private String paymentAccountNumber;
     private String paymentAccountHolder;
     private String paymentTransferNote;
+    private String paymentQrImageUrl;
 
     private String invoiceLocale;
 

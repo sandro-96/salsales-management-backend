@@ -24,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -53,7 +54,7 @@ public class BranchController {
     }
 
     //@RequirePlan({SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE})
-    @PostMapping
+    @PostMapping(consumes = "multipart/form-data")
     @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Tạo chi nhánh mới", description = "Tạo một chi nhánh mới cho cửa hàng")
     @ApiResponses({
@@ -66,11 +67,17 @@ public class BranchController {
     public ApiResponseDto<BranchResponse> create(
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
-            @RequestBody @Valid @Parameter(description = "Thông tin chi nhánh") BranchRequest request) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.create(user.getId(), shopId, request));
+            @RequestPart("branch") @Valid @Parameter(description = "Thông tin chi nhánh") BranchRequest request,
+            @RequestPart(value = "paymentQrFile", required = false)
+            @Parameter(description = "Ảnh QR chuyển khoản của chi nhánh") MultipartFile paymentQrFile) {
+        String paymentQrImageUrl = null;
+        if (paymentQrFile != null && !paymentQrFile.isEmpty()) {
+            paymentQrImageUrl = branchService.uploadPaymentQr(shopId, paymentQrFile);
+        }
+        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.create(user.getId(), shopId, request, paymentQrImageUrl));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(path = "/{id}", consumes = "multipart/form-data")
     @RequirePermission(Permission.BRANCH_MANAGE)
     @Operation(summary = "Cập nhật chi nhánh", description = "Cập nhật thông tin chi nhánh của cửa hàng")
     @ApiResponses({
@@ -84,8 +91,14 @@ public class BranchController {
             @AuthenticationPrincipal @Parameter(description = "Thông tin người dùng hiện tại") CustomUserDetails user,
             @RequestParam @Parameter(description = "ID của cửa hàng") String shopId,
             @PathVariable @Parameter(description = "ID của chi nhánh") String id,
-            @RequestBody @Valid @Parameter(description = "Thông tin cập nhật chi nhánh") BranchRequest request) {
-        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.update(user.getId(), shopId, id, request));
+            @RequestPart("branch") @Valid @Parameter(description = "Thông tin cập nhật chi nhánh") BranchRequest request,
+            @RequestPart(value = "paymentQrFile", required = false)
+            @Parameter(description = "Ảnh QR chuyển khoản của chi nhánh") MultipartFile paymentQrFile) {
+        String paymentQrImageUrl = null;
+        if (paymentQrFile != null && !paymentQrFile.isEmpty()) {
+            paymentQrImageUrl = branchService.uploadPaymentQr(shopId, paymentQrFile);
+        }
+        return ApiResponseDto.success(ApiCode.SUCCESS, branchService.update(user.getId(), shopId, id, request, paymentQrImageUrl));
     }
 
     @DeleteMapping("/{id}")
