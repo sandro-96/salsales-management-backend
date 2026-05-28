@@ -75,8 +75,9 @@ jobs:
               "chown ec2-user:ec2-user /opt/salsales/app.jar",
               "bash /opt/salsales/load-env.sh",
               "systemctl restart salsales",
-              "sleep 20",
-              "curl -sf http://127.0.0.1:8080/actuator/health"
+              "systemctl is-active salsales",
+              "timeout 120 bash -c \"until curl -sf http://127.0.0.1:8080/actuator/health; do sleep 5; done\"",
+              "curl -sf http://127.0.0.1:8080/actuator/health | grep -q UP"
             ]}')
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
