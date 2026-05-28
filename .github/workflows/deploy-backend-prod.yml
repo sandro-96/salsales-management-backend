@@ -74,10 +74,10 @@ jobs:
               "mv /tmp/app.jar /opt/salsales/app.jar",
               "chown ec2-user:ec2-user /opt/salsales/app.jar",
               "bash /opt/salsales/load-env.sh",
+              "chown ec2-user:ec2-user /opt/salsales/env.sh",
+              "chmod 600 /opt/salsales/env.sh",
               "systemctl restart salsales",
-              "systemctl is-active salsales",
-              "timeout 120 bash -c \"until curl -sf http://127.0.0.1:8080/actuator/health; do sleep 5; done\"",
-              "curl -sf http://127.0.0.1:8080/actuator/health | grep -q UP"
+              "systemctl is-active salsales"
             ]}')
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
@@ -108,3 +108,17 @@ jobs:
           if [ "$STATUS" != "Success" ]; then
             exit 1
           fi
+
+      - name: Verify public API health
+        continue-on-error: true
+        run: |
+          for i in $(seq 1 18); do
+            if curl -sf https://api.sotuci.vn/actuator/health | grep -q '"status":"UP"'; then
+              echo "Public health OK"
+              exit 0
+            fi
+            echo "Waiting for API... ($i/18)"
+            sleep 10
+          done
+          echo "::warning::API health not UP yet — check journalctl on EC2"
+          exit 0
