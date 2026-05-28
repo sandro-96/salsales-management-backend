@@ -42,7 +42,7 @@ jobs:
           cache: maven
 
       - name: Build JAR
-        run: ./mvnw -B package -DskipTests
+        run: chmod +x mvnw && ./mvnw -B package -DskipTests
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -63,20 +63,25 @@ jobs:
           if [ -z "$INSTANCE_ID" ]; then
             INSTANCE_ID="${{ env.EC2_INSTANCE_ID }}"
           fi
+          SSM_COMMANDS=$(jq -nc \
+            --arg bucket "$S3_DEPLOY_BUCKET" \
+            --arg key "$S3_JAR_KEY" \
+            --arg region "$AWS_REGION" \
+            '{commands: [
+              "set -e",
+              ("aws s3 cp s3://" + $bucket + "/" + $key + " /tmp/app.jar --region " + $region),
+              "sudo mv /tmp/app.jar /opt/salsales/app.jar",
+              "sudo chown ec2-user:ec2-user /opt/salsales/app.jar",
+              "bash /opt/salsales/load-env.sh",
+              "sudo systemctl restart salsales",
+              "sleep 8",
+              "curl -sf http://127.0.0.1:8080/actuator/health | grep -q UP"
+            ]}')
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy backend ${{ github.sha }}" \
-            --parameters "commands=[\
-\"set -e\",\
-\"aws s3 cp s3://${S3_DEPLOY_BUCKET}/${S3_JAR_KEY} /tmp/app.jar --region ${AWS_REGION}\",\
-\"sudo mv /tmp/app.jar /opt/salsales/app.jar\",\
-\"sudo chown ec2-user:ec2-user /opt/salsales/app.jar\",\
-\"bash /opt/salsales/load-env.sh\",\
-\"sudo systemctl restart salsales\",\
-\"sleep 8\",\
-\"curl -sf http://127.0.0.1:8080/actuator/health | grep -q UP\"\
-]" \
+            --parameters "$SSM_COMMANDS" \
             --query Command.CommandId --output text)
           echo "SSM CommandId: $COMMAND_ID"
           aws ssm wait command-executed \
