@@ -222,6 +222,8 @@ public class ProductServiceImpl extends BaseService implements ProductService {
         updateExistingProduct(product, request, userId, shop);
         product = productRepository.save(product);
 
+        syncBranchProductVariantsAfterProductUpdate(product);
+
         // Log audit
         logProductUpdate(userId, shopId, product, oldName, oldCategory, oldBarcode);
 
@@ -661,6 +663,76 @@ public class ProductServiceImpl extends BaseService implements ProductService {
                         .branchCostPrice(v.getCostPrice())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Khi chỉnh {@link Product#getVariants()} ở cấp shop, đồng bộ {@link BranchProduct#getVariants()}
+     * trên mọi chi nhánh: giữ tồn/giá biến thể cũ, thêm biến thể mới với tồn 0.
+     */
+    private void syncBranchProductVariantsAfterProductUpdate(Product product) {
+        List<BranchProduct> branchProducts =
+                branchProductRepository.findByProductIdAndDeletedFalse(product.getId());
+        if (branchProducts.isEmpty()) {
+            return;
+        }
+
+        List<ProductVariant> masterVariants = product.getVariants();
+        boolean productHasVariants = masterVariants != null && !masterVariants.isEmpty();
+
+        for (BranchProduct bp : branchProducts) {
+            if (!productHasVariants) {
+                if (bp.getVariants() != null && !bp.getVariants().isEmpty()) {
+                    int sum = bp.getVariants().stream().mapToInt(BranchProductVariant::getQuantity).sum();
+                    bp.setQuantity(sum);
+                    bp.setVariants(null);
+                    branchProductRepository.save(bp);
+                }
+                continue;
+            }
+
+            Map<String, BranchProductVariant> existingById = new LinkedHashMap<>();
+            int legacyQty = bp.getQuantity();
+            if (bp.getVariants() != null) {
+                for (BranchProductVariant v : bp.getVariants()) {
+                    if (StringUtils.hasText(v.getVariantId())) {
+                        existingById.put(v.getVariantId(), v);
+                    }
+                }
+            }
+
+            List<BranchProductVariant> merged = new ArrayList<>();
+            for (ProductVariant pv : masterVariants) {
+                if (!StringUtils.hasText(pv.getVariantId())) {
+                    continue;
+                }
+                BranchProductVariant existing = existingById.get(pv.getVariantId());
+                if (existing != null) {
+                    merged.add(existing);
+                } else {
+                    double variantPrice =
+                            pv.getPrice() > 0 ? pv.getPrice() : bp.getPrice();
+                    double variantCost =
+                            pv.getCostPrice() > 0 ? pv.getCostPrice() : bp.getBranchCostPrice();
+                    merged.add(BranchProductVariant.builder()
+                            .variantId(pv.getVariantId())
+                            .quantity(0)
+                            .price(variantPrice)
+                            .branchCostPrice(variantCost)
+                            .build());
+                }
+            }
+
+            if (existingById.isEmpty()
+                    && merged.stream().mapToInt(BranchProductVariant::getQuantity).sum() == 0
+                    && legacyQty > 0
+                    && merged.size() == 1) {
+                merged.get(0).setQuantity(legacyQty);
+            }
+
+            bp.setVariants(merged);
+            bp.setQuantity(merged.stream().mapToInt(BranchProductVariant::getQuantity).sum());
+            branchProductRepository.save(bp);
+        }
     }
 
     private List<BranchProduct> createBranchProducts(Shop shop, Product product, List<String> branchIds) {
