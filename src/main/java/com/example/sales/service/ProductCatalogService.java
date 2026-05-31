@@ -1,5 +1,7 @@
 package com.example.sales.service;
 
+import com.example.sales.dto.product.ProductCatalogBulkImportResponse;
+import com.example.sales.dto.product.ProductCatalogOffBrowsePageResponse;
 import com.example.sales.dto.product.ProductCatalogUpsertRequest;
 import com.example.sales.dto.product.ProductCatalogResponse;
 import org.springframework.data.domain.Page;
@@ -39,5 +41,9 @@ public interface ProductCatalogService {
      * Xoá một entry catalog theo id. Gọi từ admin UI.
      */
     void deleteById(String id);
+
+    ProductCatalogOffBrowsePageResponse browseOpenFoodFactsVietnam(int page, int pageSize);
+
+    ProductCatalogBulkImportResponse bulkUpsertFromAdmin(List<ProductCatalogUpsertRequest> requests);
 }
 

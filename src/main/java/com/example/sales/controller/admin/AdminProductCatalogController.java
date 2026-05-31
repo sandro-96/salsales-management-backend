@@ -3,6 +3,9 @@ package com.example.sales.controller.admin;
 import com.example.sales.constant.AdminPermission;
 import com.example.sales.constant.ApiCode;
 import com.example.sales.dto.ApiResponseDto;
+import com.example.sales.dto.product.ProductCatalogBulkImportRequest;
+import com.example.sales.dto.product.ProductCatalogBulkImportResponse;
+import com.example.sales.dto.product.ProductCatalogOffBrowsePageResponse;
 import com.example.sales.dto.product.ProductCatalogResponse;
 import com.example.sales.dto.product.ProductCatalogUpsertRequest;
 import com.example.sales.security.Audited;
@@ -20,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -67,5 +71,29 @@ public class AdminProductCatalogController {
     public ApiResponseDto<Void> delete(@PathVariable String id) {
         productCatalogService.deleteById(id);
         return ApiResponseDto.success(ApiCode.CATALOG_DELETED, null);
+    }
+
+    @GetMapping("/sources/open-food-facts/vietnam")
+    @Operation(summary = "Duyệt sản phẩm gắn tag Việt Nam trên Open Food Facts (phân trang)")
+    @RequireAdminPermission(AdminPermission.CATALOG_MANAGE)
+    public ApiResponseDto<ProductCatalogOffBrowsePageResponse> browseOpenFoodFactsVietnam(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(name = "page_size", defaultValue = "24") int pageSize
+    ) {
+        ProductCatalogOffBrowsePageResponse result =
+                productCatalogService.browseOpenFoodFactsVietnam(page, pageSize);
+        return ApiResponseDto.success(ApiCode.CATALOG_OFF_BROWSE_OK, result);
+    }
+
+    @PostMapping("/bulk")
+    @Operation(summary = "Nhập hàng loạt các mục catalog đã chọn")
+    @RequireAdminPermission(AdminPermission.CATALOG_MANAGE)
+    @Audited(resource = "CATALOG", action = "BULK_IMPORT")
+    public ApiResponseDto<ProductCatalogBulkImportResponse> bulkImport(
+            @Valid @RequestBody ProductCatalogBulkImportRequest request
+    ) {
+        ProductCatalogBulkImportResponse result =
+                productCatalogService.bulkUpsertFromAdmin(request.getItems());
+        return ApiResponseDto.success(ApiCode.CATALOG_BULK_IMPORTED, result);
     }
 }

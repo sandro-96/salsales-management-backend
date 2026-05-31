@@ -6,6 +6,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -13,6 +15,8 @@ import java.util.regex.Pattern;
 public interface ProductCatalogRepository extends MongoRepository<ProductCatalog, String> {
 
     Optional<ProductCatalog> findByBarcode(String barcode);
+
+    List<ProductCatalog> findByBarcodeIn(Collection<String> barcodes);
 
     Page<ProductCatalog> findByNameRegex(Pattern pattern, Pageable pageable);
 }

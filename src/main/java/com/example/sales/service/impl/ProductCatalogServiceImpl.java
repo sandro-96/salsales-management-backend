@@ -1,14 +1,20 @@
 package com.example.sales.service.impl;
 
 import com.example.sales.constant.ApiCode;
+import com.example.sales.dto.product.ProductCatalogBulkImportResponse;
+import com.example.sales.dto.product.ProductCatalogOffBrowseItem;
+import com.example.sales.dto.product.ProductCatalogOffBrowsePageResponse;
 import com.example.sales.dto.product.ProductCatalogResponse;
 import com.example.sales.dto.product.ProductCatalogUpsertRequest;
 import com.example.sales.exception.BusinessException;
+import com.example.sales.integration.openfoodfacts.OpenFoodFactsCatalogMapper;
+import com.example.sales.integration.openfoodfacts.OpenFoodFactsClient;
 import com.example.sales.model.ProductCatalog;
 import com.example.sales.repository.ProductCatalogRepository;
 import com.example.sales.service.ProductCatalogService;
 import com.example.sales.util.CategoryUtils;
 import com.example.sales.util.GtinBarcodeValidator;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -21,17 +27,25 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ProductCatalogServiceImpl implements ProductCatalogService {
 
+    private static final String OFF_SOURCE = "open-food-facts";
+    private static final String VIETNAM_TAG = "en:vietnam";
+
     private final ProductCatalogRepository productCatalogRepository;
     private final MongoTemplate mongoTemplate;
+    private final OpenFoodFactsClient openFoodFactsClient;
 
     @Override
     public ProductCatalogResponse upsertFromAdmin(ProductCatalogUpsertRequest request) {
@@ -116,6 +130,99 @@ public class ProductCatalogServiceImpl implements ProductCatalogService {
         );
         List<ProductCatalogResponse> items = rows.stream().map(this::mapToResponse).toList();
         return new PageImpl<>(items, pageable, total);
+    }
+
+    @Override
+    public ProductCatalogOffBrowsePageResponse browseOpenFoodFactsVietnam(int page, int pageSize) {
+        JsonNode root = openFoodFactsClient.searchVietnamProducts(page, pageSize)
+                .orElseThrow(() -> new BusinessException(ApiCode.OFF_UNAVAILABLE));
+
+        List<ProductCatalogOffBrowseItem> items = new ArrayList<>();
+        Set<String> barcodesForLookup = new HashSet<>();
+        for (JsonNode product : root.path("products")) {
+            ProductCatalogOffBrowseItem item = OpenFoodFactsCatalogMapper.toBrowseItem(product);
+            if (item == null) {
+                continue;
+            }
+            try {
+                String normalized = GtinBarcodeValidator.resolveForProductSave(item.getBarcode());
+                item.setBarcode(normalized);
+            } catch (BusinessException ex) {
+                continue;
+            }
+            items.add(item);
+            barcodesForLookup.add(item.getBarcode());
+            barcodesForLookup.addAll(GtinBarcodeValidator.catalogLookupCandidates(item.getBarcode()));
+        }
+
+        if (!barcodesForLookup.isEmpty()) {
+            Set<String> existingExpanded = new HashSet<>();
+            for (ProductCatalog row : productCatalogRepository.findByBarcodeIn(barcodesForLookup)) {
+                existingExpanded.add(row.getBarcode());
+                existingExpanded.addAll(GtinBarcodeValidator.catalogLookupCandidates(row.getBarcode()));
+            }
+            for (ProductCatalogOffBrowseItem item : items) {
+                boolean inCatalog = GtinBarcodeValidator.catalogLookupCandidates(item.getBarcode())
+                        .stream()
+                        .anyMatch(existingExpanded::contains);
+                item.setAlreadyInCatalog(inCatalog);
+            }
+        }
+
+        long total = root.path("count").asLong(items.size());
+        return ProductCatalogOffBrowsePageResponse.builder()
+                .items(items)
+                .page(Math.max(1, page))
+                .pageSize(Math.min(Math.max(pageSize, 1), 50))
+                .totalCount(total)
+                .source(OFF_SOURCE)
+                .countryTag(VIETNAM_TAG)
+                .build();
+    }
+
+    @Override
+    public ProductCatalogBulkImportResponse bulkUpsertFromAdmin(List<ProductCatalogUpsertRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return ProductCatalogBulkImportResponse.builder()
+                    .imported(0)
+                    .failed(0)
+                    .errors(List.of())
+                    .build();
+        }
+        int imported = 0;
+        int failed = 0;
+        List<String> errors = new ArrayList<>();
+        int maxErrors = 15;
+        for (ProductCatalogUpsertRequest req : requests) {
+            if (req == null || !StringUtils.hasText(req.getName())) {
+                failed++;
+                if (errors.size() < maxErrors) {
+                    errors.add("Thiếu tên sản phẩm");
+                }
+                continue;
+            }
+            try {
+                upsertFromAdmin(req);
+                imported++;
+            } catch (BusinessException ex) {
+                failed++;
+                if (errors.size() < maxErrors) {
+                    String code = req.getBarcode() != null ? req.getBarcode() : "?";
+                    errors.add(code + ": " + ex.getMessage());
+                }
+            } catch (Exception ex) {
+                failed++;
+                if (errors.size() < maxErrors) {
+                    errors.add("Lỗi không xác định");
+                }
+                log.warn("Bulk catalog import row failed: {}", ex.getMessage());
+            }
+        }
+        return ProductCatalogBulkImportResponse.builder()
+                .imported(imported)
+                .failed(failed)
+                .errors(errors)
+                .build();
     }
 
     @Override
